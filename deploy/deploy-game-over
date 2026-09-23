@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 022
+
+[[ "${EUID}" -eq 0 ]] || { echo 'Run as root via the restricted sudo rule.' >&2; exit 2; }
+
+[[ $# -eq 2 ]] || { echo 'Usage: deploy-game-over COMMIT_SHA SHA256' >&2; exit 2; }
+commit_sha="$1"
+expected_digest="$2"
+[[ "${commit_sha}" =~ ^[0-9a-f]{40}$ ]] || exit 2
+[[ "${expected_digest}" =~ ^[0-9a-f]{64}$ ]] || exit 2
+
+incoming="/var/lib/game-over-deploy/incoming/${commit_sha}"
+bundle="${incoming}/release.tar.gz"
+releases=/opt/game-over/releases
+active=/opt/game-over/app
+service=game-over.service
+
+[[ -d "${incoming}" && ! -L "${incoming}" ]] || exit 2
+[[ -f "${bundle}" && ! -L "${bundle}" ]] || exit 2
+[[ "$(sha256sum "${bundle}" | awk '{print $1}')" == "${expected_digest}" ]] || {
+  echo 'Release checksum mismatch.' >&2
+  exit 1
+}
+[[ -d "${releases}" && ! -L "${releases}" ]] || exit 2
+[[ -L "${active}" ]] || { echo 'Active release link is missing.' >&2; exit 2; }
+
+previous="$(readlink -f "${active}")"
+[[ "${previous}" == "${releases}/"* && -d "${previous}" ]] || exit 2
+release="${releases}/${commit_sha}"
+
+if [[ ! -d "${release}" ]]; then
+  staging="$(mktemp -d "${releases}/.release.XXXXXXXX")"
+  trap 'rm -rf -- "${staging}"' EXIT
+  python3 - "${bundle}" "${staging}" <<'PY'
+import pathlib
+import sys
+import tarfile
+
+bundle, destination = sys.argv[1:]
+allowed = {
+    'server.js', 'package.json', 'public/app.js', 'public/favicon.svg',
+    'public/index.html', 'public/styles.css',
+}
+with tarfile.open(bundle, 'r:gz') as archive:
+    members = archive.getmembers()
+    if {member.name for member in members} != allowed or len(members) != len(allowed):
+        raise SystemExit('Unexpected release file list')
+    if any(not member.isfile() or member.size > 2_000_000 for member in members):
+        raise SystemExit('Invalid release file type or size')
+    if sum(member.size for member in members) > 10_000_000:
+        raise SystemExit('Release too large')
+    for member in members:
+        target = pathlib.Path(destination, member.name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.extractfile(member) as source, target.open('xb') as output:
+            while True:
+                chunk = source.read(64 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+        target.chmod(0o644)
+PY
+  chmod 0755 "${staging}" "${staging}/public"
+  /opt/game-over/node/bin/node --check "${staging}/server.js"
+  /opt/game-over/node/bin/node --check "${staging}/public/app.js"
+  chown -R root:root "${staging}"
+  mv -T -- "${staging}" "${release}"
+  trap - EXIT
+fi
+
+same_contents=true
+for file in server.js package.json public/app.js public/favicon.svg public/index.html public/styles.css; do
+  if ! cmp -s -- "${previous}/${file}" "${release}/${file}"; then
+    same_contents=false
+    break
+  fi
+done
+
+next_link="${active}.next"
+[[ ! -e "${next_link}" && ! -L "${next_link}" ]] || exit 2
+ln -s -- "${release}" "${next_link}"
+mv -Tf -- "${next_link}" "${active}"
+
+if [[ "${same_contents}" == true ]] && systemctl is-active --quiet "${service}"; then
+  if curl --fail --silent --show-error --max-time 2 \
+      http://127.0.0.1:8889/api/health \
+      | python3 -c 'import json,sys; assert json.load(sys.stdin)["ok"] is True' 2>/dev/null; then
+    printf 'Activated %s; application files are unchanged, so no restart was needed.\n' "${commit_sha}"
+    exit 0
+  fi
+fi
+
+health_ok=false
+if systemctl restart "${service}"; then
+  for _ in {1..12}; do
+    if systemctl is-active --quiet "${service}" \
+      && curl --fail --silent --show-error --max-time 2 \
+        http://127.0.0.1:8889/api/health \
+        | python3 -c 'import json,sys; assert json.load(sys.stdin)["ok"] is True' 2>/dev/null; then
+      health_ok=true
+      break
+    fi
+    sleep 1
+  done
+fi
+
+if [[ "${health_ok}" != true ]]; then
+  echo 'Health check failed; restoring previous release.' >&2
+  ln -s -- "${previous}" "${next_link}"
+  mv -Tf -- "${next_link}" "${active}"
+  systemctl restart "${service}" || true
+  exit 1
+fi
+
+printf 'Activated %s\n' "${commit_sha}"

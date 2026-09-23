@@ -68,3 +68,11 @@ npm start
 ## 运行与数据
 
 房间、筹码和牌局暂存在服务进程内存中；关闭或重启服务后会清空。页面会保存本机使用过的房间身份，刷新后可重新连接仍在运行的房间。
+
+## CI/CD 与线上部署
+
+`.github/workflows/ci.yml` 在 Pull Request 和 `main` 更新时检查 JavaScript 语法，并运行真实 HTTP 冒烟测试（健康检查、首页、建房、六人加入和满员限制）。只有 `main` 的检查通过后，才会把同一次检查的代码打成带 SHA-256 校验的发布包，上传到服务器并检查线上健康状态。手动运行工作流只执行检查，不部署。
+
+生产服务运行在 `43.108.47.201:8889`，systemd 服务名为 `game-over.service`。发布使用专门的 `game-over-deploy` SSH 账号；GitHub 仓库的 Actions secret `PROD_SSH_PRIVATE_KEY` 存放该账号的私钥。服务器上由 root 安装的 `deploy/deploy-game-over` 脚本负责校验发布包、切换版本和失败回退。服务器 SSH 主机公钥固定在 `deploy/known_hosts`，无需关闭主机身份检查。
+
+修改 `main` 上的应用代码会触发服务重启。**当前房间、牌局和筹码在内存中，重启后会清空**。只修改 CI、文档或测试，且发布包里的应用文件未变时，部署不会重启服务。上线前请先让玩家结束当前牌局。
