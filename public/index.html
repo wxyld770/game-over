@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b1718" />
+    <meta name="description" content="和朋友一起玩 21 点。每人 1000 虚拟筹码起步，下注挑战庄家，先到 10000 筹码获胜。" />
+    <title>21 点 · 朋友牌桌</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand" aria-label="21 点朋友牌桌">
+          <span class="brand-mark">21</span>
+          <span class="brand-name">朋友牌桌</span>
+        </div>
+        <div class="topbar-right">
+          <span id="connectionStatus" class="connection-status" hidden><i></i>连接中</span>
+          <span class="eyebrow">BLACKJACK · PRIVATE TABLE</span>
+        </div>
+      </header>
+
+      <main>
+        <section id="setupView" class="setup-view" aria-labelledby="setupTitle">
+          <div class="setup-copy">
+            <span class="section-kicker"><span class="kicker-line"></span> 即开即玩 · 1–6 人</span>
+            <h1 id="setupTitle">今晚，<br /><em>来一局 21 点。</em></h1>
+            <p>开一张私人牌桌，发链接叫上朋友。每人带着 1,000 虚拟筹码入场，下注挑战庄家，谁先攒到 10,000，谁就赢下这桌。</p>
+            <div class="setup-notes">
+              <span><b>01</b> 创建或加入房间</span>
+              <span><b>02</b> 下注、要牌或停牌</span>
+              <span><b>03</b> 先到 10,000 筹码</span>
+            </div>
+            <button id="openRulesSetup" class="rules-link" type="button">查看完整规则 <span aria-hidden="true">↗</span></button>
+          </div>
+          <div class="entry-stack">
+            <form id="createForm" class="entry-card">
+              <div class="entry-heading">
+                <span class="entry-icon" aria-hidden="true">✦</span>
+                <div>
+                  <h2>创建房间</h2>
+                  <p>先开桌，朋友稍后加入</p>
+                </div>
+              </div>
+              <label for="createName">你的昵称</label>
+              <input id="createName" name="name" type="text" maxlength="16" autocomplete="nickname" placeholder="输入昵称" required />
+              <button class="button button-primary" type="submit">开一桌 <span aria-hidden="true">↗</span></button>
+            </form>
+            <form id="joinForm" class="entry-card entry-card-secondary">
+              <div class="entry-heading">
+                <span class="entry-icon entry-icon-outline" aria-hidden="true">↳</span>
+                <div>
+                  <h2>加入朋友的房间</h2>
+                  <p>输入房间码，就能坐下</p>
+                </div>
+              </div>
+              <div class="join-inputs">
+                <div>
+                  <label for="joinCode">房间码</label>
+                  <input id="joinCode" name="code" type="text" maxlength="6" inputmode="latin" autocapitalize="characters" autocomplete="off" placeholder="例如 AB12CD" required />
+                </div>
+                <div>
+                  <label for="joinName">你的昵称</label>
+                  <input id="joinName" name="name" type="text" maxlength="16" autocomplete="nickname" placeholder="输入昵称" required />
+                </div>
+              </div>
+              <button class="button button-outline" type="submit">加入牌桌 <span aria-hidden="true">→</span></button>
+            </form>
+          </div>
+        </section>
+
+        <section id="gameView" class="game-view" hidden aria-label="21 点牌桌">
+          <div class="room-bar">
+            <div class="room-identity">
+              <span class="section-kicker">私人牌桌</span>
+              <div class="room-code-line">房间 <strong id="roomCode">------</strong> <button id="copyInvite" class="icon-button" type="button" aria-label="复制邀请链接" title="复制邀请链接">⧉</button></div>
+            </div>
+            <div class="room-meta"><span id="roundLabel">等待开局</span><span class="meta-divider"></span><span id="playerCountLabel">1 / 6 人</span><span id="timerBadge" class="timer-badge" hidden></span><button id="leaveButton" class="leave-button" type="button">退出牌桌</button></div>
+          </div>
+
+          <div class="game-layout">
+            <div class="table-wrap">
+              <div class="table-surface">
+                <div class="table-rim" aria-hidden="true"></div>
+                <div class="table-inner">
+                  <div class="table-topline"><span>BLACKJACK</span><span>21</span><span>FRIENDS TABLE</span></div>
+
+                  <div id="lobbyStage" class="stage lobby-stage">
+                    <div class="stage-symbol" aria-hidden="true">♠</div>
+                    <span class="section-kicker">座位已准备好</span>
+                    <h1>等朋友上桌</h1>
+                    <p>把房间码或邀请链接发给同一网络的朋友。每人从 1,000 筹码起步，先到 10,000 筹码获胜；也可以先独自练习。</p>
+                    <div id="lobbySeats" class="lobby-seats" aria-label="房间玩家"></div>
+                    <div class="stage-actions">
+                      <button id="startButton" class="button button-primary" type="button" hidden>开始游戏 <span aria-hidden="true">→</span></button>
+                      <span id="hostHint" class="subtle" hidden>等待房主开始游戏</span>
+                    </div>
+                  </div>
+
+                  <div id="bettingStage" class="stage betting-stage" hidden>
+                    <div class="betting-intro">
+                      <span class="section-kicker">筹码挑战 · 本局下注</span>
+                      <h1>准备好押这一手？</h1>
+                      <p>所有人下注后立即发牌。倒计时结束，仍在线但未下注的玩家会自动押最低额。</p>
+                    </div>
+                    <div class="betting-panel">
+                      <div class="betting-bankroll"><span>你的当前本金</span><strong id="betBankroll">1,000 <small>筹码</small></strong></div>
+                      <form id="betForm" class="bet-form">
+                        <label for="betAmount">本局下注</label>
+                        <div class="bet-input-wrap"><span aria-hidden="true">◆</span><input id="betAmount" name="amount" type="number" inputmode="numeric" step="1" min="1" required aria-describedby="betLimits" /><span>筹码</span></div>
+                        <div id="betPresets" class="bet-presets" role="group" aria-label="快捷下注">
+                          <button type="button" data-bet="50">50</button><button type="button" data-bet="100">100</button><button type="button" data-bet="250">250</button><button type="button" data-bet="500">500</button><button type="button" data-bet="all">全押</button>
+                        </div>
+                        <p id="betLimits" class="bet-limits">最低 50 筹码，不能超过当前本金。</p>
+                        <button id="betButton" class="button button-primary" type="submit">确认下注 <span aria-hidden="true">→</span></button>
+                      </form>
+                      <div id="betStatus" class="bet-status" hidden></div>
+                    </div>
+                  </div>
+
+                  <div id="playStage" class="stage play-stage" hidden>
+                    <div class="dealer-area">
+                      <div class="hand-heading"><span>庄家</span><span id="dealerTotal" class="total-pill">? 点</span></div>
+                      <div id="dealerCards" class="cards" aria-label="庄家的牌"></div>
+                    </div>
+                    <div class="table-center">
+                      <div class="center-rule" aria-hidden="true"></div>
+                      <div id="centerMessage" class="center-message">轮到你决定</div>
+                      <div class="center-rule" aria-hidden="true"></div>
+                    </div>
+                    <div class="player-area">
+                      <div class="hand-heading"><span>你的手牌</span><span id="selfTotal" class="total-pill total-pill-player">0 点</span></div>
+                      <div id="selfCards" class="cards cards-player" aria-label="你的牌"></div>
+                      <div id="selfOutcome" class="self-outcome" aria-live="polite"></div>
+                    </div>
+                    <div class="stake-strip"><span>当前本金 <strong id="selfBankroll">1,000</strong></span><span class="stake-divider"></span><span>本局押注 <strong id="selfWager">0</strong></span></div>
+                    <div class="table-actions">
+                      <button id="hitButton" class="button button-primary action-button" type="button">再要一张 <span aria-hidden="true">＋</span></button>
+                      <button id="standButton" class="button button-outline action-button" type="button">停牌 <span aria-hidden="true">■</span></button>
+                      <button id="doubleButton" class="button button-outline action-button" type="button">加倍 <span aria-hidden="true">×2</span></button>
+                      <button id="nextButton" class="button button-primary action-button" type="button" hidden>下一局 <span aria-hidden="true">→</span></button>
+                      <span id="waitingText" class="waiting-text" hidden>等待其他玩家完成本局…</span>
+                    </div>
+                  </div>
+
+                  <div id="finishedStage" class="stage finished-stage" hidden>
+                    <span class="section-kicker">筹码挑战结束</span>
+                    <div class="stage-symbol trophy" aria-hidden="true">✦</div>
+                    <h1 id="finishedTitle">本桌战绩</h1>
+                    <p id="finishedMessage" class="finished-message"></p>
+                    <p id="finalRoundNote" class="final-round-note" hidden></p>
+                    <div id="finalRanking" class="final-ranking"></div>
+                    <button id="reviewFinalHand" class="button button-outline" type="button" hidden>回看最后一局 <span aria-hidden="true">↶</span></button>
+                    <button id="restartButton" class="button button-primary" type="button" hidden>重新挑战 <span aria-hidden="true">→</span></button>
+                    <span id="finishedHint" class="subtle" hidden>等待房主开启下一场</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="sidebar">
+              <div class="side-card players-card">
+                <div class="side-heading"><h2>本桌玩家</h2><span id="playersBadge" class="badge">1 / 6</span></div>
+                <div id="playersList" class="players-list"></div>
+              </div>
+              <div class="side-card rules-card">
+                <div class="side-heading"><h2>玩法速览</h2><span class="tiny-symbol">♣</span></div>
+                <ol>
+                  <li>每人从 1,000 筹码起步，每局先下注。</li>
+                  <li>起手两张牌，继续要牌、停牌，或加倍后只拿一张。</li>
+                  <li>与庄家分别比点数，胜负决定筹码增减。</li>
+                  <li>先到 10,000 筹码，赢下整场挑战。</li>
+                </ol>
+                <button id="openRulesGame" class="rules-link rules-link-side" type="button">完整规则 <span aria-hidden="true">↗</span></button>
+              </div>
+              <div class="side-foot">A 可算 1 或 11 点 · J / Q / K 算 10 点</div>
+            </aside>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer"><span>21 点 · 朋友牌桌</span><span>虚拟筹码 · 不涉及真实货币</span></footer>
+    </div>
+    <dialog id="rulesDialog" class="rules-dialog" aria-labelledby="rulesTitle">
+      <div class="rules-dialog-header"><div><span class="section-kicker">BLACKJACK · TABLE RULES</span><h2 id="rulesTitle">21 点完整规则</h2></div><button id="closeRules" class="rules-close" type="button" aria-label="关闭规则">×</button></div>
+      <div class="rules-dialog-body">
+        <section><h3>目标与入场</h3><p>支持 2–6 人同桌，也可独自练习。每位玩家开场拥有 <strong>1,000 虚拟筹码</strong>。每局都与庄家单独比较牌点，持续进行多局；有人达到 <strong>10,000 筹码</strong>时，整场挑战结束。</p></section>
+        <section><h3>下注与发牌</h3><p>每局先下注，金额须是整数且不超过当前本金。最低下注 <strong>50 筹码</strong>；本金不足 50 时，下注全部剩余本金。下注限时 <strong>30 秒</strong>，仍在线却未操作的玩家会自动押最低额；离线超过 30 秒的玩家本局旁观，不会被扣筹码。完成下注后，每位下注玩家和庄家各拿两张牌；庄家先亮一张、盖一张。牌来自六副牌组成的牌靴，余牌不足时重新洗牌。筹码为 0 的玩家只能旁观。</p></section>
+        <section><h3>牌点与操作</h3><p>数字牌按牌面计点，J、Q、K 均为 10 点；A 可算 1 或 11 点，系统自动取不超过 21 的较高点数。起手两张牌恰好 21 点称为<strong>自然 Blackjack</strong>。你可以「要牌」再拿一张，或「停牌」保留当前点数；超过 21 点即爆牌。只有起手两张牌时可以「加倍」：把本局赌注翻倍，再拿<strong>恰好一张</strong>牌并自动停牌；本金须足够覆盖翻倍赌注。拿到 21 点会自动停牌。玩家的操作限时 <strong>75 秒</strong>，到时仍未决定则自动停牌。</p></section>
+        <section><h3>庄家与结算</h3><p>所有玩家结束操作后，庄家翻开暗牌并按固定规则补牌：低于 17 点继续要牌，达到 17 点或以上停牌，<strong>软 17</strong>（含按 11 点计算的 A）也停牌。你爆牌则输；庄家爆牌而你未爆牌则赢。未爆牌时，点数高于庄家为赢，低于庄家为输，相同为平局。自然 Blackjack 胜过庄家普通的 21 点；双方都是自然 Blackjack 则平局，庄家自然 Blackjack 胜过玩家普通的 21 点。</p><p>普通赢局净赚<strong>下注额的 1 倍</strong>；自然 Blackjack 赢局净赚<strong>下注额的 1.5 倍，向下取整</strong>；平局退回下注、净变化为 0；输局（包括爆牌）损失下注额。页面的「当前本金」在结算时按净赢亏更新。</p></section>
+        <section><h3>整场胜负与其他约定</h3><p>某局结束后，只要有玩家达到 10,000 筹码，整场立即结束。同局多人达标时，以<strong>结算后本金最高</strong>者为冠军；最高额并列则共享冠军。若全员筹码归零，则无人获胜。游戏中途加入的玩家从下一局开始下注；筹码归零的玩家可旁观直到下场挑战。新挑战开始时所有玩家重新从 1,000 筹码起步。本玩法不提供分牌、保险或投降。</p></section>
+        <p class="rules-disclaimer">所有筹码仅用于娱乐，不是真实货币，不能购买、提现或兑换。</p>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>
