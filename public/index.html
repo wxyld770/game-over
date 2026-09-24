@@ -151,7 +151,6 @@
                       <button id="hitButton" class="button button-primary action-button" type="button">再要一张 <span aria-hidden="true">＋</span></button>
                       <button id="standButton" class="button button-outline action-button" type="button">停牌 <span aria-hidden="true">■</span></button>
                       <button id="doubleButton" class="button button-outline action-button" type="button">加倍 <span aria-hidden="true">×2</span></button>
-                      <button id="dealButton" class="button button-primary action-button" type="button" hidden>发牌 <span aria-hidden="true">→</span></button>
                       <button id="nextButton" class="button button-primary action-button" type="button" hidden>下一局 <span aria-hidden="true">→</span></button>
                       <span id="waitingText" class="waiting-text" hidden>等待其他玩家完成本局…</span>
                     </div>
@@ -189,7 +188,7 @@
                 <div class="side-heading"><h2>玩法速览</h2><span class="tiny-symbol">♣</span></div>
                 <ol>
                   <li>每人从 1,000 筹码起步，每局先下注。</li>
-                  <li>逐张发牌；加倍后再点“发牌”，只补一张。</li>
+                  <li>逐张发牌；加倍会立即补一张并自动停牌。</li>
                   <li>与庄家分别比点数，胜负决定筹码增减。</li>
                   <li id="quickGoalRule">最先达到本场目标筹码，赢下挑战。</li>
                 </ol>
@@ -208,8 +207,8 @@
       <div class="rules-dialog-body">
         <section><h3>目标与入场</h3><p>支持 2–6 人同桌，也可独自练习。每位玩家开场拥有 <strong>1,000 虚拟筹码</strong>。开局前由玩家选择目标挑战或无尽模式。目标挑战以<strong>最先达到所设筹码</strong>者获胜，默认目标为 10,000 筹码。无尽模式整场限时 <strong>10 分钟</strong>，时间到按剩余筹码排名；多人场若提前只剩一人有筹码，该玩家直接获胜。单人场筹码用尽即结束。</p></section>
         <section><h3>下注与发牌</h3><p>每局先下注，金额须是整数且不超过当前本金。最低下注 <strong>50 筹码</strong>；本金不足 50 时，下注全部剩余本金。下注限时 <strong>15 秒</strong>，仍在线却未操作的玩家会自动押最低额；离线玩家本局旁观，不会被扣筹码。完成下注后，牌会逐张发出；每位下注玩家和庄家各拿两张，庄家先亮一张、盖一张。牌来自六副牌组成的牌靴，余牌不足时重新洗牌。筹码为 0 的玩家只能旁观。</p></section>
-        <section><h3>牌点与操作</h3><p>数字牌按牌面计点，J、Q、K 均为 10 点；A 可算 1 或 11 点，系统自动取不超过 21 的较高点数。起手两张牌恰好 21 点称为<strong>自然 Blackjack</strong>。你可以「要牌」再拿一张，或「停牌」保留当前点数；超过 21 点即爆牌。只有起手两张牌时可以「加倍」：先把本局赌注翻倍，加倍按钮随即消失；再点<strong>“发牌”</strong>拿恰好一张牌并自动停牌，本金须足够覆盖翻倍赌注。拿到 21 点会自动停牌。操作限时 <strong>15 秒</strong>，到时普通手牌自动停牌，加倍中的手牌自动补一张。</p></section>
-        <section><h3>庄家与结算</h3><p>所有玩家结束操作后，庄家翻开暗牌并按固定规则补牌：低于 17 点继续要牌，达到 17 点或以上停牌，<strong>软 17</strong>（含按 11 点计算的 A）也停牌。你爆牌则输；庄家爆牌而你未爆牌则赢。未爆牌时，点数高于庄家为赢，低于庄家为输，相同为平局。自然 Blackjack 胜过庄家普通的 21 点；双方都是自然 Blackjack 也是平局，庄家自然 Blackjack 胜过玩家普通的 21 点。</p><p>普通赢局净赚<strong>下注额的 1 倍</strong>；自然 Blackjack 赢局净赚<strong>下注额的 1.5 倍，向下取整</strong>；平局损失<strong>下注额的一半，向上取整</strong>；输局（包括爆牌）损失全部下注。页面的「当前本金」在结算时按净赢亏更新。</p></section>
+        <section><h3>牌点与操作</h3><p>数字牌按牌面计点，J、Q、K 均为 10 点；A 可算 1 或 11 点，系统自动取不超过 21 的较高点数。起手两张牌恰好 21 点称为<strong>自然 Blackjack</strong>。你可以「要牌」再拿一张，或「停牌」保留当前点数；超过 21 点即爆牌。只有起手两张牌时可以「加倍」：本局赌注立即翻倍、补恰好一张牌并自动停牌，本金须足够覆盖翻倍赌注。拿到 21 点会自动停牌。操作限时 <strong>15 秒</strong>，到时仍可操作的手牌自动停牌。</p></section>
+        <section><h3>庄家与结算</h3><p>所有玩家结束操作后，庄家稍作停顿再翻开暗牌，并按固定规则逐张补牌：低于 17 点继续要牌，达到 17 点或以上停牌，<strong>软 17</strong>（含按 11 点计算的 A）也停牌。你爆牌则输；庄家爆牌而你未爆牌则赢。未爆牌时，点数高于庄家为赢，低于庄家为输，相同为平局。自然 Blackjack 胜过庄家普通的 21 点；双方都是自然 Blackjack 也是平局，庄家自然 Blackjack 胜过玩家普通的 21 点。</p><p>普通赢局净赚<strong>下注额的 1 倍</strong>；自然 Blackjack 赢局净赚<strong>下注额的 1.5 倍，向下取整</strong>；平局损失<strong>下注额的一半，向上取整</strong>；输局（包括爆牌）损失全部下注。页面的「当前本金」在结算时按净赢亏更新。</p></section>
         <section><h3>下一局与整场胜负</h3><p>本局结算后，<strong>所有在线玩家</strong>都点“准备下一局”便会自动开始下一局；游戏中不需要房主逐局推进。目标挑战中，达到目标者获胜；同局多人达标时，结算后筹码最高者为冠军，最高额并列则共享冠军。无尽模式在 10 分钟结束时按筹码排名，最高额并列共享冠军。多人场若只剩一人有筹码，该玩家提前获胜；若无人还有筹码，则无人获胜。中途加入的玩家从下一局开始下注。新挑战开始时所有玩家重新从 1,000 筹码起步。本玩法不提供分牌、保险或投降。</p></section>
         <p class="rules-disclaimer">所有筹码仅用于娱乐，不是真实货币，不能购买、提现或兑换。</p>
       </div>

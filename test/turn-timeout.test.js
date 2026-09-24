@@ -2,15 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-// This separate test process accelerates the normal 15-second turn deadline.
+// Accelerate the normal 15-second decision window and 1-second dealer pause.
 process.env.DEAL_MS = '40';
-process.env.TURN_MS = '1500';
+process.env.TURN_MS = '500';
+process.env.DEALER_PAUSE_MS = '500';
 const repoRoot = process.env.GAME_OVER_ROOT || path.resolve(__dirname, '..');
 const { server, testing } = require(path.join(repoRoot, 'server.js'));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-test('an unclaimed doubled hand receives its one card at the turn deadline', { timeout: 8_000 }, async (t) => {
+test('a timed-out hand auto-stands, then waits before the dealer reveals and draws', { timeout: 8_000 }, async (t) => {
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -18,7 +19,7 @@ test('an unclaimed doubled hand receives its one card at the turn deadline', { t
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const { room, player } = testing.createRoom('Timer');
   t.after(async () => {
-    for (const key of ['roundTimer', 'dealTimer', 'matchTimer', 'resultsTimer', 'hostTransferTimer']) {
+    for (const key of ['roundTimer', 'dealTimer', 'dealerTimer', 'matchTimer', 'resultsTimer']) {
       clearTimeout(room[key]);
     }
     await new Promise((resolve) => server.close(resolve));
@@ -41,29 +42,34 @@ test('an unclaimed doubled hand receives its one card at the turn deadline', { t
     return response.json();
   }
 
+  async function waitFor(phase) {
+    const until = Date.now() + 3_000;
+    while (Date.now() < until) {
+      const current = await state();
+      if (current.phase === phase) return current;
+      await sleep(10);
+    }
+    assert.fail(`room did not reach ${phase}; current phase: ${(await state()).phase}`);
+  }
+
   await action('start');
-  // Player 5+5=10, dealer 8+8=16, automatic double card 9 -> 19.
+  // Player 10+8=18; dealer 6+8+3=17.
   room.shoe = Array.from({ length: 100 }, () => ({ rank: '2', suit: '♣' }))
-    .concat(['5', '8', '5', '8', '9'].map((rank) => ({ rank, suit: '♠' })).reverse());
+    .concat(['10', '6', '8', '8', '3'].map((rank) => ({ rank, suit: '♠' })).reverse());
   await action('bet', { amount: 200 });
-  const dealDeadline = Date.now() + 4_000;
-  while ((await state()).phase === 'dealing' && Date.now() < dealDeadline) await sleep(10);
-  assert.equal((await state()).phase, 'playing');
+  const playing = await waitFor('playing');
+  assert.equal(playing.players[0].status, 'playing');
+  assert.ok(playing.deadlineAt > Date.now());
 
-  const doubled = await action('double');
-  assert.equal(doubled.players[0].wager, 400);
-  assert.equal(doubled.players[0].cardCount, 2);
-  assert.equal(doubled.canDeal, true);
+  const paused = await waitFor('dealer-turn');
+  assert.equal(paused.players[0].status, 'stood');
+  assert.equal(paused.players[0].roundResult, null);
+  assert.equal(paused.dealer.cards.length, 1);
+  assert.equal(paused.dealer.cardCount, 2);
+  assert.equal(paused.deadlineAt, null);
 
-  const turnDeadline = Date.now() + 3_000;
-  let settled;
-  do {
-    settled = await state();
-    if (settled.phase === 'results') break;
-    await sleep(20);
-  } while (Date.now() < turnDeadline);
-  assert.equal(settled.phase, 'results');
-  assert.equal(settled.players[0].cardCount, 3);
-  assert.equal(settled.players[0].wager, 400);
-  assert.equal(settled.players[0].roundResult.delta, 400);
+  const settled = await waitFor('results');
+  assert.equal(settled.dealer.cards.length, 3);
+  assert.equal(settled.dealer.total, 17);
+  assert.equal(settled.players[0].roundResult.delta, 200);
 });

@@ -13,6 +13,7 @@ const MINIMUM_BET = 50;
 const BET_MS = Number(process.env.BET_MS || 15_000);
 const TURN_MS = Number(process.env.TURN_MS || 15_000);
 const DEAL_MS = Number(process.env.DEAL_MS || 2_500);
+const DEALER_PAUSE_MS = Math.max(0, Number(process.env.DEALER_PAUSE_MS ?? 1_000) || 0);
 const MATCH_MS = Number(process.env.MATCH_MS || 10 * 60_000);
 const PRESENCE_GRACE_MS = 10_000;
 const MAX_PLAYERS = 6;
@@ -205,7 +206,7 @@ function makeState(room, viewer) {
       readyNext: player.readyNext,
     };
   });
-  const dealerCards = reveal ? room.dealer.cards : ['dealing', 'playing'].includes(room.phase) ? room.dealer.cards.slice(0, 1) : [];
+  const dealerCards = reveal ? room.dealer.cards : ['dealing', 'playing', 'dealer-turn'].includes(room.phase) ? room.dealer.cards.slice(0, 1) : [];
   const ownStatus = viewer.status;
   return {
     code: room.code,
@@ -231,13 +232,13 @@ function makeState(room, viewer) {
     },
     deadlineAt: room.phase === 'betting' || room.phase === 'playing' ? room.deadlineAt : null,
     dealEndsAt: room.phase === 'dealing' ? room.dealEndsAt : null,
+    dealerTurnEndsAt: room.phase === 'dealer-turn' ? room.dealerTurnEndsAt : null,
     shoeRemaining: room.shoe.length,
     canStart: room.phase === 'lobby' || room.phase === 'finished',
     canBet: room.phase === 'betting' && ownStatus === 'betting',
     canHit: room.phase === 'playing' && ownStatus === 'playing',
     canStand: room.phase === 'playing' && ownStatus === 'playing',
     canDouble: room.phase === 'playing' && ownStatus === 'playing' && viewer.cards.length === 2 && viewer.bankroll >= viewer.wager * 2,
-    canDeal: room.phase === 'playing' && ownStatus === 'doubled',
     canNext: room.phase === 'results' && !viewer.readyNext,
     message: room.message,
   };
@@ -266,6 +267,7 @@ function clearRoundTimer(room) {
   room.roundTimer = null;
   room.deadlineAt = null;
   room.dealEndsAt = null;
+  room.dealerTurnEndsAt = null;
 }
 
 function clearMatchTimer(room) {
@@ -322,7 +324,7 @@ function concludeAfterRound(room) {
 }
 
 function scoreRound(room) {
-  if (room.phase !== 'playing') return;
+  if (room.phase !== 'dealer-turn') return;
   clearRoundTimer(room);
   const eligible = participants(room).filter((player) => handValue(player.cards).total <= 21 && !isBlackjack(player.cards));
   const dealerBlackjack = isBlackjack(room.dealer.cards);
@@ -364,9 +366,22 @@ function scoreRound(room) {
   concludeAfterRound(room);
 }
 
+function beginDealerTurn(room) {
+  if (room.phase !== 'playing') return;
+  clearRoundTimer(room);
+  room.phase = 'dealer-turn';
+  room.message = `第 ${room.round} 局：庄家即将翻开暗牌…`;
+  room.dealerTurnEndsAt = Date.now() + DEALER_PAUSE_MS;
+  room.roundTimer = setTimeout(() => {
+    if (room.phase !== 'dealer-turn') return;
+    scoreRound(room);
+  }, DEALER_PAUSE_MS);
+  broadcast(room);
+}
+
 function finishIfReady(room) {
   if (room.phase !== 'playing') return;
-  if (participants(room).every((player) => player.status !== 'playing' && player.status !== 'doubled')) scoreRound(room);
+  if (participants(room).every((player) => player.status !== 'playing')) beginDealerTurn(room);
   else broadcast(room);
 }
 
@@ -401,14 +416,9 @@ function finishBetting(room) {
 function resolveTimedOutTurns(room) {
   if (room.phase !== 'playing') return;
   for (const player of participants(room)) {
-    if (player.status === 'doubled') {
-      player.cards.push(draw(room));
-      player.status = handValue(player.cards).total > 21 ? 'bust' : 'stood';
-    } else if (player.status === 'playing') {
-      player.status = 'stood';
-    }
+    if (player.status === 'playing') player.status = 'stood';
   }
-  scoreRound(room);
+  beginDealerTurn(room);
 }
 
 function dealRound(room) {
@@ -437,7 +447,7 @@ function dealRound(room) {
     room.dealEndsAt = null;
     room.phase = 'playing';
     if (isBlackjack(room.dealer.cards) || active.every((player) => player.status !== 'playing')) {
-      scoreRound(room);
+      beginDealerTurn(room);
       return;
     }
     if (room.matchExpired || (room.matchDeadlineAt && Date.now() >= room.matchDeadlineAt)) {
@@ -497,7 +507,10 @@ function expireMatch(room) {
   } else if (room.phase === 'playing') {
     resolveTimedOutTurns(room);
   } else if (room.phase === 'dealing') {
-    room.message = '10 分钟已到，本局发牌后将立即结算。';
+    room.message = '10 分钟已到，本局发牌后将进入庄家回合并结算。';
+    broadcast(room);
+  } else if (room.phase === 'dealer-turn') {
+    room.message = '10 分钟已到，庄家翻牌后将结算本局。';
     broadcast(room);
   }
 }
@@ -523,6 +536,7 @@ function createRoom(name) {
     roundTimer: null,
     deadlineAt: null,
     dealEndsAt: null,
+    dealerTurnEndsAt: null,
     matchTimer: null,
     resultsTimer: null,
   };
@@ -616,10 +630,6 @@ function handleAction(room, player, body) {
       return '现在不能加倍';
     }
     player.wager *= 2;
-    player.status = 'doubled';
-    broadcast(room);
-  } else if (action === 'deal') {
-    if (room.phase !== 'playing' || player.status !== 'doubled') return '现在不能发牌';
     player.cards.push(draw(room));
     player.status = handValue(player.cards).total > 21 ? 'bust' : 'stood';
     finishIfReady(room);
@@ -646,7 +656,11 @@ function leaveRoom(room, player) {
   if (wasHost) {
     room.hostId = (room.players.find((seat) => seat.clients.size) || room.players[0]).id;
   }
-  if (room.phase !== 'lobby' && room.phase !== 'finished' && room.players.every((seat) => seat.bankroll === 0)) {
+  // A wager committed in an unfinished hand may still return chips after settlement.
+  const unresolvedWagers = ['betting', 'dealing', 'playing', 'dealer-turn'].includes(room.phase)
+    && room.players.some((seat) => seat.wager > 0);
+  if (room.phase !== 'lobby' && room.phase !== 'finished'
+      && room.players.every((seat) => seat.bankroll === 0) && !unresolvedWagers) {
     finishMatch(room, [], '全员筹码归零，挑战结束。');
     return;
   }
@@ -706,7 +720,7 @@ const server = http.createServer(async (req, res) => {
       if (!room) return fail(res, 404, '房间不存在或已过期');
       if (room.players.length >= MAX_PLAYERS) return fail(res, 409, '房间已满（最多 6 人）');
       const player = makePlayer(name);
-      if (['betting', 'dealing', 'playing'].includes(room.phase)) player.status = 'spectating';
+      if (['betting', 'dealing', 'playing', 'dealer-turn'].includes(room.phase)) player.status = 'spectating';
       room.players.push(player);
       touch(room, player);
       if (room.phase === 'results') checkNextReady(room);

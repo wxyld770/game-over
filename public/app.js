@@ -9,7 +9,7 @@ const elements = {
   hostHint: $('hostHint'), dealerCards: $('dealerCards'), dealerTotal: $('dealerTotal'),
   selfCards: $('selfCards'), selfTotal: $('selfTotal'), selfOutcome: $('selfOutcome'),
   selfBankroll: $('selfBankroll'), selfWager: $('selfWager'), centerMessage: $('centerMessage'),
-  hitButton: $('hitButton'), standButton: $('standButton'), doubleButton: $('doubleButton'), dealButton: $('dealButton'),
+  hitButton: $('hitButton'), standButton: $('standButton'), doubleButton: $('doubleButton'),
   nextButton: $('nextButton'), waitingText: $('waitingText'), playersList: $('playersList'),
   playersBadge: $('playersBadge'), finalRanking: $('finalRanking'), restartButton: $('restartButton'),
   finishedTitle: $('finishedTitle'), finishedMessage: $('finishedMessage'), finishedHint: $('finishedHint'),
@@ -35,6 +35,7 @@ let showFinalSummary = false;
 let restartSettingsForMatch = '';
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const DEAL_STEP_MS = 450;
+const DEALER_STEP_MS = 800;
 const handVisual = { key: '', dealer: [], self: [], dealerTarget: [], selfTarget: [], timer: null };
 const chipFormatter = new Intl.NumberFormat('zh-CN');
 const chips = (amount) => chipFormatter.format(Number(amount) || 0);
@@ -198,7 +199,8 @@ function nextCardStep() {
   if (dealer.length === 0 && dealerTarget.length) return ['dealer', 0, dealerTarget[0], 'deal'];
   if (self.length === 1 && selfTarget.length > 1) return ['self', 1, selfTarget[1], 'deal'];
   if (dealer.length === 1 && dealerTarget.length > 1) return ['dealer', 1, null, 'deal'];
-  for (const side of ['dealer', 'self']) {
+  // Finish any newly drawn player card before revealing the dealer's hidden card.
+  for (const side of ['self', 'dealer']) {
     const current = handVisual[side];
     const target = handVisual[`${side}Target`];
     for (let index = 0; index < Math.min(current.length, target.length); index += 1) {
@@ -244,7 +246,7 @@ function syncHandVisual(dealer, self) {
       handVisual.timer = setTimeout(() => {
         handVisual.timer = null;
         render();
-      }, DEAL_STEP_MS);
+      }, side === 'dealer' && ['results', 'finished'].includes(state.phase) ? DEALER_STEP_MS : DEAL_STEP_MS);
     }
   }
   return !!handVisual.timer || !!nextCardStep();
@@ -262,7 +264,7 @@ function statusText(player, phase) {
   if (player.status === 'eliminated') return '筹码用尽 · 旁观中';
   if (phase === 'betting') return player.status === 'ready' ? '已下注 · 等待发牌' : '选择下注额';
   if (phase === 'finished') return { win: '末局获胜', lose: '末局失利', push: '末局平局扣半' }[player.roundResult?.outcome] || '本场结束';
-  const dictionary = { playing: '考虑中', doubled: '已加倍 · 待发牌', stood: '已停牌', bust: '已爆牌', blackjack: '21 点', waiting: '等待发牌', done: '已完成' };
+  const dictionary = { playing: '考虑中', stood: '已停牌', bust: '已爆牌', blackjack: '21 点', waiting: '等待发牌', done: '已完成' };
   return dictionary[player.status] || '游戏中';
 }
 
@@ -271,16 +273,18 @@ function readySummary(players) {
   return { ready: online.filter((player) => player.readyNext).length, total: online.length };
 }
 
-function renderPlayers(players, phase) {
+function renderPlayers(players, phase, settling = false) {
   const ordered = [...players].sort((a, b) => Number(b.bankroll || 0) - Number(a.bankroll || 0));
   elements.playersBadge.textContent = `${players.length} / 6`;
   elements.playersList.innerHTML = ordered.map((player) => {
     const self = player.id === state.selfId;
-    const wager = player.wager > 0 && ['betting', 'dealing', 'playing', 'results'].includes(phase) ? ` · 押 ${chips(player.wager)}` : '';
+    const wager = player.wager > 0 && ['betting', 'dealing', 'playing', 'dealer-turn', 'results'].includes(phase) ? ` · 押 ${chips(player.wager)}` : '';
+    const displayedBankroll = settling ? player.bankroll - (player.roundResult?.delta || 0) : player.bankroll;
+    const displayedStatus = settling ? '庄家结算中…' : statusText(player, phase);
     return `<div class="player-row ${self ? 'self' : ''}">
       <span class="player-avatar">${escapeHTML((player.name || '?').slice(0, 1))}</span>
-      <span class="player-info"><span class="player-name">${escapeHTML(player.name)}${self ? ' · 你' : ''}</span><span class="player-sub">${escapeHTML(statusText(player, phase))}${wager}</span></span>
-      <span class="player-score"><strong>${chips(player.bankroll)}</strong><small>筹码</small></span>
+      <span class="player-info"><span class="player-name">${escapeHTML(player.name)}${self ? ' · 你' : ''}</span><span class="player-sub">${escapeHTML(displayedStatus)}${wager}</span></span>
+      <span class="player-score"><strong>${chips(displayedBankroll)}</strong><small>筹码</small></span>
     </div>`;
   }).join('');
   elements.lobbySeats.innerHTML = players.map((player) => `<span class="seat"><span class="seat-avatar">${escapeHTML((player.name || '?').slice(0, 1))}</span>${escapeHTML(player.name)}${player.id === state.selfId ? ' · 你' : ''}</span>`).join('');
@@ -351,13 +355,13 @@ function render() {
   const self = players.find((player) => player.id === state.selfId) || null;
   const canReviewFinalHand = phase === 'finished' && !!self?.roundResult && (self?.cards?.length || 0) >= 2 && (state.dealer?.cards?.length || 0) >= 2;
   const reviewingFinalHand = canReviewFinalHand && !showFinalSummary;
-  const showingHand = ['dealing', 'playing', 'results'].includes(phase) || reviewingFinalHand;
+  const showingHand = ['dealing', 'playing', 'dealer-turn', 'results'].includes(phase) || reviewingFinalHand;
   const goalLabel = state.matchMode === 'endless' ? '10 分钟无尽模式' : `目标 ${chips(state.targetBankroll || 10000)}`;
 
   elements.setupView.hidden = true;
   elements.gameView.hidden = false;
   elements.roomCode.textContent = state.code || code;
-  elements.roundLabel.textContent = phase === 'lobby' ? '等待开局' : reviewingFinalHand ? `第 ${state.round} 局 · 最终结算` : phase === 'finished' ? '本场结束' : `第 ${state.round || 1} 局${phase === 'betting' ? ' · 下注' : phase === 'dealing' ? ' · 发牌' : phase === 'results' ? ' · 结算' : ''}`;
+  elements.roundLabel.textContent = phase === 'lobby' ? '等待开局' : reviewingFinalHand ? `第 ${state.round} 局 · 最终结算` : phase === 'finished' ? '本场结束' : `第 ${state.round || 1} 局${phase === 'betting' ? ' · 下注' : phase === 'dealing' ? ' · 发牌' : phase === 'dealer-turn' ? ' · 庄家回合' : phase === 'results' ? ' · 结算' : ''}`;
   elements.matchGoalLabel.hidden = phase === 'lobby';
   elements.matchGoalLabel.textContent = goalLabel;
   elements.playerCountLabel.textContent = `${players.length} / 6 人`;
@@ -365,7 +369,6 @@ function render() {
     ? '无尽模式整场 10 分钟；多人只剩一人有筹码时提前获胜。'
     : `最先达到 ${chips(state.targetBankroll || 10000)} 筹码，赢下本场挑战。`;
   renderTimer();
-  renderPlayers(players, phase);
 
   elements.lobbyStage.hidden = phase !== 'lobby';
   elements.bettingStage.hidden = phase !== 'betting';
@@ -385,37 +388,45 @@ function render() {
     animating = syncHandVisual(dealer, self);
     elements.dealerTotal.textContent = animating || dealer.total == null ? '? 点' : `${dealer.total} 点`;
     elements.selfTotal.textContent = animating || self?.total == null ? '? 点' : `${self.total} 点`;
-    elements.selfBankroll.textContent = chips(self?.bankroll);
+    const settling = animating && (phase === 'results' || reviewingFinalHand);
+    elements.selfBankroll.textContent = chips(settling ? self?.bankroll - (self?.roundResult?.delta || 0) : self?.bankroll);
     elements.selfWager.textContent = chips(self?.wager);
 
     const result = self?.roundResult;
-    elements.selfOutcome.textContent = animating ? '' : roundResultText(self, dealer) || (self?.status === 'bust' ? '爆牌了，等待本局结算' : '');
+    elements.selfOutcome.textContent = animating ? '' : phase === 'dealer-turn'
+      ? (self?.status === 'bust' ? '爆牌了，等待庄家翻牌' : '')
+      : roundResultText(self, dealer) || (self?.status === 'bust' ? '爆牌了，等待本局结算' : '');
     elements.selfOutcome.className = `self-outcome ${result?.outcome === 'win' ? 'win' : result?.outcome === 'lose' ? 'lose' : result?.outcome === 'push' ? 'push' : ''}`;
     const ready = readySummary(players);
-    elements.centerMessage.textContent = animating || phase === 'dealing'
-      ? phase === 'results' || reviewingFinalHand ? '庄家正在揭牌…' : '正在逐张发牌…'
-      : reviewingFinalHand ? '最终局 · 请查看双方手牌与结算原因'
-        : phase === 'results' ? `本局已结算 · ${ready.ready} / ${ready.total} 位在线玩家已准备`
-          : self?.status === 'spectating' ? '下局起加入'
-            : self?.status === 'eliminated' ? '筹码已用完，本局旁观'
-              : self?.status === 'doubled' ? '已加倍 · 请点击发牌'
+    elements.centerMessage.textContent = phase === 'dealer-turn'
+      ? (animating ? '你的手牌正在落定，庄家稍后翻牌…' : '庄家即将翻开暗牌…')
+      : animating || phase === 'dealing'
+        ? phase === 'results' || reviewingFinalHand ? '庄家正在揭牌与补牌…' : '正在逐张发牌…'
+        : reviewingFinalHand ? '最终局 · 请查看双方手牌与结算原因'
+          : phase === 'results' ? `本局已结算 · ${ready.ready} / ${ready.total} 位在线玩家已准备`
+            : self?.status === 'spectating' ? '下局起加入'
+              : self?.status === 'eliminated' ? '筹码已用完，本局旁观'
                 : self?.status === 'bust' ? '超过 21 点'
                   : state.canHit || state.canStand ? '轮到你决定' : '等待其他玩家';
 
     elements.hitButton.hidden = phase !== 'playing' || !state.canHit;
     elements.standButton.hidden = phase !== 'playing' || !state.canStand;
     elements.doubleButton.hidden = phase !== 'playing' || !state.canDouble;
-    elements.dealButton.hidden = phase !== 'playing' || !state.canDeal;
     elements.nextButton.hidden = animating || (!reviewingFinalHand && (phase !== 'results' || !state.canNext));
     elements.nextButton.innerHTML = reviewingFinalHand ? '查看最终排名 <span aria-hidden="true">→</span>' : '准备下一局 <span aria-hidden="true">→</span>';
-    const hasMove = state.canHit || state.canStand || state.canDouble || state.canDeal;
+    const hasMove = state.canHit || state.canStand || state.canDouble;
     elements.waitingText.hidden = !animating && phase !== 'dealing' && (reviewingFinalHand || (phase === 'results' ? !!state.canNext : hasMove));
-    elements.waitingText.textContent = animating || phase === 'dealing' ? '正在发牌，请稍等…'
-      : phase === 'results' ? `你已准备，等待其他在线玩家（${ready.ready} / ${ready.total}）…`
-        : self?.status === 'spectating' ? '旁观中，下局起加入…'
-          : self?.status === 'eliminated' ? '筹码已用完，等待本局结算…'
-            : '等待其他玩家完成本局…';
+    elements.waitingText.textContent = phase === 'dealer-turn'
+      ? (animating ? '你的手牌正在落定，庄家随后翻牌…' : '庄家稍后翻开暗牌…')
+      : animating && (phase === 'results' || reviewingFinalHand) ? '庄家正在翻牌与补牌，请稍等…'
+        : animating || phase === 'dealing' ? '正在发牌，请稍等…'
+          : phase === 'results' ? `你已准备，等待其他在线玩家（${ready.ready} / ${ready.total}）…`
+            : self?.status === 'spectating' ? '旁观中，下局起加入…'
+              : self?.status === 'eliminated' ? '筹码已用完，等待本局结算…'
+                : '等待其他玩家完成本局…';
   }
+
+  renderPlayers(players, phase, animating && (phase === 'results' || reviewingFinalHand));
 
   if (phase === 'finished') {
     const winners = players.filter((player) => Array.isArray(state.winners) && state.winners.includes(player.id));
@@ -437,7 +448,7 @@ function render() {
     }
   }
 
-  [elements.betButton, elements.hitButton, elements.standButton, elements.doubleButton, elements.dealButton, elements.startButton, elements.nextButton, elements.reviewFinalHand, elements.restartButton].forEach((button) => { button.disabled = pending || (animating && [elements.hitButton, elements.standButton, elements.doubleButton, elements.dealButton, elements.nextButton].includes(button)); });
+  [elements.betButton, elements.hitButton, elements.standButton, elements.doubleButton, elements.startButton, elements.nextButton, elements.reviewFinalHand, elements.restartButton].forEach((button) => { button.disabled = pending || (animating && [elements.hitButton, elements.standButton, elements.doubleButton, elements.nextButton].includes(button)); });
 }
 
 function updateState(newState) {
@@ -449,7 +460,7 @@ function updateState(newState) {
 
 async function submitAction(action, { amount, mode, targetBankroll, throwOnError = false } = {}) {
   if (pending || !code || !token) return;
-  if (handVisual.timer && ['hit', 'stand', 'double', 'deal', 'next'].includes(action)) {
+  if (handVisual.timer && ['hit', 'stand', 'double', 'next'].includes(action)) {
     if (throwOnError) throw new Error('发牌动画尚未结束');
     return;
   }
@@ -579,7 +590,6 @@ elements.betAmount.addEventListener('input', () => {
 elements.hitButton.addEventListener('click', () => submitAction('hit'));
 elements.standButton.addEventListener('click', () => submitAction('stand'));
 elements.doubleButton.addEventListener('click', () => submitAction('double'));
-elements.dealButton.addEventListener('click', () => submitAction('deal'));
 elements.nextButton.addEventListener('click', () => {
   if (state?.phase === 'finished') {
     showFinalSummary = true;
@@ -663,12 +673,12 @@ setInterval(renderTimer, 1000);
     },
     {
       name: 'blackjack_game_action', title: '操作 21 点牌桌',
-      description: '执行开始、下注、要牌、停牌、加倍、加倍后发牌、准备下一局或退出房间。开始时可选模式和目标；下注时须提供整数 amount。',
-      inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'bet', 'hit', 'stand', 'double', 'deal', 'next', 'leave'] }, amount: { type: 'integer', minimum: 1, description: '下注筹码数；仅在 action 为 bet 时填写' }, mode: { type: 'string', enum: ['target', 'endless'], description: '开始游戏时填写，默认 target' }, targetBankroll: { type: 'integer', minimum: 1001, maximum: 1000000, description: '目标模式的获胜筹码数；默认 10000' } }, required: ['action'], additionalProperties: false },
+      description: '执行开始、下注、要牌、停牌、加倍（立即补一张并停牌）、准备下一局或退出房间。开始时可选模式和目标；下注时须提供整数 amount。',
+      inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'bet', 'hit', 'stand', 'double', 'next', 'leave'] }, amount: { type: 'integer', minimum: 1, description: '下注筹码数；仅在 action 为 bet 时填写' }, mode: { type: 'string', enum: ['target', 'endless'], description: '开始游戏时填写，默认 target' }, targetBankroll: { type: 'integer', minimum: 1001, maximum: 1000000, description: '目标模式的获胜筹码数；默认 10000' } }, required: ['action'], additionalProperties: false },
       annotations: { readOnlyHint: false },
       execute: async (input) => {
         if (!code) throw new Error('尚未进入房间');
-        if (!['start', 'bet', 'hit', 'stand', 'double', 'deal', 'next', 'leave'].includes(input?.action)) throw new Error('无效操作');
+        if (!['start', 'bet', 'hit', 'stand', 'double', 'next', 'leave'].includes(input?.action)) throw new Error('无效操作');
         if (input.action === 'bet' && !Number.isSafeInteger(input.amount)) throw new Error('下注时请提供整数 amount');
         if (input.action === 'start' && input.mode !== undefined && !['target', 'endless'].includes(input.mode)) throw new Error('无效游戏模式');
         if (input.action === 'start' && input.targetBankroll !== undefined && (!Number.isSafeInteger(input.targetBankroll) || input.targetBankroll < 1001 || input.targetBankroll > 1000000)) throw new Error('目标筹码须为 1,001 到 1,000,000');

@@ -5,6 +5,7 @@ const path = require('node:path');
 // Keep production's 15-second betting/turn defaults. Only shorten the visual
 // dealing interval so these HTTP tests do not spend most of their time waiting.
 process.env.DEAL_MS = '300';
+process.env.DEALER_PAUSE_MS = '300';
 const repoRoot = process.env.GAME_OVER_ROOT || path.resolve(__dirname, '..');
 const { server, testing } = require(path.join(repoRoot, 'server.js'));
 
@@ -19,7 +20,7 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
   const rooms = [];
   t.after(async () => {
     for (const room of rooms) {
-      for (const key of ['roundTimer', 'dealTimer', 'matchTimer', 'resultsTimer', 'hostTransferTimer']) {
+      for (const key of ['roundTimer', 'dealTimer', 'dealerTimer', 'matchTimer', 'resultsTimer', 'hostTransferTimer']) {
         clearTimeout(room[key]);
       }
     }
@@ -102,6 +103,44 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     assert.ok(playing.deadlineAt - Date.now() <= 15_100);
   });
 
+  await t.test('dealer waits after stand, reveals later, then draws until 17', async () => {
+    const { room, players: [player] } = newRoom('Stand pause');
+    await action(room, player, 'start');
+    // Player 10+8=18; dealer 6+8=14 then draws 2 and 3 to reach 19.
+    setDraws(room, ['10', '6', '8', '8', '2', '3']);
+    await action(room, player, 'bet', { amount: 100 });
+    await waitForPhase(room, player, 'playing');
+    const paused = await action(room, player, 'stand');
+    assert.equal(paused.phase, 'dealer-turn');
+    assert.equal(paused.deadlineAt, null);
+    assert.equal(paused.dealer.cards.length, 1, 'hole card stays concealed during the pause');
+    assert.equal(paused.dealer.cardCount, 2);
+    assert.equal(paused.dealer.total, null);
+    assert.equal(paused.players[0].roundResult, null);
+    assert.equal(paused.canHit, false);
+    assert.equal((await request(room, player, 'hit')).status, 409);
+    const settled = await waitForPhase(room, player, 'results');
+    assert.deepEqual(settled.dealer.cards.map((card) => card.rank), ['6', '8', '2', '3']);
+    assert.equal(settled.dealer.total, 19);
+    assert.equal(settled.players[0].roundResult.outcome, 'lose');
+  });
+
+  await t.test('a bust also pauses before the dealer reveals the hole card', async () => {
+    const { room, players: [player] } = newRoom('Bust pause');
+    await action(room, player, 'start');
+    setDraws(room, ['10', '10', '8', '7', '10']);
+    await action(room, player, 'bet', { amount: 100 });
+    await waitForPhase(room, player, 'playing');
+    const paused = await action(room, player, 'hit');
+    assert.equal(paused.phase, 'dealer-turn');
+    assert.equal(paused.players[0].status, 'bust');
+    assert.equal(paused.players[0].cardCount, 3);
+    assert.equal(paused.players[0].roundResult, null);
+    assert.equal(paused.dealer.cards.length, 1);
+    const settled = await waitForPhase(room, player, 'results');
+    assert.equal(settled.players[0].roundResult.outcome, 'lose');
+  });
+
   await t.test('all online players must ready next, including a broke creator', async () => {
     const { room, players: [host, firstGuest, secondGuest] } = newRoom('Broke creator', 'First guest', 'Second guest');
     await action(room, host, 'start');
@@ -113,8 +152,9 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     await waitForPhase(room, host, 'playing');
     await action(room, host, 'stand');
     await action(room, firstGuest, 'stand');
-    const settled = await action(room, secondGuest, 'stand');
-    assert.equal(settled.phase, 'results');
+    const paused = await action(room, secondGuest, 'stand');
+    assert.equal(paused.phase, 'dealer-turn', 'dealer waits until everyone has acted');
+    const settled = await waitForPhase(room, host, 'results');
     assert.equal(settled.players.find((p) => p.id === host.id).roundResult.outcome, 'lose');
     assert.equal(settled.players.find((p) => p.id === host.id).bankroll, 0);
     assert.equal((await state(room, host)).canNext, true);
@@ -138,7 +178,8 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     await action(room, guest, 'bet', { amount: 100 });
     await waitForPhase(room, host, 'playing');
     await action(room, host, 'stand');
-    assert.equal((await action(room, guest, 'stand')).phase, 'results');
+    assert.equal((await action(room, guest, 'stand')).phase, 'dealer-turn');
+    await waitForPhase(room, host, 'results');
 
     guest.lastSeen = Date.now() - 1_000;
     assert.equal((await action(room, host, 'next')).phase, 'results', 'reconnect grace keeps a recent disconnect in the ready count');
@@ -149,7 +190,7 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     assert.equal(nextRound.round, 2);
   });
 
-  await t.test('double only raises the wager; deal draws one card and disables a second raise', async () => {
+  await t.test('double immediately raises the wager and deals exactly one card', async () => {
     const { room, players: [player] } = newRoom('Double');
     await action(room, player, 'start');
     setDraws(room, ['5', '8', '5', '8', '9']);
@@ -158,19 +199,21 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     assert.equal(playing.canDouble, true);
     assert.equal(playing.players[0].cardCount, 2);
 
-    const raised = await action(room, player, 'double');
-    assert.equal(raised.players[0].wager, 400);
-    assert.equal(raised.players[0].cardCount, 2);
-    assert.equal(raised.players[0].status, 'doubled');
-    assert.equal(raised.canDouble, false);
-    assert.equal(raised.canDeal, true);
+    const doubled = await action(room, player, 'double');
+    assert.equal(doubled.phase, 'dealer-turn');
+    assert.equal(doubled.players[0].wager, 400);
+    assert.equal(doubled.players[0].cardCount, 3);
+    assert.equal(doubled.players[0].status, 'stood');
+    assert.equal(doubled.canDouble, false);
+    assert.equal(doubled.canHit, false);
+    assert.equal(doubled.dealer.cards.length, 1);
+    assert.equal(doubled.players[0].roundResult, null);
     assert.equal((await request(room, player, 'double')).status, 409);
     assert.equal((await request(room, player, 'hit')).status, 409);
-
-    const drawn = await action(room, player, 'deal');
-    assert.equal(drawn.players[0].cardCount, 3);
-    assert.equal(drawn.canDeal, false);
-    assert.equal(drawn.players[0].wager, 400);
+    assert.equal((await request(room, player, 'deal')).status, 409);
+    const settled = await waitForPhase(room, player, 'results');
+    assert.equal(settled.players[0].cardCount, 3);
+    assert.equal(settled.players[0].wager, 400);
   });
 
   await t.test('equal hands lose half the wager, including natural Blackjack ties', async () => {
@@ -183,9 +226,13 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
       await action(room, player, 'start');
       setDraws(room, draws);
       await action(room, player, 'bet', { amount: wager });
-      let result = await waitForPhase(room, player, draws[0] === 'A' ? 'results' : 'playing');
-      if (result.phase === 'playing') result = await action(room, player, 'stand');
-      assert.equal(result.phase, 'results');
+      if (draws[0] !== 'A') {
+        await waitForPhase(room, player, 'playing');
+        assert.equal((await action(room, player, 'stand')).phase, 'dealer-turn');
+      } else {
+        await waitForPhase(room, player, 'dealer-turn');
+      }
+      const result = await waitForPhase(room, player, 'results');
       assert.equal(result.players[0].bankroll, 1_000 - loss);
       assert.equal(result.players[0].roundResult.delta, -loss);
     }
@@ -197,8 +244,8 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     setDraws(room, ['10', '10', '10', '8']);
     await action(room, player, 'bet', { amount: 100 });
     await waitForPhase(room, player, 'playing');
-    const finished = await action(room, player, 'stand');
-    assert.equal(finished.phase, 'finished');
+    assert.equal((await action(room, player, 'stand')).phase, 'dealer-turn');
+    const finished = await waitForPhase(room, player, 'finished');
     assert.equal(finished.players[0].bankroll, 1_100);
     assert.deepEqual(finished.winners, [player.id]);
   });
@@ -213,8 +260,8 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     await action(room, second, 'bet', { amount: 100 });
     await waitForPhase(room, first, 'playing');
     await action(room, first, 'stand');
-    const result = await action(room, second, 'stand');
-    assert.equal(result.phase, 'results', 'game continues while more than one player has chips');
+    assert.equal((await action(room, second, 'stand')).phase, 'dealer-turn');
+    const result = await waitForPhase(room, first, 'results');
     assert.ok(result.players.find((p) => p.id === first.id).bankroll > result.players.find((p) => p.id === second.id).bankroll);
 
     testing.expireMatch(room);
@@ -223,7 +270,7 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     assert.deepEqual(finished.winners, [first.id]);
   });
 
-  await t.test('the match deadline settles active hands and a pending double', async () => {
+  await t.test('the match deadline settles active hands after a double', async () => {
     const { room, players: [doubled, other] } = newRoom('Doubled', 'Other');
     await action(room, doubled, 'start', { mode: 'endless' });
     // Doubled 5+5+9=19 beats dealer 8+8+2=18; other 6+6=12 loses.
@@ -232,11 +279,14 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     await action(room, other, 'bet', { amount: 100 });
     await waitForPhase(room, doubled, 'playing');
     const raised = await action(room, doubled, 'double');
-    assert.equal(raised.players.find((p) => p.id === doubled.id).cardCount, 2);
+    assert.equal(raised.players.find((p) => p.id === doubled.id).cardCount, 3);
+    assert.equal(raised.players.find((p) => p.id === doubled.id).wager, 400);
 
     testing.expireMatch(room);
-    const finished = await state(room, doubled);
-    assert.equal(finished.phase, 'finished');
+    const paused = await state(room, doubled);
+    assert.equal(paused.phase, 'dealer-turn');
+    assert.equal(paused.players.find((p) => p.id === doubled.id).roundResult, null);
+    const finished = await waitForPhase(room, doubled, 'finished');
     assert.equal(finished.players.find((p) => p.id === doubled.id).cardCount, 3);
     assert.equal(finished.players.find((p) => p.id === doubled.id).bankroll, 1_400);
     assert.deepEqual(finished.winners, [doubled.id]);
@@ -250,8 +300,8 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     await action(room, allIn, 'bet', { amount: 1_000 });
     await waitForPhase(room, survivor, 'playing');
     await action(room, survivor, 'stand');
-    const finished = await action(room, allIn, 'stand');
-    assert.equal(finished.phase, 'finished');
+    assert.equal((await action(room, allIn, 'stand')).phase, 'dealer-turn');
+    const finished = await waitForPhase(room, survivor, 'finished');
     assert.equal(finished.players.find((p) => p.id === allIn.id).bankroll, 0);
     assert.deepEqual(finished.winners, [survivor.id]);
   });
@@ -262,9 +312,10 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
     setDraws(room, ['8', '10', '8', '8']);
     await action(room, player, 'bet', { amount: 1_000 });
     await waitForPhase(room, player, 'playing');
-    const finished = await action(room, player, 'stand');
-    assert.equal(finished.phase, 'finished');
+    assert.equal((await action(room, player, 'stand')).phase, 'dealer-turn');
+    const finished = await waitForPhase(room, player, 'finished');
     assert.equal(finished.players[0].bankroll, 0);
     assert.deepEqual(finished.winners, []);
   });
+
 });
