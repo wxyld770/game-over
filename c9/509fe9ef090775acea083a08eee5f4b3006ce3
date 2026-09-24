@@ -1,0 +1,30 @@
+public/games/match3.html
+  s_8b62f2c845e793::t_daca5248760c34 13,16,376-378,388,397
+  s_8b62f2c845e793::t_ff8371252bd496 386,392,394
+  s_8b62f2c845e793::t_8efd5a87c0f7fc 77-81,185,248,286-287,290-293,295,299-300,302-312,317,359,371,379-382,398-400
+  s_8b62f2c845e793::t_169f512cca2e32 7,28,32,37,74-76,84,134-148
+test/match3.test.js
+  s_8b62f2c845e793::t_dbc16f565020fc 23,27,35-40,47,58-61,63-81
+public/games/doudizhu.html
+  s_8b62f2c845e793::t_5f8fde79c0349e 262
+  s_8b62f2c845e793::t_0e53b287660002 319,358-365,631-632,636-639,642-644,647,673,676-688,694-721,729-734,866-870
+  s_8b62f2c845e793::t_73038b08bc508c 197-200,253,255
+  s_8b62f2c845e793::t_95881b3472bd07 221-252,254,256-261,263
+  s_8b62f2c845e793::t_60de05ff50d6a7 283-288
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "c9509fe9ef090775acea083a08eee5f4b3006ce3",
+  "prompts": {},
+  "sessions": {
+    "s_8b62f2c845e793": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd16-67e7-7740-9440-c700c00ee457",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
