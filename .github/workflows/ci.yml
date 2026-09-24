@@ -133,7 +133,7 @@ jobs:
           chmod 0600 "${known_hosts}"
           [[ "$(ssh-keygen -lf "${known_hosts}" -E sha256 | awk '{print $2}')" == 'SHA256:QNC5ZaYfXItgvd93c+7sio/D5gmkiTjDfml04OekH3E' ]]
 
-          remote='game-over-deploy@43.108.47.201'
+          remote='game-over-deploy@game.5iyeji.xyz'
           remote_dir="/var/lib/game-over-deploy/incoming/${GITHUB_SHA}"
           bundle="${RUNNER_TEMP}/game-over-release/game-over-${GITHUB_SHA}.tar.gz"
           ssh_options=(

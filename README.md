@@ -9,7 +9,7 @@
 本地运行需要 Node.js 18 或更新版本；项目只使用 Node.js 内置模块，无需安装依赖。macOS 上可双击 `开始游戏.command`，或在终端运行：
 
 ```sh
-cd /Users/yoca-709/game-over
+cd game-over
 npm start
 ```
 
@@ -70,12 +70,10 @@ npm start
 
 `.github/workflows/ci.yml` 在 Pull Request 和 `main` 更新时检查 JavaScript 语法，并运行 HTTP 冒烟及游戏规则测试。只有 `main` 的检查通过后，才会把同一次检查的代码打成带 SHA-256 校验的发布包，上传到服务器并检查线上健康状态。手动运行工作流只执行检查，不部署。
 
-游戏的正式入口是 **https://game.5iyeji.xyz/**。服务运行在 `43.108.47.201:8889`，由同机 Nginx 提供 HTTPS，systemd 服务名为 `game-over.service`。发布使用专门的 `game-over-deploy` SSH 账号；GitHub 仓库的 Actions secret `PROD_SSH_PRIVATE_KEY` 存放该账号的私钥。服务器上由 root 安装的 `deploy/deploy-game-over` 脚本负责校验发布包、切换版本和失败回退。服务器 SSH 主机公钥固定在 `deploy/known_hosts`，无需关闭主机身份检查。
+游戏的正式入口是 **https://game.5iyeji.xyz/**。线上由 Nginx 提供 HTTPS 并转发到 Node 服务。发布使用专门的 SSH 部署账号；GitHub Actions 以仓库 Secret 保存部署私钥，服务器上的部署脚本负责校验发布包、切换版本和失败回退。SSH 主机密钥经过固定校验。
 
 修改 `main` 上的应用代码会触发服务重启。**当前房间、牌局和筹码在内存中，重启后会清空**。只修改 CI、文档或测试，且发布包里的应用文件未变时，部署不会重启服务。上线前请先让玩家结束当前牌局。
 
-### 绑定游戏域名
+### 域名与 HTTPS
 
-游戏域名使用 `game.5iyeji.xyz`。在阿里云 DNS 的 `5iyeji.xyz` 解析设置中增加一条 **A** 记录：主机记录 `game`，记录值 `43.108.47.201`，TTL 使用默认值。DNS 不填写端口号。
-
-服务器已安装 `deploy/nginx-game-https.conf` 作为 `/etc/nginx/conf.d/game-over.conf`。证书由现有 acme.sh 使用 `/var/www/acme` 的 HTTP-01 验证签发，安装在 `/etc/nginx/ssl/game.5iyeji.xyz/`；服务器 crontab 自动续期，续期后先执行 `nginx -t` 再重载 Nginx。HTTPS 配置为游戏的 SSE 实时事件关闭代理缓冲，避免消息延迟。如需在新服务器上重新配置，先安装 `deploy/nginx-game-http.conf` 完成证书签发，再切换到 HTTPS 配置。
+线上域名使用 `game.5iyeji.xyz`。DNS 记录在域名管理平台维护；源站地址和部署凭据不要写进公开文档。Nginx 负责 HTTPS 和游戏的 SSE 实时连接，证书由服务器自动续期。迁移到新服务器时，先完成 DNS、证书和防火墙配置，再使用 `deploy/` 下的配置文件部署。
