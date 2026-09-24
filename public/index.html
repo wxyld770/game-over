@@ -137,7 +137,11 @@
                         <label for="betAmount">本局下注</label>
                         <div class="bet-input-wrap"><span aria-hidden="true">◆</span><input id="betAmount" name="amount" type="number" inputmode="numeric" step="1" min="1" required aria-describedby="betLimits" /><span>筹码</span></div>
                         <div id="betPresets" class="bet-presets" role="group" aria-label="快捷下注">
-                          <button type="button" data-bet="50">50</button><button type="button" data-bet="100">100</button><button type="button" data-bet="250">250</button><button type="button" data-bet="500">500</button><button type="button" data-bet="all">全押</button>
+                          <button type="button" data-bet="min"><span>最低</span><strong>50</strong></button>
+                          <button type="button" data-bet="quarter"><span>1/4</span><strong>250</strong></button>
+                          <button type="button" data-bet="third"><span>1/3</span><strong>333</strong></button>
+                          <button type="button" data-bet="half"><span>1/2</span><strong>500</strong></button>
+                          <button type="button" data-bet="all"><span>全押</span><strong>1,000</strong></button>
                         </div>
                         <p id="betLimits" class="bet-limits">最低 50 筹码，不能超过当前本金。</p>
                         <button id="betButton" class="button button-primary" type="submit">确认下注 <span aria-hidden="true">→</span></button>

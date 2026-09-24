@@ -32,6 +32,7 @@ let pending = false;
 let toastTimer = null;
 let fallbackTimer = null;
 let betDraftRound = null;
+let selectedBetPreset = 'min';
 let showFinalSummary = false;
 let restartSettingsForMatch = '';
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -342,6 +343,13 @@ function roundResultText(player, dealer) {
   return `你 ${player.total} 点 · 庄家 ${dealer.total} 点；${label}`;
 }
 
+function betPresetAmount(preset, bankroll, minimum) {
+  if (preset === 'min') return minimum;
+  if (preset === 'all') return bankroll;
+  const divisor = { quarter: 4, third: 3, half: 2 }[preset];
+  return divisor ? Math.floor(bankroll / divisor) : NaN;
+}
+
 function renderBetting(self) {
   const bankroll = Number(self?.bankroll || 0);
   const minimum = Math.min(Number(state.minimumBet || 50), bankroll);
@@ -350,10 +358,11 @@ function renderBetting(self) {
   elements.betAmount.max = String(bankroll);
   elements.betLimits.textContent = bankroll < state.minimumBet
     ? `余额不足 ${state.minimumBet} 筹码，需要全押剩余 ${chips(bankroll)} 筹码。`
-    : `本局最低 ${chips(minimum)} 筹码，最高 ${chips(bankroll)} 筹码。`;
+    : `本局最低 ${chips(minimum)} 筹码，最高 ${chips(bankroll)} 筹码。比例档向下取整，低于最低额时不可选。`;
   const currentRound = `${code}:${state.round}`;
   if (betDraftRound !== currentRound) {
     betDraftRound = currentRound;
+    selectedBetPreset = 'min';
     elements.betAmount.value = String(minimum);
   }
   elements.betForm.hidden = !state.canBet;
@@ -363,9 +372,15 @@ function renderBetting(self) {
     : self?.status === 'eliminated' ? '筹码已用完，本局只能旁观。'
       : '本局旁观，从下一局开始下注。';
   for (const button of elements.betPresets.querySelectorAll('button')) {
-    const amount = button.dataset.bet === 'all' ? bankroll : Number(button.dataset.bet);
-    button.disabled = pending || !state.canBet || amount > bankroll || amount < minimum;
-    button.classList.toggle('active', Number(elements.betAmount.value) === amount && state.canBet);
+    const amount = betPresetAmount(button.dataset.bet, bankroll, minimum);
+    const valid = Number.isSafeInteger(amount) && amount >= minimum && amount <= bankroll;
+    button.dataset.amount = valid ? String(amount) : '';
+    button.querySelector('strong').textContent = chips(amount);
+    const label = button.querySelector('span').textContent;
+    button.title = valid ? `${label}：${chips(amount)} 筹码` : `${label}低于最低下注额 ${chips(minimum)} 筹码`;
+    button.setAttribute('aria-label', button.title);
+    button.disabled = pending || !state.canBet || !valid;
+    button.classList.toggle('active', selectedBetPreset === button.dataset.bet && state.canBet && valid);
   }
 }
 
@@ -655,17 +670,18 @@ elements.betForm.addEventListener('submit', (event) => {
 elements.betPresets.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-bet]');
   if (!button || button.disabled || !state?.canBet) return;
+  const amount = Number(button.dataset.amount);
+  if (!Number.isSafeInteger(amount)) return;
+  elements.betAmount.value = String(amount);
+  selectedBetPreset = button.dataset.bet;
   const self = state.players.find((player) => player.id === state.selfId);
-  elements.betAmount.value = button.dataset.bet === 'all' ? String(self.bankroll) : button.dataset.bet;
-  for (const preset of elements.betPresets.querySelectorAll('button')) preset.classList.toggle('active', preset === button);
-  elements.betAmount.focus();
+  renderBetting(self);
 });
 elements.betAmount.addEventListener('input', () => {
-  for (const button of elements.betPresets.querySelectorAll('button')) {
-    const self = state?.players.find((player) => player.id === state.selfId);
-    const amount = button.dataset.bet === 'all' ? Number(self?.bankroll) : Number(button.dataset.bet);
-    button.classList.toggle('active', Number(elements.betAmount.value) === amount);
-  }
+  selectedBetPreset = '';
+  if (state?.phase !== 'betting') return;
+  const self = state.players.find((player) => player.id === state.selfId);
+  renderBetting(self);
 });
 elements.hitButton.addEventListener('click', () => submitAction('hit'));
 elements.standButton.addEventListener('click', () => submitAction('stand'));
