@@ -1,0 +1,57 @@
+README.md
+  s_8b62f2c845e793::t_30cb1c463ba1e3 77
+  s_8b62f2c845e793::t_6bc8d492e9d440 17
+  s_8b62f2c845e793::t_3730ce6acbe975 1,3-13,26,28
+public/styles.css
+  s_8b62f2c845e793::t_724e77e2f8419a 344-345
+.github/workflows/ci.yml
+  s_8b62f2c845e793::t_2768b019b7c7e2 38,55-58
+test/pages.test.js
+  s_8b62f2c845e793::t_6b902790a0eb34 1-30
+deploy/deploy-game-over
+  s_8b62f2c845e793::t_2768b019b7c7e2 42-47,70,78
+public/games/doudizhu.html
+  s_8b62f2c845e793::t_49f09e339cebc5 433-435
+  s_8b62f2c845e793::t_ffadd70893610b 141,352-354,404
+  s_8b62f2c845e793::t_ac16a91cf2192d 200
+  s_8b62f2c845e793::t_ac9bbfbb25b7d3 280,315-319
+  s_8b62f2c845e793::t_e387f38d1b6e7c 190,198-199,215,221-224
+  s_8b62f2c845e793::t_696e2a6c0199f5 239,281-283,292
+  s_8b62f2c845e793::t_0ecd3ad95084ed 133
+  s_8b62f2c845e793::t_60d1c23ea28a51 251
+  s_8b62f2c845e793::t_31592de5ebb7a7 1-132,134-140,142-189,191-197,201-214,216-220,225-238,240-250,252-279,284-291,293-314,320-351,355-403,405-432,436-485
+test/metrics.test.js
+  s_8b62f2c845e793::t_d370ad3d82e9d5 101-102
+public/games/match3.html
+  s_8b62f2c845e793::t_e85d0ef7d5c7a8 1-97,103-302
+public/index.html
+  s_8b62f2c845e793::t_724e77e2f8419a 8,32
+public/games/jump.html
+  s_8b62f2c845e793::t_af3ab561ab87f8 1-120,122-129,132-308,316,322-324,326-329,335-344
+test/smoke.test.js
+  s_8b62f2c845e793::t_46cecb374805b8 89,91-95,105,107-108
+public/hub.html
+  s_8b62f2c845e793::t_bb38d282f320c1 7,12,68,73,81
+  s_8b62f2c845e793::t_6ceb70ab32d736 65
+  s_8b62f2c845e793::t_724e77e2f8419a 1-6,8-11,13-64,66-67,69-72,74-80,82-94
+package.json
+  s_8b62f2c845e793::t_76f5cb2c109bb2 2,5
+server.js
+  s_8b62f2c845e793::t_ef43d9262832a5 787-798,813-814
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "cc9b52e5d48d4d0439a34b0466d8a3a9addda671",
+  "prompts": {},
+  "sessions": {
+    "s_8b62f2c845e793": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd16-67e7-7740-9440-c700c00ee457",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
