@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0b1718" />
-  <meta name="description" content="和朋友玩 21 点、斗地主，或独自挑战数独、扫雷、蜘蛛纸牌、跳一跳和消消乐。打开网页，选个游戏直接开玩。" />
+  <meta name="description" content="GAME OVER 小游戏大厅：联机牌局、益智、纸牌、反应与消除游戏，七款游戏打开网页直接玩。" />
   <link rel="canonical" href="https://game.5iyeji.xyz/" />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_CN" />
-  <meta property="og:title" content="今晚玩什么？· 小游戏大厅" />
-  <meta property="og:description" content="朋友联机玩 21 点、斗地主，自己也能挑战数独、扫雷、蜘蛛纸牌、跳一跳和消消乐。" />
+  <meta property="og:title" content="GAME OVER · 七款小游戏，打开就玩" />
+  <meta property="og:description" content="和朋友同桌，或一个人闯关。牌类、益智、反应、消除游戏都在这里。" />
   <meta property="og:url" content="https://game.5iyeji.xyz/" />
-  <title>小游戏大厅 · 朋友牌桌</title>
+  <title>GAME OVER · 小游戏大厅</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <style>
     :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; --bg:#0b1718; --panel:#142b26; --line:rgba(244,228,189,.16); --gold:#e9bf72; --paper:#f5efdf; --muted:#b3c3b7; }
@@ -34,20 +34,28 @@
     .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
     .button { display: inline-flex; align-items: center; justify-content: center; min-height: 45px; padding: 0 19px; border: 1px solid var(--gold); border-radius: 10px; text-decoration: none; font-size: .92rem; font-weight: 800; transition: transform .18s ease, background .18s ease; }
     .button:hover { transform: translateY(-2px); }
+    .button:active { transform: translateY(1px) scale(.98); }
     .button-primary { color: #183a30; background: linear-gradient(135deg, #f4da9e, #dba958); }
     .button-secondary { color: #f3d18f; background: rgba(233,191,114,.08); }
     .hero-art { position: relative; display: grid; place-items: center; min-height: 290px; border: 1px solid rgba(241,212,155,.21); border-radius: 30px; background: radial-gradient(circle at 50% 40%, #176a50, #0c3f34 62%, #082a27); box-shadow: 0 28px 65px rgba(0,0,0,.24), inset 0 0 0 9px rgba(220,172,91,.08); overflow: hidden; }
     .hero-art::before { content: ""; position: absolute; width: 260px; height: 260px; border: 1px solid rgba(239,216,164,.3); border-radius: 50%; }
-    .hero-art::after { content: "BLACKJACK  ·  FRIENDS TABLE"; position: absolute; bottom: 27px; color: rgba(242,218,167,.68); font-size: .63rem; letter-spacing: .22em; }
-    .art-card { position: absolute; display: grid; place-items: center; width: 104px; height: 143px; border: 3px solid #fbf4df; border-radius: 12px; background: #f4ecd7; color: #173d32; font-size: 3.4rem; font-weight: 900; box-shadow: 0 14px 35px rgba(0,0,0,.35); }
-    .art-card.first { transform: translate(-36px, -8px) rotate(-15deg); }
-    .art-card.second { color: #b5463c; transform: translate(44px, -11px) rotate(13deg); }
+    .hero-art::after { content: "SEVEN GAMES · ONE PLACE"; position: absolute; bottom: 25px; color: rgba(242,218,167,.74); font-size: .63rem; letter-spacing: .2em; }
+    .art-grid { position: relative; display: grid; grid-template-columns: repeat(3, clamp(56px, 5.5vw, 72px)); gap: 10px; transform: rotate(-7deg); }
+    .art-icon { display: grid; place-items: center; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.45); border-radius: 16px; color: #123a32; background: #f5e7bb; box-shadow: 0 10px 20px rgba(0,0,0,.28); font-size: clamp(1.7rem, 3.2vw, 2.5rem); font-weight: 900; animation: icon-rise 3.5s ease-in-out infinite; }
+    .art-icon:nth-child(2), .art-icon:nth-child(5) { color: #fff4dd; background: #bb594e; animation-delay: -.6s; }
+    .art-icon:nth-child(3), .art-icon:nth-child(4) { color: #eaffd8; background: #3b7b5d; animation-delay: -1.2s; }
+    .art-icon:nth-child(6) { color: #e7ebff; background: #5364a0; animation-delay: -1.8s; }
+    @keyframes icon-rise { 50% { transform: translateY(-5px); } }
     .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin: 0 4px 20px; }
     .section-heading h2 { margin: 7px 0 0; font-size: clamp(1.65rem, 3vw, 2.3rem); letter-spacing: -.04em; }
     .section-heading p { margin: 0; color: var(--muted); font-size: .83rem; }
     .games { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-bottom: 70px; }
-    .game-card { position: relative; display: flex; flex-direction: column; min-height: 210px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(145deg, rgba(34,75,57,.8), rgba(18,39,36,.98)); text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; overflow: hidden; }
+    .game-card { position: relative; display: flex; flex-direction: column; min-height: 210px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(145deg, rgba(34,75,57,.8), rgba(18,39,36,.98)); text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; overflow: hidden; animation: card-enter .5s both; }
+    .game-card:nth-child(2n) { animation-delay: .07s; }
+    .game-card:nth-child(3n) { animation-delay: .14s; }
     .game-card:hover { transform: translateY(-4px); border-color: rgba(242,206,142,.6); box-shadow: 0 20px 38px rgba(0,0,0,.2); }
+    .game-card:active { transform: translateY(1px) scale(.99); }
+    @keyframes card-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
     .game-card::after { content: attr(data-symbol); position: absolute; right: 15px; top: 9px; color: rgba(247,225,175,.1); font-size: 6.5rem; font-weight: 800; line-height: 1; pointer-events: none; }
     .game-card.featured { border-color: rgba(233,191,114,.48); background: linear-gradient(145deg, #245c48, #102f29); }
     .pill { align-self: start; padding: 5px 9px; border: 1px solid rgba(238,207,151,.33); border-radius: 99px; color: #f0d099; background: rgba(233,191,114,.09); font-size: .69rem; font-weight: 700; }
@@ -56,8 +64,8 @@
     .game-card .play { position: relative; margin-top: 15px; color: #f4d393; font-size: .85rem; font-weight: 800; }
     footer { display: flex; justify-content: space-between; gap: 12px; padding: 22px 2px 30px; border-top: 1px solid var(--line); color: #92aa9b; font-size: .78rem; }
     @media (max-width: 850px) { .hero { grid-template-columns: 1fr; padding-top: 42px; } .hero-art { min-height: 220px; } .games { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 560px) { .shell { padding: 0 16px; } header { min-height: 68px; } .header-note { display: none; } .hero { gap: 26px; padding: 37px 0 43px; } .hero p { font-size: .93rem; } .hero-art { min-height: 195px; } .art-card { width: 83px; height: 117px; font-size: 2.75rem; } .games { grid-template-columns: 1fr; gap: 12px; padding-bottom: 48px; } .game-card { min-height: 185px; padding: 20px; } .section-heading { align-items: start; flex-direction: column; gap: 6px; } footer { flex-direction: column; } }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+    @media (max-width: 560px) { .shell { padding: 0 16px; } header { min-height: 68px; } .header-note { display: none; } .hero { gap: 26px; padding: 37px 0 43px; } .hero p { font-size: .93rem; } .hero-art { min-height: 195px; } .art-grid { grid-template-columns: repeat(3, 53px); gap: 7px; } .art-icon { border-radius: 11px; font-size: 1.6rem; } .games { grid-template-columns: 1fr; gap: 12px; padding-bottom: 48px; } .game-card { min-height: 185px; padding: 20px; } .section-heading { align-items: start; flex-direction: column; gap: 6px; } footer { flex-direction: column; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
   </style>
 </head>
 <body>
@@ -65,17 +73,17 @@
     <header><a class="brand" href="/" aria-label="回到小游戏大厅"><span class="brand-mark">GO</span><span>GAME OVER · 小游戏大厅</span></a><span class="header-note">选一个游戏，马上开玩</span></header>
     <main>
       <section class="hero" aria-labelledby="heroTitle">
-        <div><span class="eyebrow">GAME NIGHT STARTS HERE</span><h1 id="heroTitle">今晚，<br /><em>玩点不一样的。</em></h1><p>约朋友打一桌 21 点或斗地主，或自己挑战一局经典小游戏。不用下载，不用注册，打开就能玩。</p><div class="hero-actions"><a class="button button-primary" href="/blackjack">和朋友玩 21 点 ↗</a><a id="resumeBlackjack" class="button button-secondary" href="/blackjack" hidden>回到上次牌桌 →</a></div></div>
-        <div class="hero-art" aria-hidden="true"><div class="art-card first">A<span style="position:absolute;bottom:7px;right:10px;font-size:1.15rem">♠</span></div><div class="art-card second">K<span style="position:absolute;bottom:7px;right:10px;font-size:1.15rem">♥</span></div></div>
+        <div><span class="eyebrow">SEVEN GAMES · ONE PLACE</span><h1 id="heroTitle">打开就玩，<br /><em>总有一款合拍。</em></h1><p>和朋友同桌竞技，或一个人解谜、闯关、放松。牌类、益智、反应、消除游戏都在这里，选一款直接开始。</p><div class="hero-actions"><a class="button button-primary" href="#games">挑个游戏，开始玩 ↓</a><a id="resumeBlackjack" class="button button-secondary" href="/blackjack" hidden>回到上次牌桌 →</a></div></div>
+        <div class="hero-art" aria-hidden="true"><div class="art-grid"><span class="art-icon">♠</span><span class="art-icon">◆</span><span class="art-icon">9</span><span class="art-icon">✹</span><span class="art-icon">↗</span><span class="art-icon">♣</span></div></div>
       </section>
-      <section aria-labelledby="gamesTitle"><div class="section-heading"><div><span class="eyebrow">PICK A GAME</span><h2 id="gamesTitle">游戏菜单</h2></div><p>熟悉的玩法，随时再来一局。</p></div><div class="games">
+      <section id="games" aria-labelledby="gamesTitle"><div class="section-heading"><div><span class="eyebrow">PICK A GAME</span><h2 id="gamesTitle">游戏菜单</h2></div><p>两款支持联机，五款适合独自挑战。</p></div><div class="games">
         <a class="game-card featured" href="/blackjack" data-symbol="♠"><span class="pill">朋友联机 · 1–6 人</span><h3>21 点</h3><p>创建私人房间，下注、要牌、冲击目标筹码。</p><span class="play">开一桌 →</span></a>
         <a class="game-card featured" href="/doudizhu" data-symbol="♣"><span class="pill">单机或三人联机</span><h3>斗地主</h3><p>叫分抢地主，和电脑较量，或约两位朋友同桌。</p><span class="play">开始斗地主 →</span></a>
-        <a class="game-card" href="/sudoku" data-symbol="9"><span class="pill">单人益智</span><h3>数独</h3><p>从简单到困难，填出每行、每列、每宫的 1–9。</p><span class="play">开始解题 →</span></a>
-        <a class="game-card" href="/minesweeper" data-symbol="✹"><span class="pill">单人益智</span><h3>扫雷</h3><p>看懂数字，排除地雷，安全翻开每一格。</p><span class="play">开始扫雷 →</span></a>
-        <a class="game-card" href="/spider" data-symbol="♣"><span class="pill">单人纸牌</span><h3>蜘蛛纸牌</h3><p>整理十列牌，凑齐从 K 到 A 的完整序列。</p><span class="play">开始接龙 →</span></a>
-        <a class="game-card" href="/jump" data-symbol="↗"><span class="pill">单人反应</span><h3>跳一跳</h3><p>按住蓄力，松开起跳，看看你能跨过多少平台。</p><span class="play">开始跳跃 →</span></a>
-        <a class="game-card" href="/match3" data-symbol="◆"><span class="pill">单人闯关</span><h3>消消乐</h3><p>交换相邻方块，连成三个或更多，挑战高分。</p><span class="play">开始消除 →</span></a>
+        <a class="game-card" href="/sudoku" data-symbol="9"><span class="pill">单人益智</span><h3>数独</h3><p>三档难度，笔记、提示和撤销陪你解开九宫格。</p><span class="play">开始解题 →</span></a>
+        <a class="game-card" href="/minesweeper" data-symbol="✹"><span class="pill">单人益智</span><h3>扫雷</h3><p>从安全的第一格出发，读数字、插旗、排出地雷。</p><span class="play">开始扫雷 →</span></a>
+        <a class="game-card" href="/spider" data-symbol="♣"><span class="pill">单人纸牌</span><h3>蜘蛛纸牌</h3><p>整理十列牌，找到可行走法，收齐八组 K 到 A。</p><span class="play">开始接龙 →</span></a>
+        <a class="game-card" href="/jump" data-symbol="↗"><span class="pill">单人反应</span><h3>跳一跳</h3><p>按住蓄力，瞄准中心落地，踩中特殊平台还能加分。</p><span class="play">开始跳跃 →</span></a>
+        <a class="game-card" href="/match3" data-symbol="◆"><span class="pill">单人闯关</span><h3>消消乐</h3><p>交换宝石凑出三连，把满屏宝石全部清空。</p><span class="play">开始消除 →</span></a>
       </div></section>
     </main>
     <footer><span>GAME OVER · 小游戏大厅</span><span>纯娱乐小游戏 · 牌类游戏仅使用虚拟筹码和积分</span></footer>

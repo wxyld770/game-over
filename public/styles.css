@@ -79,7 +79,7 @@ input:focus { border-color: var(--gold); }
 .join-inputs #joinCode { text-transform: uppercase; letter-spacing: .12em; }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 17px; min-height: 50px; padding: 10px 20px; border-radius: 11px; border: 1px solid transparent; font-weight: 700; transition: transform .16s ease, filter .16s ease, background-color .16s ease; }
 .button:not(:disabled):hover { transform: translateY(-2px); filter: brightness(1.07); }
-.button:active { transform: translateY(0); }
+.button:active { transform: translateY(1px) scale(.98); }
 .button span { font-size: 1.2rem; font-weight: 400; line-height: 1; }
 .button-primary { color: #16382e; background: linear-gradient(130deg, #f2d69c, #dfb568); box-shadow: 0 8px 24px rgba(0, 0, 0, .16); }
 .button-outline { border-color: rgba(230, 201, 147, .54); color: var(--gold-light); background: rgba(12, 31, 27, .32); }
@@ -166,14 +166,19 @@ input:focus { border-color: var(--gold); }
 .total-pill { display: inline-grid; place-items: center; min-width: 58px; height: 27px; padding: 0 8px; border: 1px solid rgba(241, 213, 151, .48); border-radius: 999px; color: var(--gold-light); font-size: .79rem; letter-spacing: 0; }
 .total-pill-player { background: var(--gold); border-color: var(--gold); color: #184233; }
 .cards { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; min-height: 111px; }
-.playing-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: 77px; height: 108px; border-radius: 8px; border: 1px solid #ded6c9; background: linear-gradient(145deg, #fffdfa, #e9e7df); color: #17231f; box-shadow: 0 7px 14px rgba(0,0,0,.22); }
+.playing-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: 77px; height: 108px; border-radius: 9px; border: 1px solid #ded6c9; background: linear-gradient(145deg, #fffdfa, #f0ede7); color: #273955; box-shadow: 0 7px 14px rgba(0,0,0,.22), inset 0 0 0 3px rgba(255,255,255,.64); }
 .playing-card.dealing-card { animation: card-deal .43s cubic-bezier(.2, .75, .24, 1) both; }
 .playing-card.flipping-card { backface-visibility: hidden; animation: card-flip .43s ease-out both; }
-.playing-card.red { color: #b44341; }
-.playing-card .card-rank { position: absolute; top: 7px; left: 9px; font-size: 1.13rem; font-weight: 800; line-height: 1; }
-.playing-card .card-corner-suit { position: absolute; top: 27px; left: 10px; font-size: .83rem; line-height: 1; }
-.playing-card .card-center-suit { font-size: 2.9rem; line-height: 1; }
-.playing-card .card-bottom { position: absolute; right: 7px; bottom: 7px; font-size: 1.05rem; font-weight: 800; line-height: 1; transform: rotate(180deg); }
+.playing-card.suit-heart { color: #bf3c4d; }
+.playing-card.suit-diamond { color: #ae512a; }
+.playing-card.suit-club { color: #236b52; }
+.playing-card .card-corner { position: absolute; top: 7px; left: 9px; display: grid; justify-items: center; gap: 1px; line-height: 1; }
+.playing-card .card-rank { font-size: 1.13rem; font-weight: 850; line-height: 1; }
+.playing-card .card-corner-suit { font-size: .82rem; line-height: 1; }
+.playing-card .card-center-suit { display: grid; place-items: center; width: 47px; height: 58px; border: 1px solid currentColor; border-radius: 50%; font-size: 2.8rem; line-height: 1; background: rgba(255,255,255,.34); }
+.playing-card .card-bottom { top: auto; left: auto; right: 9px; bottom: 7px; transform: rotate(180deg); }
+.playing-card.dealing-card .card-center-suit { animation: suit-appear .4s .18s both; }
+@keyframes suit-appear { from { transform: scale(.6); opacity: .15; } to { transform: scale(1); opacity: 1; } }
 .playing-card.back { border: 4px solid #f0eadb; background: repeating-linear-gradient(45deg, #194c45 0 5px, #123e3b 5px 10px); color: var(--gold); }
 .playing-card.back::after { content: "♠"; display: grid; place-items: center; width: 45px; height: 72px; border: 1px solid rgba(242, 221, 159, .58); border-radius: 4px; background: rgba(9, 47, 40, .35); font-size: 1.5rem; }
 .table-center { display: flex; align-items: center; justify-content: center; gap: 17px; min-height: 40px; }
@@ -181,9 +186,10 @@ input:focus { border-color: var(--gold); }
 .center-rule:last-child { transform: rotate(180deg); }
 .center-message { color: var(--gold-light); font-size: .92rem; font-weight: 700; text-align: center; }
 .self-outcome { max-width: min(100%, 560px); min-height: 22px; margin-top: 8px; color: var(--gold-light); font-size: .94rem; font-weight: 700; line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
-.self-outcome.win { color: #9ce6c2; }
+.self-outcome.win { color: #9ce6c2; animation: outcome-pop .45s cubic-bezier(.2, 1.4, .4, 1) both; }
 .self-outcome.lose { color: #ffc3ae; }
 .self-outcome.push { color: var(--gold-light); }
+@keyframes outcome-pop { from { transform: translateY(8px) scale(.96); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 .stake-strip { display: flex; align-items: center; justify-content: center; gap: 13px; color: #c7dccd; font-size: .85rem; }
 .stake-strip strong { margin-left: 5px; color: var(--gold-light); font-variant-numeric: tabular-nums; }
 .stake-divider { width: 1px; height: 15px; background: rgba(240, 213, 151, .34); }
@@ -309,10 +315,11 @@ input:focus { border-color: var(--gold); }
   .hand-heading { margin-bottom: 11px; font-size: .9rem; }
   .cards { gap: 6px; min-height: 86px; }
   .playing-card { width: 58px; height: 83px; border-radius: 6px; }
-  .playing-card .card-rank { top: 5px; left: 6px; font-size: .9rem; }
-  .playing-card .card-corner-suit { top: 21px; left: 7px; font-size: .68rem; }
-  .playing-card .card-center-suit { font-size: 2.15rem; }
-  .playing-card .card-bottom { right: 5px; bottom: 5px; font-size: .85rem; }
+  .playing-card .card-corner { top: 5px; left: 6px; }
+  .playing-card .card-rank { font-size: .9rem; }
+  .playing-card .card-corner-suit { font-size: .68rem; }
+  .playing-card .card-center-suit { width: 35px; height: 43px; font-size: 2.15rem; }
+  .playing-card .card-bottom { top: auto; left: auto; right: 6px; bottom: 5px; }
   .playing-card.back::after { width: 32px; height: 52px; }
   .table-actions { gap: 8px; }
   .table-actions .button { min-width: 0; width: calc(50% - 4px); padding-left: 8px; padding-right: 8px; font-size: .9rem; }

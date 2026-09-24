@@ -183,8 +183,9 @@ function cardHTML(card, effect = '') {
   if (!card || card.hidden || card.back) return `<div class="playing-card back ${effect}" aria-label="盖着的牌"></div>`;
   const rank = escapeHTML(card.rank);
   const suit = escapeHTML(card.suit);
-  const red = card.suit === '♥' || card.suit === '♦';
-  return `<div class="playing-card ${red ? 'red' : ''} ${effect}" aria-label="${rank}${suit}"><span class="card-rank">${rank}</span><span class="card-corner-suit">${suit}</span><span class="card-center-suit">${suit}</span><span class="card-bottom">${rank}</span></div>`;
+  const suitClass = { '♠': 'spade', '♥': 'heart', '♣': 'club', '♦': 'diamond' }[card.suit] || 'spade';
+  const suitName = { '♠': '黑桃', '♥': '红桃', '♣': '梅花', '♦': '方块' }[card.suit] || suit;
+  return `<div class="playing-card suit-${suitClass} ${effect}" aria-label="${suitName}${rank}"><span class="card-corner"><span class="card-rank">${rank}</span><span class="card-corner-suit">${suit}</span></span><span class="card-center-suit" aria-hidden="true">${suit}</span><span class="card-corner card-bottom" aria-hidden="true"><span class="card-rank">${rank}</span><span class="card-corner-suit">${suit}</span></span></div>`;
 }
 
 function cardSlots(cards = [], cardCount = cards.length) {

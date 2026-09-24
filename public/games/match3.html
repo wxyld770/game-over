@@ -1,302 +1,382 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#151e2d" />
-  <meta name="description" content="交换相邻宝石，连成三个或更多。免费在线玩消消乐。" />
-  <title>消消乐 · 小游戏大厅</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151e2d">
+  <meta name="description" content="有限棋盘消消乐：交换相邻宝石，双线三连，清空整盘。没有补牌，也不会从上方掉落。">
+  <title>消消乐清屏挑战 · 小游戏大厅</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
-    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; color-scheme: dark; --paper:#f8f2e8; --muted:#b9c3d2; --gold:#f2c77f; }
-    * { box-sizing: border-box; }
-    body { min-height: 100vh; margin: 0; color: var(--paper); background: radial-gradient(circle at 15% 0, #38435f 0, transparent 38%), radial-gradient(circle at 100% 95%, #403054 0, transparent 39%), #151e2d; }
-    button { font: inherit; cursor: pointer; }
-    a { color: inherit; }
-    :focus-visible { outline: 3px solid #f9d594; outline-offset: 3px; }
-    .shell { width: min(1050px, 100%); margin: auto; padding: 22px 22px 50px; }
-    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 24px; }
-    .back { color: var(--gold); font-weight: 700; text-decoration: none; }
-    .back:hover { text-decoration: underline; }
-    .brand { font-size: .78rem; letter-spacing: .2em; color: #bec7d2; }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(275px, 330px); gap: 25px; align-items: start; }
-    .board-panel, .side-panel { border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: rgba(25,34,51,.83); box-shadow: 0 26px 65px rgba(3,8,19,.22); }
-    .board-panel { padding: clamp(13px, 2.8vw, 28px); }
-    .title-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 17px; }
-    .title-line h1 { margin: 0; font-size: clamp(1.9rem, 4.2vw, 3.2rem); letter-spacing: -.04em; }
-    .chip { display: inline-flex; align-items: center; min-height: 30px; padding: 0 11px; border: 1px solid rgba(244,207,147,.45); border-radius: 999px; color: var(--gold); font-size: .76rem; font-weight: 800; white-space: nowrap; }
-    .grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: clamp(3px, 1vw, 7px); aspect-ratio: 1; width: 100%; max-width: 610px; margin: auto; padding: clamp(7px, 1.4vw, 13px); border: 1px solid #566377; border-radius: 18px; background: #101a2a; touch-action: none; user-select: none; }
-    .gem { display: grid; place-items: center; width: 100%; min-width: 0; padding: 0; border: 1px solid rgba(255,255,255,.17); border-radius: clamp(5px, 1.2vw, 11px); box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 3px 8px rgba(0,0,0,.18); font-size: clamp(18px, 4.5vw, 39px); line-height: 1; transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
-    .gem:hover { filter: brightness(1.2); transform: scale(1.05); }
-    .gem.selected { position: relative; z-index: 2; transform: scale(1.12); box-shadow: 0 0 0 3px #fff3cc, 0 0 20px #ffd894; }
-    .gem[data-kind="0"] { color: #ffdddf; background: linear-gradient(145deg, #f77990, #c63f61); }
-    .gem[data-kind="1"] { color: #d4f8ff; background: linear-gradient(145deg, #52c9e3, #237eaa); }
-    .gem[data-kind="2"] { color: #f9edbf; background: linear-gradient(145deg, #f0ce67, #bc8d27); }
-    .gem[data-kind="3"] { color: #e6dafa; background: linear-gradient(145deg, #b691eb, #7853bb); }
-    .gem[data-kind="4"] { color: #e8ffd4; background: linear-gradient(145deg, #9bd96c, #4d9c5c); }
-    .gem[data-kind="5"] { color: #fff0dc; background: linear-gradient(145deg, #f5ac69, #d46c4c); }
-    .gem:disabled { cursor: default; }
-    .hint { min-height: 22px; margin: 15px 4px 0; color: #d6dfeb; font-size: .87rem; line-height: 1.55; }
-    .side-panel { padding: 26px; }
-    .eyebrow { color: var(--gold); font-size: .7rem; letter-spacing: .2em; font-weight: 800; }
-    .side-panel h2 { margin: 10px 0 20px; font-size: 1.55rem; }
-    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .stat { min-height: 86px; padding: 13px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.045); }
-    .stat span { display: block; color: var(--muted); font-size: .77rem; }
-    .stat strong { display: block; margin-top: 6px; color: #fff5d5; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
-    .progress { height: 10px; margin: 22px 0 8px; border-radius: 99px; background: #0b1524; overflow: hidden; }
-    .progress > span { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #e8aa62, #f8d995); transition: width .3s ease; }
-    .progress-caption { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: .78rem; }
-    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
-    .action { min-height: 42px; padding: 0 15px; border: 1px solid #dfb976; border-radius: 10px; color: #211c25; background: linear-gradient(135deg, #f8dd9d, #e3b86a); font-weight: 800; }
-    .action.secondary { color: var(--gold); background: transparent; }
-    .action[hidden] { display: none; }
-    .rules { margin: 25px 0 0; padding-left: 19px; color: var(--muted); font-size: .85rem; line-height: 1.8; }
-    @media (max-width: 760px) { main { grid-template-columns: 1fr; } .side-panel { padding: 20px; } .grid { max-width: 550px; } }
-    @media (max-width: 420px) { .shell { padding: 15px 10px 30px; } .board-panel { padding: 12px; } .title-line { padding: 0 4px; } .gem { font-size: clamp(16px, 6.2vw, 27px); } .grid { gap: 3px; padding: 6px; } }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;color-scheme:dark;--paper:#f8f2e8;--muted:#b9c3d2;--gold:#f2c77f;--panel:#1b2739;--line:rgba(255,255,255,.15)}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{min-width:320px;min-height:100vh;margin:0;color:var(--paper);background:radial-gradient(circle at 15% 0,#38435f 0,transparent 38%),radial-gradient(circle at 100% 95%,#403054 0,transparent 39%),#151e2d}button{font:inherit;cursor:pointer}button:disabled{cursor:default;opacity:.5}a{color:inherit}:focus-visible{outline:3px solid #f9d594;outline-offset:3px}.shell{width:min(1090px,100%);margin:auto;padding:22px 22px 50px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:24px}.back{color:var(--gold);font-weight:700;text-decoration:none}.back:hover{text-decoration:underline}.brand{font-size:.78rem;letter-spacing:.2em;color:#bec7d2}
+    main{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,320px);gap:25px;align-items:start}.board-panel,.side-panel{border:1px solid var(--line);border-radius:24px;background:rgba(25,34,51,.86);box-shadow:0 26px 65px rgba(3,8,19,.22)}.board-panel{padding:clamp(13px,2.8vw,28px)}.title-line{display:flex;align-items:center;justify-content:space-between;gap:10px}.title-line h1{margin:0;font-size:clamp(1.9rem,4.2vw,3.2rem);letter-spacing:-.04em}.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 11px;border:1px solid rgba(244,207,147,.45);border-radius:999px;color:var(--gold);font-size:.76rem;font-weight:800;white-space:nowrap}.intro{margin:5px 0 18px;color:#d0d7e2;font-size:.89rem;line-height:1.55}.board-frame{position:relative;max-width:620px;margin:auto}.grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:clamp(3px,.8vw,6px);aspect-ratio:9/8;width:100%;padding:clamp(7px,1.3vw,12px);border:1px solid #5b6981;border-radius:18px;background:#101a2a;touch-action:none;user-select:none;-webkit-user-select:none}.gem{position:relative;display:grid;place-items:center;width:100%;min-width:0;min-height:0;padding:0;border:1px solid rgba(255,255,255,.18);border-radius:clamp(5px,1vw,10px);box-shadow:inset 0 -5px 0 rgba(0,0,0,.14),0 3px 8px rgba(0,0,0,.18);font-size:clamp(17px,3.8vw,38px);line-height:1;transition:transform .2s ease,filter .2s ease,box-shadow .2s ease,opacity .3s ease,background-color .2s ease}.gem:hover:not(.empty):not(:disabled){filter:brightness(1.18);transform:scale(1.05)}.gem.selected{z-index:2;transform:scale(1.1);box-shadow:0 0 0 3px #fff3cc,0 0 20px #ffd894}.gem.hinted{z-index:3;animation:hint-pulse .9s ease-in-out infinite alternate;box-shadow:0 0 0 3px #fff4cc,0 0 25px #ffe6a1}.gem.exchanging{animation:swap-pulse .2s ease-out}.gem.clearing{z-index:4;animation:vanish .42s cubic-bezier(.17,.8,.2,1) both}.gem.shaking{animation:shake .3s ease}.gem.empty{border-color:rgba(180,202,221,.075);background:#101a2a;box-shadow:inset 0 0 0 1px rgba(168,192,212,.025);opacity:.58}.gem[data-kind="0"]{color:#ffdddf;background:linear-gradient(145deg,#f77990,#c63f61)}.gem[data-kind="1"]{color:#d4f8ff;background:linear-gradient(145deg,#52c9e3,#237eaa)}.gem[data-kind="2"]{color:#f9edbf;background:linear-gradient(145deg,#f0ce67,#bc8d27)}.gem[data-kind="3"]{color:#e6dafa;background:linear-gradient(145deg,#b691eb,#7853bb)}.gem[data-kind="4"]{color:#e8ffd4;background:linear-gradient(145deg,#9bd96c,#4d9c5c)}.gem[data-kind="5"]{color:#fff0dc;background:linear-gradient(145deg,#f5ac69,#d46c4c)}
+    .board-frame.won .grid{animation:win-glow .85s ease-in-out 2}.board-frame.lost .grid{animation:lose-shake .55s ease}.end-overlay{position:absolute;inset:7px;z-index:10;display:grid;place-items:center;padding:22px;border-radius:14px;background:rgba(8,20,34,.83);backdrop-filter:blur(5px);animation:overlay-in .3s ease}.end-card{width:min(370px,100%);padding:24px;text-align:center;border:1px solid rgba(255,226,155,.54);border-radius:18px;background:linear-gradient(155deg,#293d4e,#192536);box-shadow:0 20px 60px #0007}.end-symbol{display:block;font-size:3rem;line-height:1;animation:pop .6s ease both}.end-card h2{margin:10px 0 7px;color:#ffe0a1;font-size:1.85rem}.end-card p{margin:0 0 17px;color:#d8dfeb;line-height:1.65}.end-card .action{width:100%}.end-card .action+.action{margin-top:8px}.end-card.loss h2{color:#ffc0b4}
+    .hint{min-height:42px;margin:15px 4px 0;color:#e0e7f0;font-size:.88rem;line-height:1.55}.hint.error{color:#ffc1b3}.hint.success{color:#c9f0c5}.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.tool{flex:1;min-width:105px;min-height:43px;padding:7px 12px;border:1px solid rgba(242,199,127,.62);border-radius:10px;background:rgba(242,199,127,.08);color:#f6d99e;font-weight:800}.tool:hover:not(:disabled){background:rgba(242,199,127,.18)}.side-panel{padding:26px}.eyebrow{color:var(--gold);font-size:.7rem;letter-spacing:.2em;font-weight:800}.side-panel h2{margin:10px 0 8px;font-size:1.55rem}.side-intro{margin:0 0 20px;color:var(--muted);font-size:.87rem;line-height:1.65}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{min-height:82px;padding:13px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.045)}.stat span{display:block;color:var(--muted);font-size:.77rem}.stat strong{display:block;margin-top:6px;color:#fff5d5;font-size:1.4rem;font-variant-numeric:tabular-nums}.stat strong.low{color:#ffc4b4}.progress{height:10px;margin:22px 0 8px;border-radius:99px;background:#0b1524;overflow:hidden}.progress>span{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#e8aa62,#f8d995);transition:width .38s ease}.progress-caption{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.78rem}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}.action{min-height:43px;padding:0 15px;border:1px solid #dfb976;border-radius:10px;color:#211c25;background:linear-gradient(135deg,#f8dd9d,#e3b86a);font-weight:800}.action:hover:not(:disabled){filter:brightness(1.08)}.action.secondary{color:var(--gold);background:transparent}.actions .action{flex:1}.rules{margin:25px 0 0;padding-left:19px;color:var(--muted);font-size:.85rem;line-height:1.8}.rules li{margin:5px 0}.mode-row{margin-top:17px;padding-top:16px;border-top:1px solid var(--line)}.mode-row p{margin:0 0 8px;color:#cbd5df;font-size:.82rem}.mode-button{width:100%}
+    @keyframes vanish{0%{transform:scale(1);opacity:1;filter:brightness(1)}35%{transform:scale(1.25) rotate(7deg);opacity:1;filter:brightness(1.55)}100%{transform:scale(.08) rotate(-24deg);opacity:0;filter:brightness(2)}}@keyframes hint-pulse{to{transform:scale(1.14);filter:brightness(1.35)}}@keyframes swap-pulse{50%{transform:scale(.83)}}@keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}@keyframes win-glow{50%{box-shadow:0 0 0 6px #f9d58a99,0 0 55px #f9d58a55}}@keyframes lose-shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}@keyframes overlay-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}@keyframes pop{0%{transform:scale(.4) rotate(-16deg);opacity:0}75%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+    @media(max-width:760px){main{grid-template-columns:1fr}.side-panel{padding:20px}.grid{max-width:620px}.side-intro{margin-bottom:14px}}@media(max-width:420px){.shell{padding:15px 10px 30px}.board-panel{padding:11px}.title-line{padding:0 4px}.intro{padding:0 4px;font-size:.82rem}.grid{gap:3px;padding:6px;border-radius:12px}.gem{font-size:clamp(15px,5.3vw,24px);border-radius:5px}.tool{min-width:85px;font-size:.84rem;padding:7px 5px}.hint{font-size:.83rem}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
   <div class="shell">
     <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · MATCH THREE</span></header>
     <main>
-      <section class="board-panel" aria-label="消消乐棋盘">
-        <div class="title-line"><h1>消消乐</h1><span class="chip" id="levelBadge">第 1 关</span></div>
-        <div class="grid" id="grid" role="grid" aria-label="8 乘 8 宝石棋盘"></div>
-        <p class="hint" id="message" role="status">点选两块相邻宝石，或在手机上滑动交换。</p>
+      <section class="board-panel" aria-label="消消乐清屏棋盘">
+        <div class="title-line"><h1>消消乐</h1><span class="chip" id="levelBadge">第 1 局</span></div>
+        <p class="intro">交换相邻宝石，让两条三连同时出现，消掉满屏每一颗。</p>
+        <div class="board-frame" id="boardFrame"><div class="grid" id="grid" role="grid" aria-label="8 行 9 列宝石棋盘"></div><div class="end-overlay" id="endOverlay" hidden><div class="end-card" id="endCard"><span class="end-symbol" id="endSymbol">✦</span><h2 id="endTitle"></h2><p id="endMessage"></p><button class="action" id="endPrimary" type="button"></button><button class="action secondary" id="endSecondary" type="button"></button></div></div></div>
+        <p class="hint" id="message" role="status" aria-live="polite">点两颗相邻宝石交换；手机上也可滑动，键盘可用方向键选格。</p>
+        <div class="tools"><button class="tool" id="hint" type="button">✦ 提示</button><button class="tool" id="undo" type="button">↶ 撤销</button><button class="tool" id="reshuffle" type="button">⤨ 重排剩余</button></div>
       </section>
       <aside class="side-panel">
-        <span class="eyebrow">YOUR CHALLENGE</span><h2>连成三个，继续连锁</h2>
-        <div class="stats"><div class="stat"><span>本关分数</span><strong id="score">0</strong></div><div class="stat"><span>剩余步数</span><strong id="moves">24</strong></div><div class="stat"><span>过关目标</span><strong id="target">600</strong></div><div class="stat"><span>最佳关卡</span><strong id="best">1</strong></div></div>
-        <div class="progress" aria-hidden="true"><span id="progress"></span></div><div class="progress-caption"><span>目标进度</span><span id="progressText">0%</span></div>
-        <div class="actions"><button class="action" id="next" hidden>下一关 →</button><button class="action secondary" id="restart">重玩本关</button></div>
-        <ol class="rules"><li>交换相邻的两块宝石，连成横向或纵向至少三块。</li><li>一次交换可引发多次连锁，连锁越多得分越高。</li><li>在步数用完前达到目标分数，即可进入下一关。</li></ol>
+        <span class="eyebrow">CLEAR THE WHOLE BOARD</span><h2>把满屏消掉</h2><p class="side-intro">每次成功交换消去 6 颗。没有新宝石，也没有从上方掉落。</p>
+        <div class="stats"><div class="stat"><span>已消除</span><strong id="cleared">0 / 72</strong></div><div class="stat"><span>成功交换</span><strong id="moves">0</strong></div><div class="stat"><span id="timeLabel">剩余时间</span><strong id="time">03:00</strong></div><div class="stat"><span>最快清屏</span><strong id="best">—</strong></div></div>
+        <div class="progress" aria-hidden="true"><span id="progress"></span></div><div class="progress-caption"><span>清屏进度</span><span id="progressText">0%</span></div>
+        <div class="actions"><button class="action" id="restart" type="button">重玩本局</button><button class="action secondary" id="next" type="button" hidden>下一局 →</button></div>
+        <div class="mode-row"><p>当前：<span id="modeName">3 分钟挑战</span>。切换模式会重新开局。</p><button class="action secondary mode-button" id="mode" type="button">切换为不限时</button></div>
+        <ol class="rules"><li>只需交换两颗相邻宝石；一次要同时形成两条三连，六颗会一起消失。单条三连会退回。</li><li>宝石停在原位，不下落、不补充；清空全部 72 颗即获胜。</li><li>误操作不会扣步。提示会标出一对可交换的宝石；撤销可恢复上一步，重排只移动现有宝石。</li><li>限时模式 3 分钟；想慢慢玩，可以切换不限时。</li></ol>
       </aside>
     </main>
   </div>
   <script>
-    (() => {
-      'use strict';
-      const SIZE = 8;
-      const KINDS = 6;
-      const glyphs = ['♥', '◆', '★', '✦', '⬟', '●'];
-      const names = ['红宝石', '蓝宝石', '金星', '紫水晶', '绿宝石', '琥珀'];
-      const grid = document.getElementById('grid');
-      const message = document.getElementById('message');
-      const nextButton = document.getElementById('next');
-      let board = [];
-      let selected = -1;
-      let busy = false;
-      let finished = false;
-      let score = 0;
-      let moves = 24;
-      let level = 1;
-      let best = 1;
-      let startPointer = null;
-      try {
-        const unlocked = Number(localStorage.getItem('match3:bestLevel'));
-        if (Number.isSafeInteger(unlocked) && unlocked >= 1) {
-          best = unlocked;
-          level = unlocked;
-        }
-      } catch {}
-      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-      const row = (index) => Math.floor(index / SIZE);
-      const col = (index) => index % SIZE;
-      const randomKind = () => Math.floor(Math.random() * KINDS);
-      const target = () => 500 + level * 100;
-      const adjacent = (a, b) => Math.abs(row(a) - row(b)) + Math.abs(col(a) - col(b)) === 1;
-      const swap = (a, b) => { [board[a], board[b]] = [board[b], board[a]]; };
-
-      function matches() {
-        const found = new Set();
-        for (let r = 0; r < SIZE; r += 1) {
-          for (let c = 0; c < SIZE;) {
-            const first = board[r * SIZE + c];
-            let end = c + 1;
-            while (first !== null && end < SIZE && board[r * SIZE + end] === first) end += 1;
-            if (end - c >= 3) for (let x = c; x < end; x += 1) found.add(r * SIZE + x);
-            c = end;
-          }
-        }
-        for (let c = 0; c < SIZE; c += 1) {
-          for (let r = 0; r < SIZE;) {
-            const first = board[r * SIZE + c];
-            let end = r + 1;
-            while (first !== null && end < SIZE && board[end * SIZE + c] === first) end += 1;
-            if (end - r >= 3) for (let y = r; y < end; y += 1) found.add(y * SIZE + c);
-            r = end;
-          }
-        }
-        return found;
+  (() => {
+    'use strict';
+    // PURE_GAME_LOGIC_START
+    const ROWS = 8;
+    const COLS = 9;
+    const BLOCK_ROWS = ROWS / 2;
+    const BLOCK_COLS = COLS / 3;
+    const BLOCK_COUNT = BLOCK_ROWS * BLOCK_COLS;
+    const TOTAL = ROWS * COLS;
+    const KINDS = 6;
+    const row = (index) => Math.floor(index / COLS);
+    const col = (index) => index % COLS;
+    const adjacent = (a, b) => a >= 0 && b >= 0 && a < TOTAL && b < TOTAL && Math.abs(row(a) - row(b)) + Math.abs(col(a) - col(b)) === 1;
+    const blockOf = (index) => Math.floor(row(index) / 2) * BLOCK_COLS + Math.floor(col(index) / 3);
+    function blockIndices(block) {
+      const top = Math.floor(block / BLOCK_COLS) * 2;
+      const left = (block % BLOCK_COLS) * 3;
+      return [top * COLS + left, top * COLS + left + 1, top * COLS + left + 2,
+        (top + 1) * COLS + left, (top + 1) * COLS + left + 1, (top + 1) * COLS + left + 2];
+    }
+    function pick(items) { return items[Math.floor(Math.random() * items.length)]; }
+    function pattern(block, colors) {
+      const values = Array(6);
+      const a = Math.random() < .5 ? colors[0] : colors[1];
+      const b = a === colors[0] ? colors[1] : colors[0];
+      const gap = Math.floor(Math.random() * 3);
+      for (let i = 0; i < 3; i += 1) { values[i] = i === gap ? b : a; values[i + 3] = i === gap ? a : b; }
+      const indices = blockIndices(block);
+      return { indices, values, pair: [indices[gap], indices[gap + 3]] };
+    }
+    function makeBoard() {
+      const board = Array(TOTAL).fill(null);
+      const palettes = [];
+      const winningPairs = [];
+      for (let block = 0; block < BLOCK_COUNT; block += 1) {
+        const br = Math.floor(block / BLOCK_COLS), bc = block % BLOCK_COLS;
+        const forbidden = new Set();
+        if (bc > 0) forbidden.add(palettes[block - 1]);
+        if (br > 0) forbidden.add(palettes[block - BLOCK_COLS]);
+        const palette = pick([0, 1, 2].filter(id => !forbidden.has(id)));
+        palettes[block] = palette;
+        const shape = pattern(block, [palette * 2, palette * 2 + 1]);
+        shape.indices.forEach((index, position) => { board[index] = shape.values[position]; });
+        winningPairs[block] = shape.pair;
       }
-
-      function hasMove() {
-        for (let i = 0; i < board.length; i += 1) {
-          for (const j of [i + 1, i + SIZE]) {
-            if (j >= board.length || !adjacent(i, j)) continue;
-            swap(i, j);
-            const valid = matches().size > 0;
-            swap(i, j);
-            if (valid) return true;
-          }
-        }
-        return false;
+      return { board, winningPairs };
+    }
+    function globalMatches(board) {
+      const found = new Set();
+      for (let r = 0; r < ROWS; r += 1) for (let c = 0; c < COLS;) {
+        const kind = board[r * COLS + c];
+        let end = c + 1;
+        while (kind !== null && end < COLS && board[r * COLS + end] === kind) end += 1;
+        if (end - c >= 3) for (let i = c; i < end; i += 1) found.add(r * COLS + i);
+        c = end;
       }
-
-      function freshBoard() {
-        do {
-          board = Array(SIZE * SIZE).fill(null);
-          for (let i = 0; i < board.length; i += 1) {
-            const choices = Array.from({ length: KINDS }, (_, value) => value).filter((kind) =>
-              !(col(i) >= 2 && board[i - 1] === kind && board[i - 2] === kind)
-              && !(row(i) >= 2 && board[i - SIZE] === kind && board[i - 2 * SIZE] === kind));
-            board[i] = choices[Math.floor(Math.random() * choices.length)];
-          }
-        } while (!hasMove());
+      for (let c = 0; c < COLS; c += 1) for (let r = 0; r < ROWS;) {
+        const kind = board[r * COLS + c];
+        let end = r + 1;
+        while (kind !== null && end < ROWS && board[end * COLS + c] === kind) end += 1;
+        if (end - r >= 3) for (let i = r; i < end; i += 1) found.add(i * COLS + c);
+        r = end;
       }
-
-      function render() {
-        const fragment = document.createDocumentFragment();
-        board.forEach((kind, index) => {
-          const tile = document.createElement('button');
-          tile.type = 'button';
-          tile.className = 'gem' + (index === selected ? ' selected' : '');
-          tile.dataset.index = String(index);
-          tile.dataset.kind = String(kind);
-          tile.textContent = kind === null ? '' : glyphs[kind];
-          tile.setAttribute('role', 'gridcell');
-          tile.setAttribute('aria-label', `第 ${row(index) + 1} 行第 ${col(index) + 1} 列：${names[kind] || '空'}`);
-          tile.setAttribute('aria-selected', index === selected ? 'true' : 'false');
-          tile.disabled = busy || finished || kind === null;
-          fragment.append(tile);
-        });
-        grid.replaceChildren(fragment);
-        document.getElementById('score').textContent = score;
-        document.getElementById('moves').textContent = moves;
-        document.getElementById('target').textContent = target();
-        document.getElementById('levelBadge').textContent = `第 ${level} 关`;
-        document.getElementById('best').textContent = best;
-        const percent = Math.min(100, Math.floor(score * 100 / target()));
-        document.getElementById('progress').style.width = `${percent}%`;
-        document.getElementById('progressText').textContent = `${percent}%`;
-        nextButton.hidden = !finished || score < target();
-      }
-
-      function dropAndFill() {
-        for (let c = 0; c < SIZE; c += 1) {
-          const survivors = [];
-          for (let r = SIZE - 1; r >= 0; r -= 1) {
-            const kind = board[r * SIZE + c];
-            if (kind !== null) survivors.push(kind);
-          }
-          for (let r = SIZE - 1; r >= 0; r -= 1) {
-            board[r * SIZE + c] = survivors[SIZE - 1 - r] ?? randomKind();
-          }
+      return found;
+    }
+    function analyzeSwap(board, a, b) {
+      if (!adjacent(a, b) || board[a] === null || board[b] === null) return { valid: false, reason: 'empty' };
+      const swapped = board.slice();
+      [swapped[a], swapped[b]] = [swapped[b], swapped[a]];
+      if (blockOf(a) === blockOf(b)) {
+        const indices = blockIndices(blockOf(a));
+        const top = swapped[indices[0]];
+        const bottom = swapped[indices[3]];
+        if (top !== null && bottom !== null && top !== bottom
+            && indices.slice(0, 3).every(index => swapped[index] === top)
+            && indices.slice(3).every(index => swapped[index] === bottom)) {
+          return { valid: true, swapped, cleared: indices };
         }
       }
-
-      async function trySwap(a, b) {
-        if (busy || finished || !adjacent(a, b)) return;
-        busy = true;
-        selected = -1;
-        swap(a, b);
+      return { valid: false, reason: globalMatches(swapped).size ? 'single' : 'nomatch' };
+    }
+    function winningPair(board, block) {
+      const indices = blockIndices(block);
+      if (board[indices[0]] === null) return null;
+      for (let i = 0; i < 3; i += 1) {
+        const a = indices[i], b = indices[i + 3];
+        if (analyzeSwap(board, a, b).valid) return [a, b];
+      }
+      return null;
+    }
+    function reorderBoard(board) {
+      const reordered = board.slice();
+      for (let block = 0; block < BLOCK_COUNT; block += 1) {
+        const indices = blockIndices(block);
+        if (board[indices[0]] === null) continue;
+        const colors = [...new Set(indices.map(index => board[index]))];
+        if (colors.length !== 2) throw new Error('清屏盘状态异常');
+        const shape = pattern(block, colors);
+        shape.indices.forEach((index, position) => { reordered[index] = shape.values[position]; });
+      }
+      return reordered;
+    }
+    // PURE_GAME_LOGIC_END
+    const glyphs = ['♥', '◆', '★', '✦', '⬟', '●'];
+    const names = ['红宝石', '蓝宝石', '金星', '紫水晶', '绿宝石', '琥珀'];
+    const $ = id => document.getElementById(id);
+    const grid = $('grid');
+    const tiles = [];
+    const history = [];
+    const LIMIT_MS = 3 * 60_000;
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    let board = [];
+    let selected = -1;
+    let hinted = [];
+    let busy = false;
+    let finished = false;
+    let timed = true;
+    let level = 1;
+    let cleared = 0;
+    let moves = 0;
+    let hintsUsed = 0;
+    let startedAt = null;
+    let elapsedAtFinish = 0;
+    let bestMs = null;
+    let pointerStart = null;
+    let suppressClick = false;
+    try {
+      const savedLevel = Number(localStorage.getItem('match3:clearLevel'));
+      const savedBest = Number(localStorage.getItem('match3:clearBestMs'));
+      if (Number.isSafeInteger(savedLevel) && savedLevel >= 1) level = savedLevel;
+      if (Number.isSafeInteger(savedBest) && savedBest > 0) bestMs = savedBest;
+    } catch {}
+    function formatTime(ms) {
+      const seconds = Math.max(0, Math.ceil(ms / 1000));
+      return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    }
+    function currentElapsed() { return startedAt === null ? 0 : finished ? elapsedAtFinish : Date.now() - startedAt; }
+    function setMessage(text, tone = '') { $('message').textContent = text; $('message').className = 'hint' + (tone ? ` ${tone}` : ''); }
+    function buildTiles() {
+      const fragment = document.createDocumentFragment();
+      for (let index = 0; index < TOTAL; index += 1) {
+        const tile = document.createElement('button');
+        tile.type = 'button'; tile.className = 'gem'; tile.dataset.index = String(index);
+        tile.setAttribute('role', 'gridcell'); fragment.append(tile); tiles.push(tile);
+      }
+      grid.replaceChildren(fragment);
+    }
+    function render() {
+      for (let index = 0; index < TOTAL; index += 1) {
+        const tile = tiles[index], kind = board[index];
+        tile.className = 'gem';
+        if (kind === null) tile.classList.add('empty');
+        if (index === selected) tile.classList.add('selected');
+        if (hinted.includes(index)) tile.classList.add('hinted');
+        tile.dataset.kind = kind === null ? '' : String(kind);
+        tile.textContent = kind === null ? '' : glyphs[kind];
+        tile.disabled = kind === null || busy || finished;
+        tile.setAttribute('aria-label', `第 ${row(index) + 1} 行第 ${col(index) + 1} 列：${kind === null ? '已清空' : names[kind]}`);
+        tile.setAttribute('aria-selected', String(index === selected));
+      }
+      $('levelBadge').textContent = `第 ${level} 局`;
+      $('cleared').textContent = `${cleared} / ${TOTAL}`;
+      $('moves').textContent = String(moves);
+      $('best').textContent = bestMs === null ? '—' : formatTime(bestMs);
+      const percent = Math.round(cleared * 100 / TOTAL);
+      $('progress').style.width = `${percent}%`;
+      $('progressText').textContent = `${percent}%`;
+      $('undo').disabled = busy || !history.length || finished;
+      $('hint').disabled = busy || finished;
+      $('reshuffle').disabled = busy || finished;
+      $('next').hidden = !finished || cleared !== TOTAL;
+      $('modeName').textContent = timed ? '3 分钟挑战' : '不限时练习';
+      $('mode').textContent = timed ? '切换为不限时' : '切换为 3 分钟挑战';
+      $('timeLabel').textContent = timed ? '剩余时间' : '已用时间';
+      updateClock();
+    }
+    function updateClock() {
+      const ms = timed ? LIMIT_MS - currentElapsed() : currentElapsed();
+      $('time').textContent = formatTime(ms);
+      $('time').classList.toggle('low', timed && ms <= 30_000 && !finished);
+      if (timed && startedAt !== null && !finished && !busy && ms <= 0) finish(false);
+    }
+    function showEnd(won) {
+      $('endOverlay').hidden = false;
+      $('endCard').classList.toggle('loss', !won);
+      $('endSymbol').textContent = won ? '✦' : '⌛';
+      $('endTitle').textContent = won ? '全屏清空！' : '时间到';
+      $('endMessage').textContent = won
+        ? `72 颗全部消除，耗时 ${formatTime(elapsedAtFinish)}。没有一颗新宝石掉下来！`
+        : `还剩 ${TOTAL - cleared} 颗。此局仍有清屏路径，再试一次或切换不限时。`;
+      $('endPrimary').textContent = won ? '继续下一局 →' : '重试这一局';
+      $('endSecondary').textContent = won ? '重玩这一局' : '切换不限时';
+      $('boardFrame').classList.remove('won', 'lost');
+      void $('boardFrame').offsetWidth;
+      $('boardFrame').classList.add(won ? 'won' : 'lost');
+    }
+    function finish(won) {
+      if (finished) return;
+      elapsedAtFinish = startedAt === null ? 0 : Date.now() - startedAt;
+      finished = true; busy = false; selected = -1; hinted = [];
+      if (won) {
+        if (bestMs === null || elapsedAtFinish < bestMs) {
+          bestMs = elapsedAtFinish;
+          try { localStorage.setItem('match3:clearBestMs', String(bestMs)); } catch {}
+        }
+        try { localStorage.setItem('match3:clearLevel', String(level + 1)); } catch {}
+        setMessage('清屏成功！每一颗宝石都消失了。', 'success');
+      } else setMessage('时间到！点“重试这一局”或切换不限时。', 'error');
+      showEnd(won); render();
+    }
+    function snapshot() { return { board: board.slice(), cleared, moves }; }
+    async function trySwap(a, b) {
+      if (busy || finished || !adjacent(a, b)) return;
+      if (timed && startedAt !== null && currentElapsed() >= LIMIT_MS) { finish(false); return; }
+      const move = analyzeSwap(board, a, b);
+      selected = -1; hinted = [];
+      if (!move.valid) {
         render();
-        await wait(170);
-        let hit = matches();
-        if (!hit.size) {
-          swap(a, b);
-          busy = false;
-          message.textContent = '这一换没有连成三个，换个位置试试。';
-          render();
-          return;
-        }
-        moves -= 1;
-        let chain = 0;
-        while (hit.size) {
-          chain += 1;
-          score += hit.size * 10 * chain;
-          for (const index of hit) board[index] = null;
-          render();
-          await wait(220);
-          dropAndFill();
-          render();
-          await wait(190);
-          hit = matches();
-        }
-        if (score >= target()) {
-          finished = true;
-          if (level + 1 > best) {
-            best = level + 1;
-            try { localStorage.setItem('match3:bestLevel', String(best)); } catch {}
-          }
-          message.textContent = `过关啦！本关拿到 ${score} 分，继续挑战下一关。`;
-        } else if (moves === 0) {
-          finished = true;
-          message.textContent = `步数用完了，还差 ${target() - score} 分。点“重玩本关”再试一次。`;
-        } else {
-          if (!hasMove()) {
-            freshBoard();
-            message.textContent = '棋盘没有可交换的组合，已自动重新排列。';
-          } else {
-            message.textContent = chain > 1 ? `漂亮！触发 ${chain} 次连锁。` : `消除了 ${score} 分，继续加油！`;
-          }
-        }
-        busy = false;
+        tiles[a].classList.add('shaking'); tiles[b].classList.add('shaking');
+        setMessage(move.reason === 'single'
+          ? '这次有一条三连，但清屏挑战需要同时连成两条；宝石已退回。试试提示。'
+          : '这次没有组成两条三连，宝石会留在原处；不会扣步。');
+        return;
+      }
+      history.push(snapshot());
+      if (startedAt === null) startedAt = Date.now();
+      busy = true; board = move.swapped; moves += 1;
+      render();
+      tiles[a].classList.add('exchanging'); tiles[b].classList.add('exchanging');
+      await wait(155);
+      for (const index of move.cleared) tiles[index].classList.add('clearing');
+      await wait(400);
+      for (const index of move.cleared) board[index] = null;
+      cleared += move.cleared.length;
+      busy = false;
+      if (cleared === TOTAL) finish(true);
+      else if (timed && currentElapsed() >= LIMIT_MS) finish(false);
+      else {
+        setMessage(`漂亮！双线消除 ${move.cleared.length} 颗，还剩 ${TOTAL - cleared} 颗。`, 'success');
         render();
       }
-
-      function choose(index) {
-        if (busy || finished) return;
-        if (selected === index) selected = -1;
-        else if (selected >= 0 && adjacent(selected, index)) {
-          trySwap(selected, index);
-          return;
-        } else selected = index;
-        render();
+    }
+    function choose(index) {
+      if (busy || finished || board[index] === null) return;
+      if (selected === index) selected = -1;
+      else if (selected >= 0 && adjacent(selected, index)) { trySwap(selected, index); return; }
+      else selected = index;
+      hinted = [];
+      render();
+    }
+    function showHint() {
+      if (busy || finished) return;
+      const available = [];
+      for (let block = 0; block < BLOCK_COUNT; block += 1) {
+        const pair = winningPair(board, block);
+        if (pair) available.push(pair);
       }
-
-      function start(nextLevel = false) {
-        if (nextLevel) level += 1;
-        score = 0;
-        moves = Math.max(16, 26 - level * 2);
-        selected = -1;
-        busy = false;
-        finished = false;
-        freshBoard();
-        message.textContent = '点选两块相邻宝石，或在手机上滑动交换。';
-        render();
-      }
-
-      grid.addEventListener('click', (event) => {
-        const tile = event.target.closest('.gem');
-        if (tile && !tile.disabled) choose(Number(tile.dataset.index));
-      });
-      grid.addEventListener('pointerdown', (event) => {
-        const tile = event.target.closest('.gem');
-        startPointer = tile ? { index: Number(tile.dataset.index), x: event.clientX, y: event.clientY } : null;
-      });
-      grid.addEventListener('pointerup', (event) => {
-        if (!startPointer || busy || finished) return;
-        const start = startPointer;
-        startPointer = null;
-        const dx = event.clientX - start.x;
-        const dy = event.clientY - start.y;
-        if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
-        const destination = Math.abs(dx) > Math.abs(dy)
-          ? start.index + (dx > 0 ? 1 : -1)
-          : start.index + (dy > 0 ? SIZE : -SIZE);
-        if (destination >= 0 && destination < board.length && adjacent(start.index, destination)) {
-          event.preventDefault();
-          trySwap(start.index, destination);
-        }
-      });
-      grid.addEventListener('pointercancel', () => { startPointer = null; });
-      document.getElementById('restart').addEventListener('click', () => { if (!busy) start(); });
-      nextButton.addEventListener('click', () => { if (finished && score >= target()) start(true); });
-      start();
-    })();
+      if (!available.length) { setMessage('暂时没有可用提示，试试撤销或重排。', 'error'); return; }
+      hinted = pick(available); selected = -1; hintsUsed += 1;
+      setMessage(`高亮的两颗相邻宝石交换后会双线消除。已使用 ${hintsUsed} 次提示。`);
+      render();
+      tiles[hinted[0]].focus();
+    }
+    function undo() {
+      if (busy || !history.length || finished) return;
+      const previous = history.pop();
+      board = previous.board; cleared = previous.cleared; moves = previous.moves;
+      selected = -1; hinted = [];
+      setMessage('已撤销上一步。棋盘仍能完整清空。');
+      render();
+    }
+    async function reshuffle() {
+      if (busy || finished) return;
+      busy = true; selected = -1; hinted = [];
+      history.push(snapshot());
+      render();
+      for (let index = 0; index < TOTAL; index += 1) if (board[index] !== null) tiles[index].classList.add('exchanging');
+      await wait(220);
+      board = reorderBoard(board);
+      busy = false;
+      setMessage('剩余宝石已重新排列，没有增加或掉落；仍可全部消完。');
+      render();
+    }
+    function start(nextLevel = false) {
+      if (nextLevel) level += 1;
+      const generated = makeBoard();
+      board = generated.board;
+      history.length = 0;
+      selected = -1; hinted = []; busy = false; finished = false;
+      cleared = 0; moves = 0; hintsUsed = 0; startedAt = null; elapsedAtFinish = 0;
+      $('endOverlay').hidden = true;
+      $('boardFrame').classList.remove('won', 'lost');
+      setMessage('点两颗相邻宝石交换；手机上也可滑动。每次要同时连成两条三连。');
+      render();
+    }
+    grid.addEventListener('click', event => {
+      if (suppressClick) { suppressClick = false; return; }
+      const tile = event.target.closest('.gem');
+      if (tile && !tile.disabled) choose(Number(tile.dataset.index));
+    });
+    grid.addEventListener('pointerdown', event => {
+      const tile = event.target.closest('.gem');
+      pointerStart = tile && !tile.disabled ? { index: Number(tile.dataset.index), x: event.clientX, y: event.clientY, id: event.pointerId } : null;
+      if (pointerStart) tile.setPointerCapture(event.pointerId);
+    });
+    grid.addEventListener('pointerup', event => {
+      if (!pointerStart || busy || finished) return;
+      const from = pointerStart; pointerStart = null;
+      const dx = event.clientX - from.x, dy = event.clientY - from.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+      const to = Math.abs(dx) > Math.abs(dy) ? from.index + (dx > 0 ? 1 : -1) : from.index + (dy > 0 ? COLS : -COLS);
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 0);
+      if (adjacent(from.index, to)) trySwap(from.index, to);
+    });
+    grid.addEventListener('pointercancel', () => { pointerStart = null; });
+    grid.addEventListener('keydown', event => {
+      const tile = event.target.closest('.gem');
+      if (!tile) return;
+      const index = Number(tile.dataset.index);
+      const offset = { ArrowUp: -COLS, ArrowDown: COLS, ArrowLeft: -1, ArrowRight: 1 }[event.key];
+      if (offset !== undefined) {
+        event.preventDefault();
+        const next = index + offset;
+        if (adjacent(index, next) && board[next] !== null) tiles[next].focus();
+      } else if (event.key.toLowerCase() === 'h') { event.preventDefault(); showHint(); }
+      else if (event.key.toLowerCase() === 'u') { event.preventDefault(); undo(); }
+    });
+    $('hint').addEventListener('click', showHint);
+    $('undo').addEventListener('click', undo);
+    $('reshuffle').addEventListener('click', reshuffle);
+    $('restart').addEventListener('click', () => { if (!busy) start(); });
+    $('next').addEventListener('click', () => { if (finished && cleared === TOTAL) start(true); });
+    $('mode').addEventListener('click', () => { if (!busy) { timed = !timed; start(); } });
+    $('endPrimary').addEventListener('click', () => start(cleared === TOTAL));
+    $('endSecondary').addEventListener('click', () => { if (cleared !== TOTAL) timed = false; start(); });
+    buildTiles(); start(); setInterval(updateClock, 250);
+  })();
   </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
   "name": "game-over",
   "version": "1.0.0",
   "private": true,
-  "description": "Browser mini games with multiplayer blackjack and doudizhu",
+  "description": "Browser mini game hub with multiplayer card games and solo challenges",
   "scripts": {
     "start": "node server.js"
   },

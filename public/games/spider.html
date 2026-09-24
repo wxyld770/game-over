@@ -121,13 +121,16 @@
       user-select: none;
       touch-action: manipulation;
     }
-    .card.face-up { cursor: grab; }
+    .card.face-up { cursor: grab; background: linear-gradient(145deg,#fffaf0,#eee5d4); border-color: #cbbd9f; }
     .card.face-up:active { cursor: grabbing; }
     .card.is-selected { border: 3px solid #f8cb65; background: #fff9e9; box-shadow: 0 0 0 2px #346849, 0 7px 15px rgba(0,0,0,.38); }
     .card.is-picked-run { box-shadow: 0 0 0 2px #f4d488, 0 7px 15px rgba(0,0,0,.38); }
-    .card-corner { display: flex; align-items: center; gap: 2px; padding: 3px 5px; color: #182d25; font-weight: 900; font-size: clamp(13px,1.25vw,18px); line-height: 1; }
+    .card.is-hint-source { box-shadow: 0 0 0 3px #ffe393, 0 0 18px rgba(255,226,145,.8); animation: hint-pulse 1s ease-in-out 3; }
+    .column.is-hint-target::before { border: 3px solid #fff0ac; background: rgba(255,225,135,.18); box-shadow: 0 0 18px rgba(255,225,135,.7); animation: hint-pulse 1s ease-in-out 3; }
+    .card-corner { display: flex; align-items: center; gap: 2px; padding: 3px 5px; color: #102a20; font-weight: 950; font-size: clamp(15px,1.45vw,20px); line-height: 1; text-shadow: 0 1px 0 #fff; }
     .card-corner i { font-size: .76em; font-style: normal; }
-    .card-center { flex: 1; display: grid; place-items: center; color: #20362d; font-size: clamp(23px,2.3vw,35px); opacity: .82; }
+    .card-center { flex: 1; display: grid; place-items: center; color: #234838; font-size: clamp(24px,2.5vw,38px); opacity: .84; }
+    .card-bottom { align-self: end; padding: 0 6px 3px; color: #234838; font-size: 12px; font-weight: 850; line-height: 1; transform: rotate(180deg); }
     .card.back { padding: 4px; border-color: #dfbe75; background: #163a36; }
     .back-pattern { width: 100%; height: 100%; display: grid; place-items: center; border: 1px solid rgba(239,216,156,.85); border-radius: 4px; background: repeating-linear-gradient(45deg, rgba(230,200,128,.13) 0 2px, transparent 2px 9px), radial-gradient(circle,#2a5e53,#113b39); color: rgba(243,219,163,.75); font-size: 22px; }
     .side { display: grid; gap: 14px; }
@@ -136,6 +139,8 @@
     .side-panel p { margin: 0; color: #c8d7c8; font-size: .85rem; line-height: 1.65; }
     .stock-button { width: 100%; min-height: 89px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px; border: 1px solid rgba(232,201,133,.45); border-radius: 12px; background: rgba(9,44,34,.65); color: var(--cream); text-align: left; }
     .stock-button:hover:not(:disabled) { background: rgba(232,201,133,.14); }
+    .stock-button.hint-deal { border-color: #fff0ad; box-shadow: 0 0 0 2px rgba(255,236,166,.35), 0 0 25px rgba(255,227,147,.35); animation: hint-pulse 1s ease-in-out 3; }
+    @keyframes hint-pulse { 50% { filter: brightness(1.23); } }
     .stock-button strong { display: block; font-size: 1rem; }
     .stock-button small { color: var(--muted); font-size: .76rem; }
     .stock-cards { position: relative; flex: 0 0 67px; height: 58px; }
@@ -152,6 +157,17 @@
     .status { min-height: 41px; display: flex; align-items: center; gap: 9px; margin-top: 15px; padding: 8px 13px; border: 1px solid rgba(231,203,145,.25); border-radius: 10px; background: rgba(12,43,31,.75); color: #e0e7cd; font-size: .85rem; }
     .status::before { content: "✦"; color: var(--gold); font-size: 1rem; }
     .bottom-note { margin: 14px 0 0; color: #aec4ad; font-size: .76rem; }
+    .sequence-celebration { position: absolute; z-index: 5; left: 50%; top: 42%; width: min(350px,88%); padding: 22px 15px; border: 1px solid #f3d68e; border-radius: 20px; background: radial-gradient(circle,rgba(38,99,63,.97),rgba(5,48,37,.95)); box-shadow: 0 22px 70px rgba(0,0,0,.35), 0 0 45px rgba(249,219,133,.42); text-align: center; pointer-events: none; transform: translate(-50%,-50%); }
+    .sequence-celebration[hidden] { display: none; }
+    .sequence-celebration.active { animation: collect-pop .9s ease both; }
+    .sequence-cards { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; }
+    .sequence-cards i { display: grid; place-items: center; width: 34px; height: 46px; border: 1px solid #e8d6b0; border-radius: 5px; background: #fff7e7; color: #163d2c; font-size: 1.2rem; font-style: normal; font-weight: 900; box-shadow: 0 3px 8px rgba(0,0,0,.22); }
+    .sequence-cards i:nth-child(1) { transform: rotate(-13deg) translateY(4px); }
+    .sequence-cards i:nth-child(2) { transform: rotate(-6deg); }
+    .sequence-cards i:nth-child(4) { transform: rotate(6deg); }
+    .sequence-cards i:nth-child(5) { transform: rotate(13deg) translateY(4px); }
+    .sequence-celebration strong { color: #ffe2a0; font-size: 1.15rem; }
+    @keyframes collect-pop { 0% { opacity: 0; transform: translate(-50%,-35%) scale(.65); } 18% { opacity: 1; transform: translate(-50%,-50%) scale(1.04); } 67% { opacity: 1; transform: translate(-50%,-50%) scale(1); } 100% { opacity: 0; transform: translate(-50%,-70%) scale(.92); } }
     .win-cover { position: fixed; z-index: 10; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(4,19,17,.76); backdrop-filter: blur(7px); }
     .win-cover[hidden] { display: none; }
     .win-panel { width: min(460px,100%); padding: 38px 30px; border: 1px solid #e9c981; border-radius: 24px; background: radial-gradient(circle at top,#286544,#102f26 70%); box-shadow: 0 30px 90px rgba(0,0,0,.45); text-align: center; }
@@ -161,7 +177,8 @@
     .win-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
     @media (max-width: 1080px) {
-      .game-grid { grid-template-columns: 1fr; }
+      .game-grid { grid-template-columns: minmax(0, 1fr); }
+      .game-grid > div { min-width: 0; }
       .side { grid-template-columns: repeat(2,minmax(0,1fr)); }
       .side-panel:last-child { grid-column: 1 / -1; }
     }
@@ -169,17 +186,19 @@
       :root { --card-h: 86px; --up-step: 28px; --down-step: 11px; }
       .topbar { min-height: 68px; }
       .brand { font-size: .9rem; }
-      .intro { padding-top: 20px; }
-      .toolbar { width: 100%; }
-      .toolbar .action { flex: 1; padding: 8px 9px; font-size: .82rem; }
-      .stats { gap: 6px; }
-      .stat { min-height: 62px; padding: 8px 10px; }
+      .intro { display: block; padding-top: 20px; }
+      .intro > div:first-child { min-width: 0; }
+      .intro p:last-child { overflow-wrap: anywhere; }
+      .toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; margin-top: 17px; }
+      .toolbar .action { min-width: 0; width: 100%; padding: 8px 4px; font-size: .78rem; line-height: 1.25; }
+      .stats { width: 100%; gap: 6px; }
+      .stat { min-width: 0; min-height: 62px; padding: 8px 7px; }
       .stat strong { font-size: 1.13rem; }
       .table { min-height: 495px; padding: 12px 9px; }
       .table-head { padding-bottom: 10px; }
       .board { min-width: 680px; min-height: 365px; }
-      .card-corner { font-size: 13px; }
-      .card-center { font-size: 22px; }
+      .card-corner { font-size: 15px; }
+      .card-center { font-size: 25px; }
       .side { grid-template-columns: 1fr; }
       .side-panel:last-child { grid-column: auto; }
     }
@@ -202,6 +221,7 @@
           <p>八副黑桃，十列牌阵。理清每一步，把八组 K 到 A 全部收走。</p>
         </div>
         <div class="toolbar">
+          <button class="action" id="hintButton" type="button">✦ 提示</button>
           <button class="action" id="undoButton" type="button">↶ 撤销上一步</button>
           <button class="action primary" id="newButton" type="button">↻ 新游戏</button>
         </div>
@@ -217,13 +237,17 @@
           <div class="table-frame">
             <section class="table" aria-label="蜘蛛纸牌牌桌">
               <div class="table-head"><strong>♠ · SPIDER TABLE</strong><span>手机点选 · 电脑拖拽</span></div>
+              <div class="sequence-celebration" id="sequenceCelebration" hidden aria-hidden="true">
+                <div class="sequence-cards"><i>K</i><i>Q</i><i>J</i><i>10</i><i>A</i></div>
+                <strong id="sequenceLabel">K → A · 收齐一组！</strong>
+              </div>
               <div class="board-scroll" tabindex="0" aria-label="十列牌阵，可左右滑动查看">
                 <div class="board" id="board" aria-label="十列牌阵"></div>
               </div>
             </section>
           </div>
-          <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可以直接拖拽。</div>
-          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列。</p>
+          <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
+          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示只标记可行走法，不保证最优解。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
@@ -273,10 +297,17 @@
       const status = document.getElementById("status");
       const dealButton = document.getElementById("dealButton");
       const undoButton = document.getElementById("undoButton");
+      const hintButton = document.getElementById("hintButton");
+      const sequenceCelebration = document.getElementById("sequenceCelebration");
       const winCover = document.getElementById("winCover");
       let game;
       let history = [];
       let selected = null;
+      let hint = null;
+      let hintCursor = 0;
+      let hintTimer = null;
+      let celebrating = false;
+      let celebrationTimer = null;
       let dragging = false;
 
       function randomIndex(max) {
@@ -378,9 +409,96 @@
         if (!target) return false;
         return !target.length || target[target.length - 1].r === game.cols[fromCol][fromIndex].r + 1;
       }
+      function clearHint() {
+        hint = null;
+        clearTimeout(hintTimer);
+        hintTimer = null;
+        dealButton.classList.remove("hint-deal");
+        board.querySelectorAll(".is-hint-source, .is-hint-target").forEach(element => {
+          element.classList.remove("is-hint-source", "is-hint-target");
+        });
+      }
       function clearSelection() {
         selected = null;
+        clearHint();
         renderBoard();
+      }
+      function findHints() {
+        const moves = [];
+        for (let fromCol = 0; fromCol < 10; fromCol++) {
+          const source = game.cols[fromCol];
+          for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
+            if (!pickable(fromCol, fromIndex)) continue;
+            const run = source.slice(fromIndex);
+            for (let toCol = 0; toCol < 10; toCol++) {
+              if (!canMove(fromCol, fromIndex, toCol)) continue;
+              const target = game.cols[toCol];
+              const end = target.concat(run).slice(-13);
+              const completes = end.length === 13 &&
+                end.every((card, i) => card.up && card.r === 13 - i);
+              const reveals = fromIndex > 0 && !source[fromIndex - 1].up;
+              const priority = (completes ? 100 : 0) + (reveals ? 35 : 0) +
+                (target.length ? 12 : 0) + Math.min(run.length, 10);
+              moves.push({ fromCol, fromIndex, toCol, count: run.length, priority });
+            }
+          }
+        }
+        return moves.sort((a, b) => b.priority - a.priority ||
+          a.fromCol - b.fromCol || a.toCol - b.toCol);
+      }
+      function showHint() {
+        if (game.completed === 8) return;
+        clearHint();
+        const moves = findHints();
+        if (moves.length) {
+          const move = moves[hintCursor % moves.length];
+          hintCursor = (hintCursor + 1) % moves.length;
+          selected = { col: move.fromCol, index: move.fromIndex };
+          hint = move;
+          renderBoard();
+          const viewport = board.parentElement;
+          const column = board.querySelector('.column[data-col="' + move.fromCol + '"]');
+          if (column && viewport.scrollTo) {
+            viewport.scrollTo({
+              left: Math.max(0, column.offsetLeft - viewport.clientWidth / 2 + column.clientWidth / 2),
+              behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+            });
+          }
+          announce("提示：第 " + (move.fromCol + 1) + " 列的 " + move.count +
+            " 张牌 → 第 " + (move.toCol + 1) + " 列。点亮的目标列可放置。");
+          hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
+        } else if (game.stock.length && game.cols.every(col => col.length)) {
+          selected = null;
+          renderBoard();
+          dealButton.classList.add("hint-deal");
+          announce("当前没有合法移牌，可以从底牌发下一轮。");
+          hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
+        } else if (game.stock.length) {
+          announce("当前没有合法移牌；先填满空列才能发牌，可尝试撤销。");
+        } else {
+          announce("当前没有合法移牌，底牌也已用尽；可尝试撤销或新游戏。");
+        }
+      }
+      function clearCelebration() {
+        clearTimeout(celebrationTimer);
+        celebrationTimer = null;
+        celebrating = false;
+        sequenceCelebration.classList.remove("active");
+        sequenceCelebration.hidden = true;
+      }
+      function showCelebration(count) {
+        clearCelebration();
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        celebrating = true;
+        document.getElementById("sequenceLabel").textContent =
+          "K → A · 收齐 " + count + " 组！";
+        sequenceCelebration.hidden = false;
+        void sequenceCelebration.offsetWidth;
+        sequenceCelebration.classList.add("active");
+        celebrationTimer = setTimeout(() => {
+          clearCelebration();
+          if (game.completed === 8) render();
+        }, 920);
       }
       function collectCompleteRuns() {
         let collected = 0;
@@ -406,6 +524,9 @@
           announce(message);
         }
         selected = null;
+        clearHint();
+        hintCursor = 0;
+        if (collected) showCelebration(collected);
         save();
         render();
       }
@@ -428,6 +549,7 @@
           announce("先填满所有空列，才能从底牌发下一轮。");
           return;
         }
+        clearHint();
         snapshot();
         for (const col of game.cols) col.push({ r: game.stock.pop(), up: true });
         game.moves++;
@@ -435,6 +557,9 @@
         afterAction("新的一轮已经发到十列。", collected);
       }
       function undo() {
+        clearHint();
+        clearCelebration();
+        hintCursor = 0;
         const previous = history.pop();
         if (!previous) { announce("没有可撤销的步骤。"); return; }
         game.cols = previous.cols;
@@ -450,6 +575,9 @@
       function startNew(force) {
         if (!force && game && game.moves > 0 && game.completed < 8 &&
             !window.confirm("开始新游戏会清除当前进度，确定吗？")) return;
+        clearHint();
+        clearCelebration();
+        hintCursor = 0;
         game = freshGame();
         history = [];
         selected = null;
@@ -478,6 +606,7 @@
           column.setAttribute("role", "button");
           column.setAttribute("aria-label", "第 " + (colIndex + 1) + " 列，" + col.length + " 张牌");
           if (selected && canMove(selected.col, selected.index, colIndex)) column.classList.add("is-valid-target");
+          if (hint && hint.toCol === colIndex) column.classList.add("is-hint-target");
           const number = document.createElement("div");
           number.className = "column-number";
           number.textContent = String(colIndex + 1).padStart(2, "0");
@@ -494,11 +623,12 @@
             element.style.setProperty("--top", "calc(" + upBefore + " * var(--up-step) + " + downBefore + " * var(--down-step))");
             if (card.up) {
               const rank = RANKS[card.r];
-              element.innerHTML = '<span class="card-corner">' + rank + '<i>♠</i></span><span class="card-center" aria-hidden="true">♠</span>';
+              element.innerHTML = '<span class="card-corner">' + rank + '<i>♠</i></span><span class="card-center" aria-hidden="true">♠</span><span class="card-bottom" aria-hidden="true">' + rank + '♠</span>';
               element.setAttribute("role", "button");
               element.setAttribute("aria-label", "第 " + (colIndex + 1) + " 列，" + rank + "，点击选牌或作为落点");
               element.tabIndex = 0;
               element.draggable = pickable(colIndex, index);
+              if (hint && hint.fromCol === colIndex && index >= hint.fromIndex) element.classList.add("is-hint-source");
               if (selected && selected.col === colIndex) {
                 if (selected.index === index) element.classList.add("is-selected");
                 else if (index > selected.index) element.classList.add("is-picked-run");
@@ -524,11 +654,12 @@
         document.getElementById("dealHint").textContent = game.stock.length ? "还可发 " + (game.stock.length / 10) + " 轮" : "底牌已发完";
         dealButton.disabled = !game.stock.length || game.completed === 8;
         undoButton.disabled = !history.length;
+        hintButton.disabled = game.completed === 8;
         document.getElementById("completeTrack").innerHTML = Array.from({ length: 8 }, (_, i) =>
           '<span class="complete-slot' + (i < game.completed ? ' done' : '') + '" aria-label="第 ' + (i + 1) + ' 组' + (i < game.completed ? '已完成' : '未完成') + '">♠</span>'
         ).join("");
         updateTime();
-        if (game.completed === 8) {
+        if (game.completed === 8 && !celebrating) {
           document.getElementById("winSummary").textContent = "用时 " + formatTime(game.finishedAt - game.startedAt) + " · 共 " + game.moves + " 步";
           winCover.hidden = false;
           document.getElementById("winNewButton").focus();
@@ -552,6 +683,7 @@
           if (moveCards(selected.col, selected.index, colIndex)) return;
         }
         if (index >= 0 && pickable(colIndex, index)) {
+          clearHint();
           selected = { col: colIndex, index };
           renderBoard();
           const count = game.cols[colIndex].length - index;
@@ -578,6 +710,7 @@
         const col = Number(column.dataset.col);
         const index = Number(card.dataset.index);
         if (!pickable(col, index)) { event.preventDefault(); return; }
+        clearHint();
         selected = { col, index };
         dragging = true;
         event.dataTransfer.effectAllowed = "move";
@@ -609,6 +742,7 @@
         if (selected) clearSelection();
       });
       dealButton.addEventListener("click", deal);
+      hintButton.addEventListener("click", showHint);
       undoButton.addEventListener("click", undo);
       document.getElementById("newButton").addEventListener("click", () => startNew(false));
       document.getElementById("winNewButton").addEventListener("click", () => startNew(true));

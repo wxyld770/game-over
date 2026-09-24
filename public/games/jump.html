@@ -45,11 +45,11 @@
 <body>
   <div class="shell">
     <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · JUMP</span></header>
-    <div class="intro"><div><span class="eyebrow">HOLD · CHARGE · RELEASE</span><h1>跳一跳</h1><p>按住屏幕蓄力，松开跳到下一个平台。空格键也可以操作。</p></div><div class="scoreboard"><div class="scorebox"><span>当前得分</span><strong id="score">0</strong></div><div class="scorebox"><span>最高得分</span><strong id="best">0</strong></div></div></div>
+    <div class="intro"><div><span class="eyebrow">HOLD · CHARGE · RELEASE</span><h1>跳一跳</h1><p>按住屏幕蓄力，松开跳到下一个平台。空格键也可以操作。</p></div><div class="scoreboard"><div class="scorebox"><span>当前得分</span><strong id="score">0</strong></div><div class="scorebox"><span>最高得分</span><strong id="best">0</strong></div><div class="scorebox"><span>完美连击</span><strong id="combo">0</strong></div></div></div>
     <main>
       <div class="game-wrap"><canvas id="game" aria-label="跳一跳游戏画面，按住蓄力，松开起跳"></canvas></div>
-      <div class="controls"><p class="message" id="message" role="status">按住画面或空格键，看到落点提示后松开。</p><div class="actions"><button class="action secondary" id="restart" type="button">重新开始</button></div></div>
-      <section class="instruction"><h2>怎么玩</h2><p>按住越久，跳得越远；平台上方的金色小圈会提示预计落点。必须从上方落到平台才算成功。走过一个平台得 1 分；掉下去就结束，可以马上重玩。</p></section>
+      <div class="controls"><p class="message" id="message" role="status">按住画面或空格键蓄力，观察角色和蓄力条后松开。</p><div class="actions"><button class="action secondary" id="restart" type="button">重新开始</button></div></div>
+      <section class="instruction"><h2>怎么玩</h2><p>按住越久，跳得越远；角色会压低身体蓄势。落到新平台得 1 分，踩中平台中央额外得 2 分；连续完美落点还会增加连击奖励。带 ★ 的星光平台再奖励 3 分。掉下去就结束，可立即重玩。</p></section>
     </main>
   </div>
   <script>
@@ -60,6 +60,7 @@
       const message = document.getElementById('message');
       const scoreText = document.getElementById('score');
       const bestText = document.getElementById('best');
+      const comboText = document.getElementById('combo');
       const restart = document.getElementById('restart');
       let width = 900;
       let height = 450;
@@ -69,6 +70,11 @@
       let cameraX = 0;
       let score = 0;
       let best = 0;
+      let perfectStreak = 0;
+      let spawned = 0;
+      let particles = [];
+      let impactAt = -1000;
+      const reducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       let charging = false;
       let chargeSource = null;
       let activePointerId = null;
@@ -99,23 +105,37 @@
         const gap = (98 + Math.random() * 145) * scale;
         const size = (107 + Math.random() * 32) * scale;
         const shift = (Math.random() * 34 - 17) * scale;
-        return { x: previous.x + previous.w + gap, y: previous.y + shift, w: size, h: 25 * scale, hue: 176 + Math.random() * 42 };
+        spawned += 1;
+        return {
+          x: previous.x + previous.w + gap,
+          y: previous.y + shift,
+          w: size,
+          h: 25 * scale,
+          hue: 176 + Math.random() * 42,
+          special: spawned % 4 === 2 ? 'star' : 'normal',
+          pulse: 0
+        };
       }
 
       function start() {
         scale = Math.max(.74, Math.min(1, width / 760));
-        platforms = [{ x: 32 * scale, y: height - 105 * scale, w: 145 * scale, h: 25 * scale, hue: 181 }];
+        spawned = 0;
+        particles = [];
+        impactAt = -1000;
+        platforms = [{ x: 32 * scale, y: height - 105 * scale, w: 145 * scale, h: 25 * scale, hue: 181, special: 'normal', pulse: 0 }];
         for (let i = 0; i < 3; i += 1) platforms.push(nextPlatform(platforms.at(-1)));
         player = { x: platforms[0].x + platforms[0].w / 2, y: platforms[0].y - 19 * scale, vx: 0, vy: 0, r: 19 * scale, standing: platforms[0] };
         cameraX = 0;
         score = 0;
+        perfectStreak = 0;
         scoreText.textContent = '0';
+        comboText.textContent = '0';
         charging = false;
         chargeSource = null;
         activePointerId = null;
         charge = 0;
         state = 'ready';
-        message.textContent = '按住画面或空格键，看到落点提示后松开。';
+        message.textContent = '按住画面或空格键蓄力，观察角色和蓄力条后松开。';
       }
 
       function beginCharge(source) {
@@ -124,7 +144,7 @@
         chargeSource = source;
         chargeStart = performance.now();
         charge = 0;
-        message.textContent = '正在蓄力……松开就跳！';
+        message.textContent = '正在蓄势……看好距离，松开就跳！';
       }
 
       function cancelCharge(source) {
@@ -144,7 +164,22 @@
         player.vy = -(390 + 45 * charge) * scale;
         player.standing = null;
         state = 'jumping';
-        message.textContent = '起跳！看准下一个平台。';
+        burst(player.x, player.y + player.r, '#f7ce78', 7);
+        message.textContent = '起跳！瞄准平台中间，完美落点有额外奖励。';
+      }
+
+      function burst(x, y, color, count) {
+        if (reducedMotion) return;
+        for (let i = 0; i < count; i += 1) {
+          const angle = -Math.PI + Math.random() * Math.PI;
+          const speed = (50 + Math.random() * 95) * scale;
+          particles.push({ type: 'spark', x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+            life: .7, maxLife: .7, color });
+        }
+      }
+
+      function floatPoints(x, y, label, color) {
+        particles.push({ type: 'label', x, y, vx: 0, vy: -45 * scale, life: 1.15, maxLife: 1.15, label, color });
       }
 
       function land(platform) {
@@ -154,24 +189,54 @@
         player.standing = platform;
         state = 'ready';
         charge = 0;
+        impactAt = performance.now();
+        platform.pulse = 1;
+        burst(player.x, platform.y, platform.special === 'star' ? '#ffdc87' : '#a6efdb', 13);
         if (platform !== platforms[0]) {
-          score += 1;
+          const center = platform.x + platform.w / 2;
+          const perfect = Math.abs(player.x - center) <= platform.w * .12;
+          perfectStreak = perfect ? perfectStreak + 1 : 0;
+          const centerBonus = perfect ? 2 + Math.min(perfectStreak - 1, 2) : 0;
+          const specialBonus = platform.special === 'star' ? 3 : 0;
+          const earned = 1 + centerBonus + specialBonus;
+          score += earned;
           scoreText.textContent = score;
+          comboText.textContent = perfectStreak;
           if (score > best) {
             best = score;
             bestText.textContent = best;
             try { localStorage.setItem('jump:best', String(best)); } catch {}
           }
+          floatPoints(player.x, platform.y - 25 * scale,
+            (perfect ? '完美 ' : platform.special === 'star' ? '星光 ' : '') + '+' + earned,
+            perfect || specialBonus ? '#ffe19a' : '#d7f8e5');
           while (platforms.length && platforms[0] !== platform) platforms.shift();
           while (platforms.length < 4) platforms.push(nextPlatform(platforms.at(-1)));
-          message.textContent = `落得漂亮！已经跳过 ${score} 个平台。`;
+          if (perfect) {
+            message.textContent = '完美落点！本次 +' + earned + ' 分'
+              + (perfectStreak > 1 ? '，连续 ' + perfectStreak + ' 次中心着陆！' : '！');
+          } else if (specialBonus) {
+            message.textContent = '踩中星光平台！本次 +' + earned + ' 分。';
+          } else {
+            message.textContent = '成功落地！本次 +1 分。瞄准中间可得更多分。';
+          }
         } else {
+          perfectStreak = 0;
+          comboText.textContent = '0';
           message.textContent = '还在当前平台上，再多蓄一点力试试。';
         }
       }
 
       function update(dt, now) {
         if (charging) charge = Math.min(1, (now - chargeStart) / 1100);
+        for (const platform of platforms) platform.pulse = Math.max(0, (platform.pulse || 0) - dt * 3);
+        for (const particle of particles) {
+          particle.x += particle.vx * dt;
+          particle.y += particle.vy * dt;
+          if (particle.type === 'spark') particle.vy += 160 * scale * dt;
+          particle.life -= dt;
+        }
+        particles = particles.filter((particle) => particle.life > 0);
         if (state !== 'jumping') return;
         const previousBottom = player.y + player.r;
         player.vy += 850 * scale * dt;
@@ -190,7 +255,7 @@
         }
         if (state === 'jumping' && player.y - player.r > height + 80 * scale) {
           state = 'over';
-          message.textContent = `掉下去了！本次跳过 ${score} 个平台，点击“重新开始”再来。`;
+          message.textContent = `掉下去了！本次得分 ${score} 分，点击“重新开始”再来。`;
         }
         const desiredCamera = Math.max(0, player.x - width * .36);
         cameraX += (desiredCamera - cameraX) * Math.min(1, dt * 5);
@@ -198,7 +263,14 @@
 
       function roundedRect(x, y, w, h, radius) {
         ctx.beginPath();
-        ctx.roundRect(x, y, w, h, radius);
+        if (typeof ctx.roundRect === 'function') { ctx.roundRect(x, y, w, h, radius); return; }
+        const r = Math.min(radius, w / 2, h / 2);
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
       }
 
       function draw(now) {
@@ -229,57 +301,119 @@
         platforms.forEach((platform, index) => {
           const x = platform.x - cameraX;
           if (x + platform.w < -25 || x > width + 25) return;
+          const center = x + platform.w / 2;
           ctx.fillStyle = 'rgba(4,15,22,.28)';
           roundedRect(x + 7 * scale, platform.y + 8 * scale, platform.w, platform.h + 8 * scale, 10 * scale);
           ctx.fill();
-          ctx.fillStyle = `hsl(${platform.hue} 43% 46%)`;
+          ctx.fillStyle = platform.special === 'star' ? '#b37f35' : 'hsl(' + platform.hue + ' 43% 46%)';
           roundedRect(x, platform.y, platform.w, platform.h, 10 * scale);
           ctx.fill();
-          ctx.fillStyle = index === 0 ? '#d9d89c' : '#a7e3d2';
+          ctx.fillStyle = platform.special === 'star' ? '#ffe3a3' : index === 0 ? '#d9d89c' : '#a7e3d2';
           roundedRect(x + 6 * scale, platform.y + 2 * scale, platform.w - 12 * scale, 5 * scale, 4 * scale);
           ctx.fill();
+          if (platform.special === 'star') {
+            ctx.fillStyle = '#fff1bf';
+            ctx.textAlign = 'center';
+            ctx.font = '900 ' + Math.max(14, 18 * scale) + 'px sans-serif';
+            ctx.fillText('★', center, platform.y + 21 * scale);
+            ctx.font = '800 ' + Math.max(10, 11 * scale) + 'px sans-serif';
+            ctx.fillText('+3', center, platform.y - 6 * scale);
+          } else {
+            ctx.fillStyle = 'rgba(255,244,191,.75)';
+            roundedRect(center - platform.w * .12, platform.y + 8 * scale,
+              platform.w * .24, 4 * scale, 2 * scale);
+            ctx.fill();
+          }
+          if (platform.pulse > 0) {
+            ctx.strokeStyle = 'rgba(255,232,166,' + platform.pulse + ')';
+            ctx.lineWidth = (1 + platform.pulse * 3) * scale;
+            roundedRect(x - 2 * scale, platform.y - 2 * scale,
+              platform.w + 4 * scale, platform.h + 4 * scale, 12 * scale);
+            ctx.stroke();
+          }
         });
 
         if (charging && player.standing) {
-          const vx = (125 + 390 * charge) * scale;
-          const vy = (390 + 45 * charge) * scale;
-          const predictedX = player.x + vx * 2 * vy / (850 * scale) - cameraX;
-          ctx.strokeStyle = '#ffe19a';
-          ctx.lineWidth = 2.5;
-          ctx.setLineDash([5, 5]);
-          ctx.beginPath();
-          ctx.arc(predictedX, player.standing.y - 11 * scale, 12 * scale, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
           const bx = Math.max(15, Math.min(width - 150, player.x - cameraX - 65));
-          ctx.fillStyle = 'rgba(4,26,32,.7)';
-          roundedRect(bx, Math.max(12, player.y - 72 * scale), 130, 12, 6);
+          const by = Math.max(24, player.y - 86 * scale);
+          ctx.fillStyle = 'rgba(4,26,32,.78)';
+          roundedRect(bx, by, 130, 13, 7);
           ctx.fill();
-          ctx.fillStyle = '#ffd57d';
-          roundedRect(bx, Math.max(12, player.y - 72 * scale), 130 * charge, 12, 6);
+          ctx.fillStyle = charge > .87 ? '#fff0b3' : '#ffd57d';
+          roundedRect(bx, by, 130 * charge, 13, 7);
           ctx.fill();
+          ctx.fillStyle = '#fff2c8';
+          ctx.textAlign = 'center';
+          ctx.font = '800 ' + Math.max(10, 12 * scale) + 'px sans-serif';
+          ctx.fillText('蓄力 ' + Math.round(charge * 100) + '%', bx + 65, by - 7);
+          const cx = player.x - cameraX;
+          ctx.strokeStyle = 'rgba(255,223,153,' + (.2 + charge * .55) + ')';
+          ctx.lineWidth = 2 * scale;
+          for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(cx + side * (26 + charge * 3) * scale, player.y - 14 * scale);
+            ctx.lineTo(cx + side * (35 + charge * 8) * scale, player.y - 21 * scale);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx + side * (28 + charge * 4) * scale, player.y + 5 * scale);
+            ctx.lineTo(cx + side * (39 + charge * 6) * scale, player.y + 4 * scale);
+            ctx.stroke();
+          }
         }
 
         const px = player.x - cameraX;
         const py = player.y;
+        let stretchX = 1;
+        let stretchY = 1;
+        if (charging) {
+          stretchX = 1 + charge * .22;
+          stretchY = 1 - charge * .36;
+        } else if (state === 'jumping') {
+          stretchX = player.vy < 0 ? .87 : 1.05;
+          stretchY = player.vy < 0 ? 1.18 : .94;
+        } else {
+          const impact = Math.max(0, 1 - (now - impactAt) / 290);
+          stretchX = 1 + impact * .2;
+          stretchY = 1 - impact * .29;
+        }
         ctx.fillStyle = 'rgba(0,0,0,.2)';
         ctx.beginPath();
-        ctx.ellipse(px, Math.min(height - 8, py + player.r + 16 * scale), 22 * scale, 5 * scale, 0, 0, Math.PI * 2);
+        ctx.ellipse(px, Math.min(height - 8, py + player.r + 16 * scale),
+          (22 + (charging ? charge * 7 : 0)) * scale, 5 * scale, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.save();
+        ctx.translate(px, py + player.r * (1 - stretchY));
+        ctx.scale(stretchX, stretchY);
         ctx.fillStyle = state === 'over' ? '#e4a187' : '#ffe1a1';
         ctx.beginPath();
-        ctx.arc(px, py, player.r, 0, Math.PI * 2);
+        ctx.arc(0, 0, player.r, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#203b47';
         ctx.beginPath();
-        ctx.arc(px - 6 * scale, py - 3 * scale, 2 * scale, 0, Math.PI * 2);
-        ctx.arc(px + 6 * scale, py - 3 * scale, 2 * scale, 0, Math.PI * 2);
+        ctx.arc(-6 * scale, -3 * scale, 2 * scale, 0, Math.PI * 2);
+        ctx.arc(6 * scale, -3 * scale, 2 * scale, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#203b47';
         ctx.lineWidth = 2 * scale;
         ctx.beginPath();
-        ctx.arc(px, py + 2 * scale, 5 * scale, .12, Math.PI - .12);
+        ctx.arc(0, 2 * scale, 5 * scale, .12, Math.PI - .12);
         ctx.stroke();
+        ctx.restore();
+        for (const particle of particles) {
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, particle.life / Math.min(particle.maxLife, .35));
+          ctx.fillStyle = particle.color;
+          if (particle.type === 'label') {
+            ctx.textAlign = 'center';
+            ctx.font = '900 ' + Math.max(15, 22 * scale) + 'px sans-serif';
+            ctx.fillText(particle.label, particle.x - cameraX, particle.y);
+          } else {
+            ctx.beginPath();
+            ctx.arc(particle.x - cameraX, particle.y, 2.7 * scale, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
 
         if (state === 'over') {
           ctx.fillStyle = 'rgba(4,20,28,.5)';

@@ -93,12 +93,138 @@
     @media (max-width: 720px) { .setup { grid-template-columns: 1fr; } .hero { align-items: start; flex-direction: column; } .table { padding: 14px; min-height: 380px; } .players { gap: 5px; } .player { padding: 9px; } .player-name { font-size: .8rem; } .player-meta { font-size: .68rem; } .card { width: 48px; height: 71px; padding: 5px; font-size: .94rem; } .hand { gap: 5px; } }
     @media (max-width: 420px) { .shell { padding: 14px 10px 30px; } .roombar { padding: 12px; } .table::before { inset: 7px; } .card { width: 43px; height: 65px; } }
     @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
+
+    /* The tabletop and cards are original CSS artwork; no game assets are reused. */
+    :root { --bg:#071d1b; --panel:#143b32; --line:rgba(243,216,159,.2); --gold:#f5ca78; --paper:#fbf5e9; --muted:#b9d0c6; }
+    body { overflow-x:hidden; background:radial-gradient(circle at 50% -12%, #1e5a49 0, transparent 45%),radial-gradient(circle at 6% 75%, #153b36 0, transparent 34%),#071d1b; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.23; background-image:radial-gradient(rgba(255,255,255,.18) .7px,transparent .7px); background-size:7px 7px; mask-image:linear-gradient(to bottom,#000,transparent 78%); }
+    .shell { position:relative; width:min(1220px,100%); padding:20px 24px 70px; }
+    header { border-bottom:1px solid rgba(248,218,164,.13); }
+    .brand { color:#a8c9bb; }
+    .hero { position:relative; min-height:182px; padding:35px 0 30px; align-items:center; }
+    .hero > div:first-child { position:relative; z-index:2; }
+    h1 { margin:7px 0 6px; font-size:clamp(3.05rem,6.3vw,5.1rem); letter-spacing:.045em; text-shadow:0 5px 24px rgba(0,0,0,.18); }
+    .title-suit { display:inline-block; margin-left:.15em; color:#f0c56f; font-size:.52em; vertical-align:top; transform:rotate(15deg) translateY(.14em); }
+    .hero p { max-width:650px; font-size:.93rem; }
+    .eyebrow { letter-spacing:.21em; }
+    .hero-visual { position:absolute; right:86px; top:25px; width:235px; height:145px; opacity:.82; pointer-events:none; filter:drop-shadow(0 18px 15px rgba(0,0,0,.24)); }
+    .hero-card { position:absolute; top:17px; left:82px; display:flex; flex-direction:column; align-items:center; justify-content:space-around; width:82px; height:118px; padding:8px; border:2px solid #fff; border-radius:10px; background:linear-gradient(140deg,#fffef9,#e7e6de); color:#17392f; box-shadow:0 5px 16px rgba(0,0,0,.18); transform:rotate(4deg); }
+    .hero-card b { align-self:flex-start; font-size:1.4rem; line-height:1; }
+    .hero-card i { font-size:2.7rem; font-style:normal; line-height:1; }
+    .hero-card:first-child { left:32px; transform:rotate(-19deg) translateY(12px); }
+    .hero-card:nth-child(2) { z-index:1; color:#c62d39; transform:rotate(1deg); }
+    .hero-card:last-child { left:132px; transform:rotate(17deg) translateY(11px); }
+    .status { position:relative; z-index:2; align-self:flex-start; background:rgba(11,34,29,.75); box-shadow:0 0 0 4px rgba(229,189,112,.05); }
+    .panel { border-color:rgba(247,216,153,.19); background:linear-gradient(155deg,rgba(25,72,58,.95),rgba(12,42,37,.97)); box-shadow:0 23px 55px rgba(1,12,13,.31),inset 0 1px rgba(255,255,255,.07); }
+    .setup .panel { position:relative; overflow:hidden; min-height:285px; padding:27px; transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease; }
+    .setup .panel::before { content:""; position:absolute; top:-70px; right:-60px; width:180px; height:180px; border-radius:50%; border:1px solid rgba(246,212,146,.1); box-shadow:0 0 0 27px rgba(246,212,146,.035),0 0 0 54px rgba(246,212,146,.025); pointer-events:none; }
+    .setup .panel:hover { transform:translateY(-4px); border-color:rgba(247,216,153,.42); box-shadow:0 29px 57px rgba(1,12,13,.35); }
+    .mode-icon { width:56px; height:56px; border-radius:17px; background:linear-gradient(145deg,rgba(247,212,139,.22),rgba(247,212,139,.05)); box-shadow:inset 0 1px rgba(255,255,255,.14); font-size:1.9rem; }
+    .btn { border-radius:12px; box-shadow:0 5px 13px rgba(0,0,0,.13),inset 0 1px rgba(255,255,255,.35); transition:transform .16s ease,filter .16s ease,box-shadow .16s ease; }
+    .btn:not(:disabled):active { transform:translateY(2px) scale(.985); box-shadow:0 1px 4px rgba(0,0,0,.18); }
+    .btn.secondary { box-shadow:inset 0 1px rgba(255,255,255,.07); }
+    .roombar { min-height:65px; background:linear-gradient(90deg,rgba(19,64,51,.97),rgba(15,46,41,.97)); }
+    .roombar strong { font-size:1.22rem; letter-spacing:.17em; }
+    .table { min-height:430px; margin-top:16px; padding:24px 30px 18px; isolation:isolate; background:radial-gradient(ellipse at 50% 39%,#277658 0,#16523f 49%,#0d3c35 80%,#10342f 100%); box-shadow:0 26px 55px rgba(0,0,0,.3),inset 0 0 0 7px rgba(5,31,27,.35),inset 0 0 0 9px rgba(239,203,130,.27); }
+    .table::before { inset:17px; border:2px solid rgba(242,211,147,.35); border-radius:42% / 35%; box-shadow:inset 0 0 0 7px rgba(7,43,34,.2),0 0 0 7px rgba(3,22,21,.13); }
+    .table::after { content:""; position:absolute; z-index:-1; width:360px; height:180px; top:115px; left:50%; transform:translateX(-50%); border:1px solid rgba(255,230,176,.08); border-radius:50%; box-shadow:0 0 0 26px rgba(255,230,176,.018); pointer-events:none; }
+    .table.your-turn { border-color:rgba(255,218,140,.61); box-shadow:0 26px 55px rgba(0,0,0,.3),0 0 29px rgba(237,192,99,.11),inset 0 0 0 7px rgba(5,31,27,.35),inset 0 0 0 9px rgba(239,203,130,.36); }
+    .table-head { z-index:2; }
+    .table-title { display:grid; gap:2px; }
+    .table-kicker { color:#c7e0cd; opacity:.72; font-size:.61rem; font-weight:800; letter-spacing:.2em; }
+    .table-head h2 { font-size:1.33rem; letter-spacing:.035em; }
+    .table-indicators { display:flex; align-items:center; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
+    .role-summary,.timer { display:inline-flex; align-items:center; min-height:29px; padding:4px 10px; border:1px solid rgba(255,223,161,.34); border-radius:999px; background:rgba(5,37,30,.5); color:#ffe4ae; font-size:.74rem; font-weight:800; }
+    .timer:empty { display:none; }
+    .players { z-index:2; gap:14px; margin:26px 0 14px; }
+    .player { position:relative; min-height:93px; padding:13px 15px; border-color:rgba(214,235,214,.19); border-radius:16px; background:linear-gradient(135deg,rgba(3,33,30,.74),rgba(7,51,41,.54)); box-shadow:inset 0 1px rgba(255,255,255,.07); transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease; }
+    .player.landlord { border-color:rgba(255,211,126,.53); background:linear-gradient(135deg,rgba(91,61,20,.61),rgba(40,47,31,.69)); }
+    .player.farmer { border-color:rgba(124,225,197,.3); }
+    .player.me { box-shadow:inset 0 0 0 1px rgba(190,246,213,.18),inset 0 1px rgba(255,255,255,.1); }
+    .player.active { transform:translateY(-4px); border-color:#ffdf9e; box-shadow:0 0 0 2px rgba(253,219,153,.24),0 0 28px rgba(252,199,97,.22),inset 0 1px rgba(255,255,255,.13); }
+    .player.active::after { content:"当前回合"; position:absolute; top:-11px; right:11px; padding:3px 7px; border-radius:999px; background:#f3ca80; color:#204035; font-size:.6rem; font-weight:900; box-shadow:0 3px 9px rgba(0,0,0,.2); }
+    .player-name { font-size:.95rem; }
+    .badge { border-radius:999px; padding:3px 7px; font-weight:800; }
+    .badge.role-landlord { color:#2a382e; background:#f2c572; border-color:#f2c572; }
+    .badge.role-farmer { color:#c6fff1; background:rgba(58,159,137,.2); border-color:rgba(126,232,203,.38); }
+    .player-meta { margin-top:12px; color:#d1dfd4; }
+    .center { z-index:2; min-height:147px; padding:9px 5px 15px; }
+    .center-label { padding:4px 10px; border:1px solid rgba(255,232,175,.22); border-radius:999px; background:rgba(8,53,39,.35); color:#ffe5aa; font-size:.72rem; letter-spacing:.03em; }
+    .center-message { max-width:95%; margin-top:8px; padding:3px 12px; color:#e5f4e6; font-weight:700; text-shadow:0 2px 7px rgba(0,0,0,.23); }
+    .played-cards { min-height:61px; align-items:center; justify-content:flex-start; flex-wrap:nowrap; max-width:100%; overflow-x:auto; padding:8px 7px 5px; scrollbar-width:thin; }
+    .played-cards .mini-card:first-child { margin-left:auto; }
+    .played-cards .mini-card:last-child { margin-right:auto; }
+    .mini-card { position:relative; flex:none; display:flex; align-items:flex-start; justify-content:flex-start; width:39px; height:53px; padding:4px 3px; border:1px solid #f5f0e5; border-radius:6px; background:linear-gradient(145deg,#fffdf7,#ece9df); color:#1b3342; box-shadow:0 3px 7px rgba(0,0,0,.26); font-size:.68rem; }
+    .mini-card + .mini-card { margin-left:-7px; }
+    .mini-card .mini-rank { position:relative; z-index:1; display:grid; line-height:.95; font-size:.72rem; }
+    .mini-card .mini-suit { font-size:.76rem; }
+    .mini-card .mini-center { position:absolute; inset:0; display:grid; place-items:center; font-size:1.38rem; opacity:.86; }
+    .mini-card.red { color:#bf2d40; }
+    .mini-card.joker-big { color:#b32e3d; }
+    .mini-card.joker-small { color:#26627a; }
+    .mini-card.joker-big .mini-rank,.mini-card.joker-small .mini-rank { font-size:.55rem; }
+    .mini-card.entering { animation:playedIn .42s cubic-bezier(.16,1,.3,1) both; animation-delay:var(--delay,0ms); }
+    .bottom { z-index:2; width:fit-content; max-width:100%; min-height:43px; margin:5px auto 0; padding:5px 12px; border:1px solid rgba(247,219,165,.2); border-radius:999px; background:rgba(6,36,30,.33); color:#f5e4bd; }
+    .bottom .mini-card { width:28px; height:38px; font-size:.57rem; }
+    .bottom .mini-card .mini-center { font-size:.95rem; }
+    .my-hand-panel { position:relative; margin-top:17px; padding:20px 24px 21px; overflow:hidden; background:linear-gradient(155deg,rgba(26,67,54,.98),rgba(10,39,35,.98)); }
+    .my-hand-panel::before { content:""; position:absolute; top:-130px; left:50%; width:650px; height:250px; transform:translateX(-50%); border-radius:50%; background:rgba(239,216,167,.055); filter:blur(42px); pointer-events:none; }
+    .hand-head { position:relative; z-index:1; align-items:flex-start; }
+    .hand-head h2 { font-size:1.21rem; }
+    .hand-head h2 span { color:#f9d899; font-size:.8rem; }
+    .hand-meta { display:flex; align-items:center; justify-content:flex-end; gap:11px; flex-wrap:wrap; }
+    .hand-meta span { color:#bdd4c6; }
+    .hand-meta strong { padding:5px 9px; border:1px solid rgba(245,207,134,.4); border-radius:7px; color:#f9dcaa; background:rgba(5,33,29,.35); font-size:.75rem; }
+    .hand-viewport { position:relative; min-height:158px; margin:8px -7px 1px; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; scrollbar-color:#a2aa8d transparent; overscroll-behavior-inline:contain; touch-action:pan-x; }
+    .hand-viewport::-webkit-scrollbar,.played-cards::-webkit-scrollbar { height:6px; }
+    .hand-viewport::-webkit-scrollbar-thumb,.played-cards::-webkit-scrollbar-thumb { border-radius:10px; background:rgba(248,214,150,.49); }
+    .hand { position:relative; display:flex; width:max-content; min-width:100%; height:151px; min-height:0; flex-wrap:nowrap; justify-content:center; align-items:flex-end; gap:0; margin:0; padding:28px 17px 11px; touch-action:none; }
+    .card { position:relative; flex:none; display:flex; flex-direction:column; align-items:stretch; justify-content:space-between; width:78px; height:112px; padding:6px 7px; border:1px solid #e5e0d2; border-radius:9px; color:#192d3b; background:radial-gradient(circle at 18% 17%,#fffefa,#f6f3e9 58%,#e9e7dc); box-shadow:0 7px 0 rgba(5,19,19,.16),0 11px 16px rgba(0,0,0,.22),inset 0 0 0 2px #fdfbf5; transform:translateY(var(--arc,0px)) rotate(var(--tilt,0deg)); transform-origin:50% 100%; transition:transform .17s cubic-bezier(.2,.75,.23,1.2),box-shadow .17s ease,border-color .17s ease; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent; touch-action:none; }
+    .card + .card { margin-left:-30px; }
+    .card::after { content:""; position:absolute; inset:4px; border:1px solid rgba(26,50,45,.08); border-radius:5px; pointer-events:none; }
+    .card.red { color:#c1273d; }
+    .card.suit-diamond { color:#d44335; }
+    .card.suit-club { color:#1b5548; }
+    .card.joker-small { color:#26627a; background:linear-gradient(147deg,#fffefa,#e7f2ee); }
+    .card.joker-big { color:#bf3441; background:linear-gradient(147deg,#fffefa,#fce8e5); }
+    .card-index { display:grid; justify-items:start; gap:1px; width:27px; font-size:1.26rem; line-height:.9; font-weight:950; letter-spacing:-.05em; }
+    .card-index .suit { font-size:1.02rem; letter-spacing:0; }
+    .card-center { position:absolute; inset:27px 0 17px; display:grid; place-items:center; font-size:2.65rem; line-height:1; opacity:.88; text-shadow:0 1px rgba(255,255,255,.6); }
+    .card-footer { align-self:end; display:grid; justify-items:center; transform:rotate(180deg); font-size:.87rem; line-height:.9; font-weight:900; opacity:.9; }
+    .card-footer .suit { font-size:.75rem; }
+    .card.joker-small .card-center,.card.joker-big .card-center { font-size:2.2rem; }
+    .card.joker-small .card-index,.card.joker-big .card-index { font-size:.72rem; letter-spacing:0; }
+    .card.entering { animation:dealCard .34s cubic-bezier(.17,.85,.25,1.1) both; animation-delay:var(--deal-delay,0ms); }
+    .card.selected { z-index:100 !important; border-color:#f7bd58; box-shadow:0 0 0 3px #f9d47d,0 12px 27px rgba(0,0,0,.31),0 0 22px rgba(249,205,104,.3); transform:translateY(calc(var(--arc,0px) - 21px)) rotate(var(--tilt,0deg)); }
+    .card:focus-visible { z-index:110 !important; outline:3px solid #f8d682; outline-offset:3px; }
+    @media (hover:hover) { .card:not(.selected):hover { z-index:90 !important; transform:translateY(calc(var(--arc,0px) - 10px)) rotate(var(--tilt,0deg)); box-shadow:0 13px 21px rgba(0,0,0,.3); } }
+    .hand-rail { display:flex; justify-content:center; align-items:center; gap:13px; margin:-2px 0 13px; color:#b9d1bf; font-size:.72rem; }
+    .rail-button { display:grid; place-items:center; flex:none; width:38px; height:38px; padding:0; border:1px solid rgba(239,211,151,.35); border-radius:50%; color:#f7d698; background:rgba(4,29,26,.4); font-size:1.45rem; line-height:1; transition:background .15s,transform .15s; }
+    .rail-button:hover { background:rgba(242,206,138,.16); transform:scale(1.08); }
+    .rail-button:disabled { opacity:.28; cursor:default; }
+    .actions { position:relative; z-index:1; gap:10px; }
+    .actions .btn { min-width:102px; min-height:46px; font-size:.92rem; }
+    .hint { position:relative; z-index:1; }
+    .result { position:relative; overflow:hidden; padding:28px; border-color:rgba(246,205,130,.5); background:radial-gradient(circle at 50% -10%,rgba(246,213,143,.2),transparent 52%),linear-gradient(145deg,#1c5141,#0e312b); animation:resultIn .55s cubic-bezier(.17,.85,.25,1.1) both; }
+    .result::before,.result::after { content:"✦"; position:absolute; top:24px; color:#f3cb7e; font-size:1.9rem; opacity:.65; }
+    .result::before { left:13%; }
+    .result::after { right:13%; }
+    .result h2 { font-size:2rem; }
+    .result.win h2 { color:#ffe3a9; text-shadow:0 3px 19px rgba(248,202,105,.24); }
+    .result.lose h2 { color:#f8d7c5; }
+    @keyframes dealCard { from { opacity:0; transform:translateY(40px) rotate(-10deg) scale(.89); } to { opacity:1; transform:translateY(var(--arc,0px)) rotate(var(--tilt,0deg)) scale(1); } }
+    @keyframes playedIn { from { opacity:0; transform:translateY(30px) scale(.86); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes resultIn { from { opacity:0; transform:translateY(18px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @media (max-width:960px) { .hero-visual { right:30px; opacity:.43; } .table { padding:22px 20px 17px; } .card { width:70px; height:104px; } .card + .card { margin-left:-31px; } .card-center { font-size:2.4rem; } .hand { height:143px; } }
+    @media (max-width:720px) { .shell { padding:14px 13px 45px; } .hero { min-height:150px; padding:24px 0 22px; } .hero-visual { right:5px; top:13px; transform:scale(.72); transform-origin:top right; opacity:.27; } .hero p { font-size:.86rem; } .setup .panel { min-height:0; } .table { min-height:405px; padding:19px 14px 16px; } .table::before { inset:8px; } .players { gap:6px; margin:24px 0 14px; } .player { min-height:86px; padding:10px 8px; } .player-name { font-size:.77rem; } .player-meta { margin-top:10px; font-size:.67rem; line-height:1.4; } .player.active::after { top:-10px; right:1px; font-size:.53rem; } .center { min-height:151px; } .my-hand-panel { padding:17px 14px 20px; } .card { width:66px; height:99px; } .card + .card { margin-left:-34px; } .card-index { font-size:1.12rem; } .card-center { font-size:2.2rem; } .hand { height:139px; justify-content:flex-start; } .hand-viewport { min-height:146px; } .actions .btn { min-width:87px; } }
+    @media (max-width:430px) { .shell { padding:11px 9px 36px; } .brand { font-size:.61rem; } .hero { min-height:139px; } h1 { font-size:3.1rem; } .table { padding:18px 11px 15px; } .table-kicker { display:none; } .table-head h2 { font-size:1.1rem; } .role-summary,.timer { min-height:25px; padding:3px 7px; font-size:.64rem; } .players { gap:5px; } .player { min-height:83px; padding:9px 5px; } .player-name { gap:3px; font-size:.72rem; } .badge { padding:2px 5px; font-size:.58rem; } .player-meta { font-size:.62rem; } .center-message { font-size:.79rem; } .hand-head { gap:4px; } .hand-head h2 { font-size:1rem; } .hand-meta { gap:4px; } .hand-meta span { display:none; } .hand-meta strong { font-size:.67rem; } .card { width:63px; height:94px; padding:5px 6px; } .card + .card { margin-left:-35px; } .card-center { font-size:2.03rem; } .hand { height:132px; padding-left:13px; padding-right:13px; } .hand-viewport { min-height:137px; } .hand-rail { font-size:.66rem; } .actions .btn { min-width:76px; padding:0 11px; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
   </style>
 </head>
 <body>
   <div class="shell">
     <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · DOU DIZHU</span></header>
-    <div class="hero"><div><span class="eyebrow">SOLO OR FRIENDS</span><h1>斗地主</h1><p>一个人和两名电脑较量，或叫上两位朋友在线同桌。叫分抢地主，轮流出牌，先出完手牌的一方获胜。</p></div><span class="status" id="connection" hidden>连接中</span></div>
+    <div class="hero"><div><span class="eyebrow">SOLO OR FRIENDS · 3 PLAYER TABLE</span><h1>斗地主<span class="title-suit">♠</span></h1><p>一个人和两名电脑较量，或叫上两位朋友在线同桌。叫分抢地主，轮流出牌，先出完手牌的一方获胜。</p></div><div class="hero-visual" aria-hidden="true"><span class="hero-card"><b>A</b><i>♠</i></span><span class="hero-card"><b>K</b><i>♥</i></span><span class="hero-card"><b>J</b><i>♣</i></span></div><span class="status" id="connection" hidden>连接中</span></div>
 
     <main>
       <section class="setup" id="setup">
@@ -109,13 +235,13 @@
 
       <section id="gameView" hidden>
         <div class="roombar panel"><span class="room-mode" id="roomMode">房间</span><strong id="roomCode"></strong><span class="spacer"></span><button class="btn secondary" id="copyLink" type="button" hidden>复制邀请链接</button><button class="btn danger" id="leave" type="button">离开房间</button></div>
-        <section class="table panel" aria-label="斗地主牌桌">
-          <div class="table-head"><h2 id="phaseTitle">等待玩家</h2><span class="timer" id="timer"></span></div>
+        <section class="table panel" id="gameTable" aria-label="斗地主牌桌">
+          <div class="table-head"><div class="table-title"><span class="table-kicker">LIVE TABLE · 经典三人局</span><h2 id="phaseTitle">等待玩家</h2></div><div class="table-indicators"><span class="role-summary" id="roleSummary">地主 vs 农民</span><span class="timer" id="timer"></span></div></div>
           <div class="players" id="players"></div>
           <div class="center"><span class="center-label" id="centerLabel"></span><div class="played-cards" id="playedCards"></div><p class="center-message" id="centerMessage"></p><div class="bids" id="bidHistory"></div></div>
           <div class="bottom" id="bottomCards"></div>
         </section>
-        <section class="my-hand-panel panel"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><span id="handTip">点选想出的牌</span></div><div class="hand" id="hand"></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></section>
+        <section class="my-hand-panel panel"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><div class="hand-meta"><span id="handTip">点选想出的牌</span><strong id="selectedCount">已选 0 张</strong></div></div><div class="hand-viewport" id="handViewport" aria-label="可横向浏览的手牌"><div class="hand" id="hand" role="group" aria-label="你的手牌，点击或按住滑动选择"></div></div><div class="hand-rail"><button class="rail-button" id="handPrev" type="button" aria-label="向左浏览手牌">‹</button><span>轻扫浏览 · 长按滑选</span><button class="rail-button" id="handNext" type="button" aria-label="向右浏览手牌">›</button></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></section>
         <section class="result panel" id="result" hidden><h2 id="resultTitle"></h2><p id="resultMessage"></p><button class="btn" id="again" type="button">再来一局</button></section>
       </section>
 
@@ -139,6 +265,11 @@
       let polling = null;
       let pending = false;
       let lastRenderedSignature = '';
+      let previousHandIds = new Set();
+      let lastPlaySignature = '';
+      let dragSelection = null;
+      let dragFrame = 0;
+      let lastPointerActivation = { id: '', time: 0 };
 
       function storeSession(code, value) {
         try {
@@ -180,51 +311,237 @@
       function showError(message, inRoom = false) {
         $(inRoom ? 'actionError' : 'setupError').textContent = message;
       }
+      function syncSelection() {
+        const hand = $('hand');
+        for (const element of hand.children) {
+          const selected = chosen.has(Number(element.dataset.cardId));
+          element.classList.toggle('selected', selected);
+          element.setAttribute('aria-pressed', String(selected));
+        }
+        $('selectedCount').textContent = `已选 ${chosen.size} 张`;
+        if (state) renderActions();
+      }
+      function toggleCard(id) {
+        if (chosen.has(id)) chosen.delete(id);
+        else chosen.add(id);
+        showError('', true);
+        syncSelection();
+      }
       function cardNode(card, interactive = false) {
         const element = document.createElement(interactive ? 'button' : 'span');
         element.className = interactive ? 'card' : 'mini-card';
         if (suitIsRed(card.suit)) element.classList.add('red');
         else element.classList.add('black');
+        const suitName = { '♠': 'spade', '♥': 'heart', '♣': 'club', '♦': 'diamond' }[card.suit];
+        if (suitName) element.classList.add(`suit-${suitName}`);
+        if (card.rank === '小王') element.classList.add('joker-small');
+        if (card.rank === '大王') element.classList.add('joker-big');
+        const rank = card.rank === '小王' ? '小王' : card.rank === '大王' ? '大王' : card.rank;
+        const symbol = card.suit || (card.rank === '大王' ? '✦' : '✧');
         if (interactive) {
           element.type = 'button';
           element.dataset.cardId = String(card.id);
           element.classList.toggle('selected', chosen.has(card.id));
           element.setAttribute('aria-pressed', chosen.has(card.id) ? 'true' : 'false');
           element.setAttribute('aria-label', cardText(card));
-          element.addEventListener('click', () => {
-            if (chosen.has(card.id)) chosen.delete(card.id);
-            else chosen.add(card.id);
-            showError('', true);
-            element.classList.toggle('selected', chosen.has(card.id));
-            element.setAttribute('aria-pressed', chosen.has(card.id) ? 'true' : 'false');
-            renderActions();
+          element.addEventListener('click', (event) => {
+            if (event.detail !== 0 && lastPointerActivation.id === String(card.id) && performance.now() - lastPointerActivation.time < 700) return;
+            toggleCard(card.id);
           });
           const top = document.createElement('span');
-          top.className = 'corner';
-          top.textContent = cardText(card);
-          element.append(top);
-          const large = document.createElement('span');
-          large.textContent = card.rank === '小王' || card.rank === '大王' ? '★' : (card.suit || '★');
-          large.style.alignSelf = 'center';
-          element.append(large);
-        } else element.textContent = cardText(card);
+          top.className = 'card-index';
+          const topRank = document.createElement('span');
+          topRank.textContent = rank;
+          const topSuit = document.createElement('span');
+          topSuit.className = 'suit';
+          topSuit.textContent = symbol;
+          top.append(topRank, topSuit);
+          const center = document.createElement('span');
+          center.className = 'card-center';
+          center.textContent = symbol;
+          const footer = document.createElement('span');
+          footer.className = 'card-footer';
+          const footRank = document.createElement('span');
+          footRank.textContent = rank;
+          const footSuit = document.createElement('span');
+          footSuit.className = 'suit';
+          footSuit.textContent = symbol;
+          footer.append(footRank, footSuit);
+          element.append(top, center, footer);
+        } else {
+          element.setAttribute('aria-label', cardText(card));
+          const miniRank = document.createElement('span');
+          miniRank.className = 'mini-rank';
+          miniRank.textContent = rank;
+          const miniSuit = document.createElement('span');
+          miniSuit.className = 'mini-suit';
+          miniSuit.textContent = symbol;
+          miniRank.append(miniSuit);
+          const miniCenter = document.createElement('span');
+          miniCenter.className = 'mini-center';
+          miniCenter.textContent = symbol;
+          element.append(miniRank, miniCenter);
+        }
         return element;
       }
       function renderHand() {
         if (!state) return;
         const focusedCardId = document.activeElement?.dataset?.cardId;
+        const previousScroll = $('handViewport').scrollLeft;
+        const freshHand = previousHandIds.size === 0;
         const hand = Array.isArray(state.hand) ? state.hand : [];
         const inHand = new Set(hand.map((card) => card.id));
         for (const id of chosen) if (!inHand.has(id)) chosen.delete(id);
         const sorted = [...hand].sort((a, b) => a.value - b.value || a.id - b.id);
-        $('hand').replaceChildren(...sorted.map((card) => cardNode(card, true)));
+        $('hand').replaceChildren(...sorted.map((card, index) => {
+          const element = cardNode(card, true);
+          const position = sorted.length > 1 ? index / (sorted.length - 1) - .5 : 0;
+          element.style.setProperty('--tilt', `${(position * 4.2).toFixed(2)}deg`);
+          element.style.setProperty('--arc', `${Math.round(Math.abs(position) * 5)}px`);
+          element.style.zIndex = String(index + 1);
+          if (!previousHandIds.has(card.id)) {
+            element.classList.add('entering');
+            element.style.setProperty('--deal-delay', `${Math.min(index * 24, 330)}ms`);
+          }
+          return element;
+        }));
+        previousHandIds = inHand;
+        $('handViewport').scrollLeft = freshHand ? 0 : previousScroll;
         if (focusedCardId) {
           const restoredFocus = [...$('hand').children].find((element) => element.dataset.cardId === focusedCardId);
           restoredFocus?.focus({ preventScroll: true });
         }
         $('handCount').textContent = `(${hand.length} 张)`;
-        $('handTip').textContent = state.canPlay ? '点选想出的牌，或选择过牌' : '等待轮到你';
+        $('handTip').textContent = state.canPlay ? '点击或滑动选牌' : '可提前选牌，等待轮到你';
+        $('selectedCount').textContent = `已选 ${chosen.size} 张`;
+        updateHandRail();
       }
+      function updateHandRail() {
+        const viewport = $('handViewport');
+        const max = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+        $('handPrev').disabled = viewport.scrollLeft < 3;
+        $('handNext').disabled = viewport.scrollLeft > max - 3;
+      }
+      function cardIndexAtX(clientX) {
+        const cards = [...$('hand').children];
+        if (!cards.length) return -1;
+        let index = 0;
+        for (let i = 1; i < cards.length; i += 1) {
+          if (clientX >= cards[i].getBoundingClientRect().left) index = i;
+          else break;
+        }
+        return index;
+      }
+      function applyDragRange(index) {
+        if (!dragSelection || index < 0) return;
+        chosen.clear();
+        for (const id of dragSelection.original) chosen.add(id);
+        const cards = [...$('hand').children];
+        const lower = Math.min(dragSelection.startIndex, index);
+        const upper = Math.max(dragSelection.startIndex, index);
+        for (let i = lower; i <= upper; i += 1) {
+          const id = Number(cards[i].dataset.cardId);
+          if (dragSelection.select) chosen.add(id);
+          else chosen.delete(id);
+        }
+        showError('', true);
+        syncSelection();
+      }
+      function stopDrag() {
+        dragSelection = null;
+        if (dragFrame) cancelAnimationFrame(dragFrame);
+        dragFrame = 0;
+      }
+      function keepDragInView() {
+        dragFrame = 0;
+        if (!dragSelection || !dragSelection.moved) return;
+        const viewport = $('handViewport');
+        const bounds = viewport.getBoundingClientRect();
+        const edge = 42;
+        let shift = 0;
+        if (dragSelection.x < bounds.left + edge) shift = -Math.min(13, Math.ceil((bounds.left + edge - dragSelection.x) / 3));
+        else if (dragSelection.x > bounds.right - edge) shift = Math.min(13, Math.ceil((dragSelection.x - (bounds.right - edge)) / 3));
+        if (shift) {
+          viewport.scrollLeft += shift;
+          applyDragRange(cardIndexAtX(dragSelection.x));
+        }
+        dragFrame = requestAnimationFrame(keepDragInView);
+      }
+      $('hand').addEventListener('pointerdown', (event) => {
+        const card = event.target.closest('.card');
+        if (!card || (event.pointerType === 'mouse' && event.button !== 0)) return;
+        const cards = [...$('hand').children];
+        const id = Number(card.dataset.cardId);
+        dragSelection = {
+          pointerId: event.pointerId,
+          startIndex: cards.indexOf(card),
+          id,
+          original: new Set(chosen),
+          select: !chosen.has(id),
+          startX: event.clientX,
+          lastX: event.clientX,
+          startedAt: performance.now(),
+          pointerType: event.pointerType,
+          mode: null,
+          x: event.clientX,
+          moved: false,
+        };
+        try { $('hand').setPointerCapture(event.pointerId); } catch {}
+      });
+      $('hand').addEventListener('pointermove', (event) => {
+        if (!dragSelection || dragSelection.pointerId !== event.pointerId) return;
+        if (dragSelection.pointerType === 'touch') {
+          if (!dragSelection.mode && Math.abs(event.clientX - dragSelection.startX) > 8) {
+            dragSelection.mode = performance.now() - dragSelection.startedAt >= 180 ? 'select' : 'scroll';
+          }
+          if (dragSelection.mode === 'scroll') {
+            $('handViewport').scrollLeft -= event.clientX - dragSelection.lastX;
+            dragSelection.lastX = event.clientX;
+            dragSelection.moved = true;
+            return;
+          }
+        }
+        dragSelection.x = event.clientX;
+        const index = cardIndexAtX(event.clientX);
+        if (Math.abs(event.clientX - dragSelection.startX) > 5 || index !== dragSelection.startIndex) {
+          dragSelection.moved = true;
+          applyDragRange(index);
+          if (!dragFrame) dragFrame = requestAnimationFrame(keepDragInView);
+        }
+      });
+      $('hand').addEventListener('pointerup', (event) => {
+        if (!dragSelection || dragSelection.pointerId !== event.pointerId) return;
+        if (dragSelection.mode === 'scroll') {
+          lastPointerActivation = { id: String(dragSelection.id), time: performance.now() };
+          stopDrag();
+          return;
+        }
+        if (dragSelection.moved) applyDragRange(cardIndexAtX(event.clientX));
+        else toggleCard(dragSelection.id);
+        lastPointerActivation = { id: String(dragSelection.id), time: performance.now() };
+        stopDrag();
+      });
+      $('hand').addEventListener('pointercancel', stopDrag);
+      $('hand').addEventListener('keydown', (event) => {
+        const card = event.target.closest('.card');
+        if (!card) return;
+        const cards = [...$('hand').children];
+        const index = cards.indexOf(card);
+        let next = index;
+        if (event.key === 'ArrowRight') next += 1;
+        else if (event.key === 'ArrowLeft') next -= 1;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = cards.length - 1;
+        else return;
+        event.preventDefault();
+        next = Math.max(0, Math.min(cards.length - 1, next));
+        cards[next]?.focus({ preventScroll: true });
+        cards[next]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        if (event.shiftKey && next !== index) toggleCard(Number(cards[next].dataset.cardId));
+      });
+      $('handViewport').addEventListener('scroll', updateHandRail, { passive: true });
+      $('handPrev').addEventListener('click', () => $('handViewport').scrollBy({ left: -220, behavior: 'smooth' }));
+      $('handNext').addEventListener('click', () => $('handViewport').scrollBy({ left: 220, behavior: 'smooth' }));
       function actionButton(text, callback, type = 'primary', disabled = false) {
         const button = document.createElement('button');
         button.type = 'button';
@@ -259,6 +576,7 @@
           item.className = 'player';
           if (player.id === state.selfId) item.classList.add('me');
           if (player.id === state.currentTurnId) item.classList.add('active');
+          if (state.landlordId) item.classList.add(player.id === state.landlordId ? 'landlord' : 'farmer');
           const name = document.createElement('div');
           name.className = 'player-name';
           const literal = document.createElement('span');
@@ -272,7 +590,14 @@
             if (!applies) continue;
             const badge = document.createElement('span');
             badge.className = 'badge';
+            if (text === '地主') badge.classList.add('role-landlord');
             badge.textContent = text;
+            name.append(badge);
+          }
+          if (state.landlordId && player.id !== state.landlordId) {
+            const badge = document.createElement('span');
+            badge.className = 'badge role-farmer';
+            badge.textContent = '农民';
             name.append(badge);
           }
           const meta = document.createElement('div');
@@ -286,12 +611,25 @@
           return item;
         });
         $('players').replaceChildren(...fragments);
+        $('roleSummary').textContent = state.landlordId
+          ? `♛ 地主 ${turnName(state.landlordId)} · ×${state.multiplier || 1}`
+          : '♛ 地主待定 · 等待叫分';
       }
       function renderCenter() {
         const last = state.lastPlay;
         $('centerLabel').textContent = last ? `${turnName(last.playerId)}出了 ${playName[last.type] || last.type || '牌'}` : (state.phase === 'lobby' ? '等朋友入座' : state.phase === 'bidding' ? '叫分决定谁当地主' : '新一轮出牌');
         const cards = Array.isArray(last?.cards) ? last.cards : [];
-        $('playedCards').replaceChildren(...cards.map((card) => cardNode(card)));
+        const signature = last ? `${last.playerId}:${cards.map((card) => card.id).join(',')}` : '';
+        const animate = !!signature && signature !== lastPlaySignature;
+        lastPlaySignature = signature;
+        $('playedCards').replaceChildren(...cards.map((card, index) => {
+          const element = cardNode(card);
+          if (animate) {
+            element.classList.add('entering');
+            element.style.setProperty('--delay', `${Math.min(index * 38, 280)}ms`);
+          }
+          return element;
+        }));
         $('centerMessage').textContent = state.message || (state.currentTurnId ? `轮到 ${turnName(state.currentTurnId)}` : '');
         $('bidHistory').replaceChildren(...(state.bidHistory || []).map((bid) => {
           const chip = document.createElement('span');
@@ -310,12 +648,15 @@
         $('result').hidden = !complete;
         if (!complete) return;
         const meWon = (state.winners || []).includes(state.selfId);
-        $('resultTitle').textContent = meWon ? '这局赢了！' : '这局结束';
+        $('result').classList.toggle('win', meWon);
+        $('result').classList.toggle('lose', !meWon);
+        $('resultTitle').textContent = meWon ? '漂亮，赢下这局！' : '这局惜败，再来！';
         const winnerNames = (state.winners || []).map(turnName).join('、');
         const readyCount = state.readyCount ?? 0;
         const neededCount = state.neededCount ?? (state.mode === 'solo' ? 1 : 3);
         const iAmReady = (state.nextReadyIds || []).includes(state.selfId);
-        $('resultMessage').textContent = `赢家：${winnerNames || '等待结算'}。底分 ${state.baseScore || 1} × 倍数 ${state.multiplier || 1}。已准备 ${readyCount}/${neededCount}${iAmReady ? '，等待其他人准备。' : '。'}`;
+        const winningSide = state.winningTeam === 'landlord' ? '地主' : '农民';
+        $('resultMessage').textContent = `${winningSide}获胜 · ${winnerNames || '等待结算'}。底分 ${state.baseScore || 1} × 倍数 ${state.multiplier || 1}。已准备 ${readyCount}/${neededCount}${iAmReady ? '，等待其他人准备。' : '。'}`;
         $('again').textContent = '准备下一局';
         $('again').hidden = !state.canStart;
       }
@@ -337,7 +678,8 @@
         $('roomMode').textContent = state.mode === 'solo' ? '单机房间' : '联机房间';
         $('roomCode').textContent = state.code;
         $('copyLink').hidden = state.mode !== 'online';
-        $('phaseTitle').textContent = phaseName[state.phase] || '斗地主';
+        $('phaseTitle').textContent = `第 ${state.round || 1} 局 · ${phaseName[state.phase] || '斗地主'}`;
+        $('gameTable').classList.toggle('your-turn', state.currentTurnId === state.selfId && state.phase !== 'finished');
         $('connection').hidden = false;
         $('connection').textContent = '牌桌已连接';
         renderPlayers();
@@ -357,6 +699,10 @@
         if (previousPhase !== nextState.phase) {
           chosen.clear();
           showError('', true);
+          if (nextState.phase === 'bidding' || nextState.phase === 'lobby') {
+            previousHandIds.clear();
+            lastPlaySignature = '';
+          }
         }
         render();
       }
@@ -405,6 +751,9 @@
         roomCode = '';
         token = '';
         chosen.clear();
+        previousHandIds.clear();
+        lastPlaySignature = '';
+        stopDrag();
         $('connection').hidden = true;
         $('gameView').hidden = true;
         $('setup').hidden = false;

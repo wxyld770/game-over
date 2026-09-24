@@ -8,13 +8,21 @@
   <title>数独 · Game Over</title>
   <style>
     :root{color-scheme:dark;--bg:#0b1718;--panel:#142521;--felt:#0c4538;--gold:#e9bf72;--gold-light:#f7d995;--paper:#f4eee1;--muted:#aebdb5;--line:rgba(242,231,201,.17);--red:#f29b83;--green:#9be1bc;font-family:"DM Sans","Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}body{min-width:320px;min-height:100vh;margin:0;color:var(--paper);background:radial-gradient(circle at 75% 8%,#1b3d33,transparent 33rem),radial-gradient(circle at 0 100%,#163a31,transparent 25rem),var(--bg)}button,select{font:inherit}button{cursor:pointer}button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--gold-light);outline-offset:3px}a{color:inherit;text-decoration:none}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{min-width:320px;min-height:100vh;margin:0;color:var(--paper);background:radial-gradient(circle at 75% 8%,#1b3d33,transparent 33rem),radial-gradient(circle at 0 100%,#163a31,transparent 25rem),var(--bg)}button,select{font:inherit}button{cursor:pointer}button:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--gold-light);outline-offset:3px}a{color:inherit;text-decoration:none}
     .shell{width:min(1120px,100%);margin:auto;padding:0 24px 46px}.topbar{min-height:76px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);gap:12px}.brand{display:flex;align-items:center;gap:11px;font-weight:750;letter-spacing:.08em}.mark{display:grid;place-items:center;width:40px;height:40px;border:1px solid var(--gold);border-radius:12px;color:var(--gold-light);font-size:20px}.back{font-size:.88rem;color:var(--gold-light);border-bottom:1px solid #b9945e;padding-bottom:3px}.eyebrow{margin:34px 0 9px;color:var(--gold);font-size:.75rem;font-weight:800;letter-spacing:.22em}.hero{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:22px}.hero h1{margin:0;font-size:clamp(2.5rem,5vw,4.2rem);letter-spacing:-.05em;line-height:1.1}.hero p{margin:9px 0 0;color:var(--muted);line-height:1.6}.timer{border:1px solid #b9945e73;border-radius:12px;padding:11px 16px;color:var(--gold-light);font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap}
     .layout{display:grid;grid-template-columns:minmax(0,610px) minmax(250px,1fr);gap:22px;align-items:start}.game-card,.side-card{border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#1d3a32,#112520);box-shadow:0 18px 48px #0003}.game-card{padding:22px}.toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;justify-content:space-between;margin-bottom:16px}.toolbar label{display:flex;align-items:center;gap:9px;font-size:.86rem;color:var(--muted)}select{border:1px solid #e9bf7260;border-radius:9px;background:#0b2621;color:var(--paper);padding:9px 30px 9px 11px}.toolbar-actions{display:flex;gap:8px}.small-btn,.tool-btn,.digit{border:1px solid #e9bf7260;border-radius:9px;background:#102d26;color:var(--gold-light);font-weight:700}.small-btn{padding:9px 12px}.small-btn:hover,.tool-btn:hover,.digit:hover{background:#244e3e}.board-wrap{display:flex;justify-content:center}.board{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));width:min(100%,540px);aspect-ratio:1;border:3px solid var(--gold);border-radius:9px;overflow:hidden;background:#dac49b;gap:1px;touch-action:manipulation}.cell{position:relative;display:grid;place-items:center;min-width:0;min-height:0;padding:0;border:0;border-radius:0;background:#f4eee1;color:#194335;font-size:clamp(1rem,3.3vw,2rem);font-weight:750;font-variant-numeric:tabular-nums;line-height:1}.cell.box-right{border-right:2px solid #947341}.cell.box-bottom{border-bottom:2px solid #947341}.cell.fixed{background:#e9dfca;color:#244138}.cell.peer{background:#e4eddd}.cell.same{background:#d3e4ce}.cell.selected{background:#f6d995;color:#17392d;box-shadow:inset 0 0 0 2px #8e6a2e;z-index:1}.cell.conflict,.cell.wrong{background:#efb6a6;color:#6c211f}.cell .candidates{width:100%;height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);align-items:center;justify-items:center;font-size:clamp(.48rem,1.55vw,.8rem);font-weight:650;color:#416f56}.cell.selected .candidates{color:#265743}
     .keypad{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:7px;margin-top:17px}.digit{min-width:0;height:48px;font-size:1.15rem}.tool-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}.tool-btn{min-height:43px;padding:8px 5px;font-size:.88rem}.tool-btn.active{background:var(--gold);color:#17392d;border-color:var(--gold)}.status{min-height:26px;margin:15px 0 0;color:var(--gold-light);font-size:.9rem;line-height:1.5}.status.error{color:var(--red)}.status.success{color:var(--green)}
     .side-card{padding:24px}.side-card h2{margin:0 0 14px;font-size:1.08rem}.side-card p,.side-card li{color:var(--muted);font-size:.91rem;line-height:1.8}.side-card ol{padding-left:20px;margin:0}.tip{margin-top:18px;padding:13px 15px;border:1px solid #e9bf724d;border-radius:11px;background:#e9bf720e;color:#e7d8b6;font-size:.84rem;line-height:1.7}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:780px){.layout{grid-template-columns:1fr}.side-card{padding:18px}.shell{padding:0 12px 30px}.hero{margin-bottom:16px}.hero h1{font-size:2.5rem}.game-card{padding:11px;border-radius:15px}.board{width:100%}.cell{font-size:clamp(1rem,5.7vw,1.7rem)}.cell .candidates{font-size:clamp(.47rem,2vw,.72rem)}}
     @media(max-width:390px){.toolbar{align-items:stretch}.toolbar-actions{width:100%}.small-btn{flex:1}.keypad{gap:4px}.digit{height:43px}.tool-btn{font-size:.78rem}.hero p{font-size:.84rem}}
+    .puzzle-meta{display:flex;align-items:center;gap:12px;margin:0 0 14px;color:#c9dfd2;font-size:.77rem;font-weight:700}.puzzle-meta span:first-child{white-space:nowrap}.progress-track{flex:1;height:7px;overflow:hidden;border-radius:999px;background:#071f1c;box-shadow:inset 0 1px 3px #0005}.progress-fill{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#83cda8,#f1cf81);box-shadow:0 0 12px #d8d08680;transition:width .25s ease}.save-mark{color:#a8c9b4;white-space:nowrap}
+    .cell.same{background:#c1e8c9;color:#0b4b3c;box-shadow:inset 0 0 0 1px #6aae83}.cell.selected.same{background:#f8d889;color:#17392d;box-shadow:inset 0 0 0 2px #8e6a2e}.cell.hinted{animation:hintPulse .75s ease 2;background:#d3edb6}.cell:focus-visible{z-index:3;outline:3px solid #e9a640;outline-offset:-3px}
+    .digit{height:52px;border-radius:12px;background:linear-gradient(145deg,#173a30,#0d2a25);font-size:1.3rem;transition:transform .14s ease,background .14s ease,box-shadow .14s ease}.digit.active{border-color:#f4d38c;background:#f4d38c;color:#17392d;box-shadow:0 0 0 3px #e9bf7230}.digit.done{opacity:.45}.digit:disabled{cursor:default}.digit:not(:disabled):active,.tool-btn:not(:disabled):active{transform:scale(.95)}
+    .tool-row{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.tool-btn{min-height:47px;border-radius:11px;transition:transform .14s ease,background .14s ease}.tool-btn:disabled{opacity:.43;cursor:default}.tool-btn.highlight{border-color:#f2ce87;color:#ffdfa1;background:#28503c}.status{min-height:42px}.finish-banner{display:flex;align-items:center;gap:14px;margin-top:14px;padding:15px;border:1px solid #d7c37c91;border-radius:15px;background:radial-gradient(circle at 10% 50%,#f4d78624,transparent 42%),#1d4b3b;box-shadow:0 10px 26px #0003;animation:finishIn .5s ease both}.finish-symbol{display:grid;place-items:center;flex:none;width:47px;height:47px;border-radius:50%;background:#f1d690;color:#224435;font-size:1.65rem;box-shadow:0 0 0 5px #f1d69024}.finish-copy{display:grid;gap:3px;flex:1}.finish-copy strong{color:#ffe5af;font-size:1rem}.finish-copy span{color:#cce4d2;font-size:.8rem}.finish-banner button{border:1px solid #f0d08d;border-radius:9px;padding:9px 12px;background:#f0d08d;color:#15372e;font-weight:800}
+    @keyframes hintPulse{50%{background:#fff0a4;box-shadow:inset 0 0 0 3px #e0a444}}@keyframes finishIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+    @media(max-width:600px){.keypad{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.digit{height:50px;font-size:1.28rem}.tool-row{grid-template-columns:repeat(3,minmax(0,1fr))}.tool-btn{min-height:49px}.puzzle-meta{font-size:.7rem}.save-mark{display:none}.finish-banner{flex-wrap:wrap}.finish-banner button{width:100%}}
+    @media(max-width:390px){.shell{padding-left:8px;padding-right:8px}.game-card{padding:9px}.cell{font-size:clamp(1rem,6vw,1.6rem)}.cell .candidates{font-size:.49rem}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   </style>
 </head>
 <body>
@@ -25,12 +33,14 @@
     <main class="layout">
       <section class="game-card" aria-label="数独游戏">
         <div class="toolbar"><label for="difficulty">难度 <select id="difficulty"><option value="easy">简单</option><option value="medium">中等</option><option value="hard">困难</option></select></label><div class="toolbar-actions"><button type="button" class="small-btn" id="restart">重开本题</button><button type="button" class="small-btn" id="new">换一题</button></div></div>
+        <div class="puzzle-meta"><span id="progressLabel">已填 0 / 0 格</span><div class="progress-track" aria-hidden="true"><i class="progress-fill" id="progressFill"></i></div><span class="save-mark">● 自动保存</span></div>
         <div class="board-wrap"><div class="board" id="board" role="grid" aria-label="数独棋盘"></div></div>
         <div class="keypad" aria-label="输入数字"><button type="button" class="digit" data-digit="1">1</button><button type="button" class="digit" data-digit="2">2</button><button type="button" class="digit" data-digit="3">3</button><button type="button" class="digit" data-digit="4">4</button><button type="button" class="digit" data-digit="5">5</button><button type="button" class="digit" data-digit="6">6</button><button type="button" class="digit" data-digit="7">7</button><button type="button" class="digit" data-digit="8">8</button><button type="button" class="digit" data-digit="9">9</button></div>
-        <div class="tool-row"><button type="button" class="tool-btn" id="erase">⌫ 擦除</button><button type="button" class="tool-btn" id="notes" aria-pressed="false">✎ 笔记：关</button><button type="button" class="tool-btn" id="check">✓ 检查</button></div>
+        <div class="tool-row"><button type="button" class="tool-btn" id="undo" aria-label="撤销上一步">↶ 撤销</button><button type="button" class="tool-btn" id="erase">⌫ 擦除</button><button type="button" class="tool-btn" id="notes" aria-pressed="false">✎ 笔记：关</button><button type="button" class="tool-btn highlight" id="hint">✦ 提示</button><button type="button" class="tool-btn" id="check">✓ 检查</button></div>
         <p class="status" id="status" role="status" aria-live="polite">选择空格，再点击数字。每题只有一个解。</p>
+        <div class="finish-banner" id="finishBanner" hidden><span class="finish-symbol" aria-hidden="true">✦</span><div class="finish-copy"><strong>九宫格完成！</strong><span id="finishDetail">做得漂亮</span></div><button type="button" id="finishNew">再来一题</button></div>
       </section>
-      <aside class="side-card"><h2>玩法规则</h2><ol><li>把 1～9 填进每一行、每一列和每个 3×3 宫。</li><li>同一行、列、宫内不能有重复数字；重复格会标红。</li><li>打开“笔记”后，数字会作为候选记录，不会直接填入。</li><li>填满后自动判定；也可随时点“检查”。</li></ol><div class="tip">电脑键盘：方向键移动，1～9 填数，Backspace / Delete 擦除，N 切换笔记。换题会生成一份新的唯一解题目。</div></aside>
+      <aside class="side-card"><h2>玩法规则</h2><ol><li>把 1～9 填进每一行、每一列和每个 3×3 宫。</li><li>选中数字会高亮棋盘里相同的数字；重复格会标红。</li><li>打开“笔记”后，数字会作为候选记录，不会直接填入。</li><li>卡住时点“提示”，误操作可撤销；进度会自动保存在本机。</li></ol><div class="tip">键盘：方向键移动，1～9 填数，Backspace / Delete 擦除，N 切换笔记，H 获取提示，Ctrl/⌘ + Z 撤销。手机上可直接点击棋盘和大号数字键。</div></aside>
     </main>
   </div>
   <script>
@@ -40,6 +50,8 @@
     const statusEl = document.getElementById('status');
     const timeEl = document.getElementById('time');
     const notesButton = document.getElementById('notes');
+    const undoButton = document.getElementById('undo');
+    const storageKey = 'game-over:sudoku:progress:v1';
     const allDigitsMask = 0x3fe;
     const clueCounts = { easy: 40, medium: 32, hard: 27 };
     let game;
@@ -48,6 +60,88 @@
     let noteMode = false;
     let clock;
     let cells = [];
+    let history = [];
+    let pausedAt = null;
+
+    function saveProgress() {
+      if (!game) return;
+      try {
+        const elapsedMs = Math.max(0, (game.completed ? game.finishedAt : pausedAt || Date.now()) - game.startedAt);
+        localStorage.setItem(storageKey, JSON.stringify({
+          version: 1, difficulty: game.difficulty, answer: game.answer, puzzle: game.puzzle,
+          values: game.values, notes: game.notes.map(set => [...set]), wrong: [...game.wrong],
+          selected: game.selected, completed: game.completed, elapsedMs, noteMode,
+        }));
+      } catch { /* The game remains playable if storage is unavailable. */ }
+    }
+    function validGrid(values, allowBlank) {
+      return Array.isArray(values) && values.length === 81
+        && values.every(value => Number.isInteger(value) && value >= (allowBlank ? 0 : 1) && value <= 9);
+    }
+    function validSolution(values) {
+      if (!validGrid(values, false)) return false;
+      for (let n = 0; n < 9; n++) {
+        const row = [], col = [], box = [];
+        for (let i = 0; i < 9; i++) {
+          row.push(values[n * 9 + i]);
+          col.push(values[i * 9 + n]);
+          box.push(values[(Math.floor(n / 3) * 3 + Math.floor(i / 3)) * 9 + (n % 3) * 3 + i % 3]);
+        }
+        if ([row, col, box].some(group => new Set(group).size !== 9)) return false;
+      }
+      return true;
+    }
+    function restoreProgress() {
+      let data;
+      try { data = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return false; }
+      if (!data || data.version !== 1 || !clueCounts[data.difficulty]
+        || !validSolution(data.answer) || !validGrid(data.puzzle, true) || !validGrid(data.values, true)
+        || !Array.isArray(data.notes) || data.notes.length !== 81
+        || data.notes.some(notes => !Array.isArray(notes) || notes.some(value => !Number.isInteger(value) || value < 1 || value > 9))
+        || data.puzzle.some((value, index) => value && value !== data.answer[index])
+        || data.puzzle.some((value, index) => value && data.values[index] !== value)
+        || !Number.isInteger(data.selected) || data.selected < 0 || data.selected > 80
+        || !Number.isFinite(data.elapsedMs) || data.elapsedMs < 0 || data.elapsedMs > 31536000000) return false;
+      const completed = !!data.completed && data.values.every((value, index) => value === data.answer[index]);
+      game = {
+        difficulty: data.difficulty, answer: data.answer, puzzle: data.puzzle,
+        values: data.values, notes: data.notes.map(notes => new Set(notes)),
+        wrong: new Set((Array.isArray(data.wrong) ? data.wrong : []).filter(index => Number.isInteger(index) && index >= 0 && index < 81)),
+        selected: data.selected, startedAt: Date.now() - data.elapsedMs,
+        finishedAt: completed ? Date.now() : null, completed, hintIndex: null,
+      };
+      document.getElementById('difficulty').value = data.difficulty;
+      noteMode = !!data.noteMode;
+      history = [];
+      buildBoard();
+      setStatus(completed ? '这题已完成！可以换一题继续挑战。' : '已恢复上次的题目进度。', completed ? 'success' : '');
+      updateTime(); render();
+      return true;
+    }
+    function snapshot() {
+      return {
+        values: game.values.slice(), notes: game.notes.map(set => [...set]), wrong: [...game.wrong],
+        selected: game.selected, completed: game.completed, finishedAt: game.finishedAt, hintIndex: game.hintIndex,
+      };
+    }
+    function rememberMove() {
+      history.push(snapshot());
+      if (history.length > 80) history.shift();
+    }
+    function undo() {
+      if (!game || !history.length) { setStatus('没有可撤销的操作。'); return; }
+      const previous = history.pop();
+      game.values = previous.values;
+      game.notes = previous.notes.map(notes => new Set(notes));
+      game.wrong = new Set(previous.wrong);
+      game.selected = previous.selected;
+      game.completed = previous.completed;
+      game.finishedAt = previous.finishedAt;
+      game.hintIndex = previous.hintIndex;
+      setStatus('已撤销上一步。');
+      render(); updateTime();
+      cells[game.selected]?.focus({ preventScroll: true });
+    }
 
     function shuffled(items) {
       const copy = items.slice();
@@ -149,7 +243,7 @@
         button.type = 'button';
         button.className = 'cell';
         button.setAttribute('role', 'gridcell');
-        button.addEventListener('click', () => { game.selected = index; render(); });
+        button.addEventListener('click', () => { game.selected = index; game.hintIndex = null; render(); });
         boardEl.append(button);
         return button;
       });
@@ -173,6 +267,7 @@
         if (index === selected) button.classList.add('selected');
         if (conflicts.has(index)) button.classList.add('conflict');
         if (game.wrong.has(index)) button.classList.add('wrong');
+        if (index === game.hintIndex) button.classList.add('hinted');
         button.replaceChildren();
         if (digit) button.textContent = String(digit);
         else if (notes.size) {
@@ -187,11 +282,32 @@
       notesButton.classList.toggle('active', noteMode);
       notesButton.setAttribute('aria-pressed', String(noteMode));
       notesButton.textContent = `✎ 笔记：${noteMode ? '开' : '关'}`;
+      undoButton.disabled = history.length === 0;
+      document.getElementById('hint').disabled = game.completed;
+      document.querySelectorAll('[data-digit]').forEach(button => {
+        const digit = Number(button.dataset.digit);
+        const done = game.values.filter((value, index) => value === digit && value === game.answer[index]).length === 9;
+        button.classList.toggle('active', selectedValue === digit);
+        button.classList.toggle('done', done);
+        button.disabled = game.completed || done;
+        button.setAttribute('aria-label', `数字 ${digit}${done ? '，已填完' : ''}`);
+      });
+      const givens = game.puzzle.filter(Boolean).length;
+      const filled = game.values.filter(Boolean).length - givens;
+      const needed = 81 - givens;
+      document.getElementById('progressLabel').textContent = `已填 ${filled} / ${needed} 格`;
+      document.getElementById('progressFill').style.width = `${Math.max(0, Math.min(100, filled / needed * 100))}%`;
+      document.getElementById('finishBanner').hidden = !game.completed;
+      if (game.completed) {
+        const difficultyName = { easy: '简单', medium: '中等', hard: '困难' }[game.difficulty];
+        document.getElementById('finishDetail').textContent = `${difficultyName}难度 · 用时 ${timeEl.textContent}`;
+      }
       updateStatus();
+      saveProgress();
     }
     function updateTime() {
       if (!game) return;
-      const seconds = Math.floor(((game.completed ? game.finishedAt : Date.now()) - game.startedAt) / 1000);
+      const seconds = Math.max(0, Math.floor(((game.completed ? game.finishedAt : pausedAt || Date.now()) - game.startedAt) / 1000));
       timeEl.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     }
     function resetCurrent() {
@@ -200,15 +316,18 @@
       game.wrong = new Set();
       game.selected = game.puzzle.findIndex(value => value === 0);
       game.startedAt = Date.now(); game.finishedAt = null; game.completed = false;
+      game.hintIndex = null;
+      history = [];
+      pausedAt = null;
       noteMode = false;
       setStatus('选择空格，再点击数字。每题只有一个解。');
-      render(); updateTime();
+      updateTime(); render();
     }
     function newGame() {
       const difficulty = document.getElementById('difficulty').value;
       setStatus('正在生成唯一解题目…');
       const { answer, puzzle } = makePuzzle(difficulty);
-      game = { answer, puzzle };
+      game = { answer, puzzle, difficulty };
       buildBoard();
       resetCurrent();
     }
@@ -217,13 +336,17 @@
       if (game.values.every((value, index) => value === game.answer[index])) {
         game.completed = true; game.finishedAt = Date.now(); updateTime();
         setStatus('全部正确！恭喜完成，可以换一题继续挑战。', 'success');
+        render();
       } else setStatus('所有格子已填满，还有数字不正确。点“检查”查看。', 'error');
     }
     function enterDigit(digit) {
       if (!game || game.completed || game.puzzle[game.selected]) return;
       const index = game.selected;
       if (noteMode && game.values[index]) { setStatus("先擦除当前数字，再记录候选笔记。"); return; }
+      if (!noteMode && game.values[index] === digit && game.notes[index].size === 0) return;
+      rememberMove();
       game.wrong.clear();
+      game.hintIndex = null;
       if (noteMode) { if (game.notes[index].has(digit)) game.notes[index].delete(digit); else game.notes[index].add(digit); }
       else { game.values[index] = digit; game.notes[index].clear(); }
       setStatus(noteMode ? '已更新候选笔记。' : '继续填数，重复数字会立即标红。');
@@ -231,8 +354,28 @@
     }
     function erase() {
       if (!game || game.completed || game.puzzle[game.selected]) return;
+      if (!game.values[game.selected] && game.notes[game.selected].size === 0) return;
+      rememberMove();
       game.values[game.selected] = 0; game.notes[game.selected].clear(); game.wrong.clear();
+      game.hintIndex = null;
       setStatus('已擦除选中格。'); render();
+    }
+    function hint() {
+      if (!game || game.completed) return;
+      const preferred = game.selected;
+      const index = !game.puzzle[preferred] && game.values[preferred] !== game.answer[preferred]
+        ? preferred : game.values.findIndex((value, at) => !game.puzzle[at] && value !== game.answer[at]);
+      if (index < 0) { winIfComplete(); return; }
+      rememberMove();
+      game.values[index] = game.answer[index];
+      game.notes[index].clear();
+      game.wrong.clear();
+      game.selected = index;
+      game.hintIndex = index;
+      const row = Math.floor(index / 9) + 1, col = index % 9 + 1;
+      setStatus(`提示：第 ${row} 行第 ${col} 列填 ${game.answer[index]}。`, 'success');
+      render(); winIfComplete();
+      cells[index].focus({ preventScroll: true });
     }
     function validate() {
       if (!game) return;
@@ -245,27 +388,43 @@
       render();
     }
     document.querySelectorAll('[data-digit]').forEach(button => button.addEventListener('click', () => enterDigit(Number(button.dataset.digit))));
+    undoButton.addEventListener('click', undo);
     document.getElementById('erase').addEventListener('click', erase);
     document.getElementById('notes').addEventListener('click', () => { noteMode = !noteMode; render(); });
+    document.getElementById('hint').addEventListener('click', hint);
     document.getElementById('check').addEventListener('click', validate);
     document.getElementById('restart').addEventListener('click', resetCurrent);
     document.getElementById('new').addEventListener('click', newGame);
+    document.getElementById('finishNew').addEventListener('click', newGame);
     document.getElementById('difficulty').addEventListener('change', newGame);
     document.addEventListener('keydown', event => {
       if (!game || event.target.tagName === 'SELECT') return;
       const key = event.key;
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (/^[1-9]$/.test(key)) { event.preventDefault(); enterDigit(Number(key)); return; }
       if (key === 'Backspace' || key === 'Delete' || key === '0') { event.preventDefault(); erase(); return; }
       if (key.toLowerCase() === 'n') { event.preventDefault(); noteMode = !noteMode; render(); return; }
+      if (key.toLowerCase() === 'h') { event.preventDefault(); hint(); return; }
       const move = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[key];
       if (move === undefined) return;
       event.preventDefault();
       const row = Math.floor(game.selected / 9), col = game.selected % 9;
       const nextRow = Math.max(0, Math.min(8, row + (key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0)));
       const nextCol = Math.max(0, Math.min(8, col + (key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0)));
-      game.selected = nextRow * 9 + nextCol; render(); cells[game.selected].focus();
+      game.selected = nextRow * 9 + nextCol; game.hintIndex = null; render(); cells[game.selected].focus();
     });
-    newGame();
+    document.addEventListener('visibilitychange', () => {
+      if (!game) return;
+      if (document.hidden) { pausedAt = Date.now(); saveProgress(); }
+      else if (pausedAt) {
+        if (!game.completed) game.startedAt += Date.now() - pausedAt;
+        pausedAt = null;
+        updateTime(); saveProgress();
+      }
+    });
+    window.addEventListener('pagehide', saveProgress);
+    if (!restoreProgress()) newGame();
     clock = setInterval(updateTime, 1000);
   })();
   </script>

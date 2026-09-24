@@ -86,7 +86,7 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
   const homepage = await fetch(`${baseUrl}/`);
   assert.equal(homepage.status, 200);
   const homeHtml = await homepage.text();
-  assert.match(homeHtml, /<title>小游戏大厅 · 朋友牌桌<\/title>/);
+  assert.match(homeHtml, /<title>GAME OVER · 小游戏大厅<\/title>/);
   assert.match(homeHtml, /<meta property="og:url" content="https:\/\/game\.5iyeji\.xyz\/" \/>/);
   for (const slug of ['blackjack', 'sudoku', 'minesweeper', 'spider', 'jump', 'match3', 'doudizhu']) {
     const response = await fetch(`${baseUrl}/${slug}`);

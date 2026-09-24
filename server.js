@@ -935,7 +935,7 @@ setInterval(() => {
 
 if (require.main === module) {
   server.listen(PORT, HOST, () => {
-    console.log(`21 点牌桌已启动：http://localhost:${PORT}`);
+    console.log(`小游戏大厅已启动：http://localhost:${PORT}`);
     if (process.env.OPEN_BROWSER === '1' && process.platform === 'darwin') {
       require('node:child_process').spawn('open', [`http://localhost:${PORT}`], {
         stdio: 'ignore',
