@@ -1,9 +1,10 @@
 const $ = (id) => document.getElementById(id);
 const elements = {
   setupView: $('setupView'), gameView: $('gameView'), createForm: $('createForm'), joinForm: $('joinForm'),
-  createName: $('createName'), joinName: $('joinName'), joinCode: $('joinCode'),
+  createName: $('createName'), joinName: $('joinName'), joinCode: $('joinCode'), joinButton: $('joinButton'),
+  setupTitle: $('setupTitle'), setupIntro: $('setupIntro'), inviteNotice: $('inviteNotice'), inviteNoticeTitle: $('inviteNoticeTitle'), inviteNoticeText: $('inviteNoticeText'),
   connectionStatus: $('connectionStatus'), roomCode: $('roomCode'), roundLabel: $('roundLabel'),
-  playerCountLabel: $('playerCountLabel'), matchGoalLabel: $('matchGoalLabel'), matchTimerBadge: $('matchTimerBadge'), timerBadge: $('timerBadge'), copyInvite: $('copyInvite'),
+  playerCountLabel: $('playerCountLabel'), matchGoalLabel: $('matchGoalLabel'), matchTimerBadge: $('matchTimerBadge'), timerBadge: $('timerBadge'), copyRoomCode: $('copyRoomCode'), shareInvite: $('shareInvite'), lobbyShareInvite: $('lobbyShareInvite'),
   leaveButton: $('leaveButton'), lobbyStage: $('lobbyStage'), bettingStage: $('bettingStage'), playStage: $('playStage'),
   finishedStage: $('finishedStage'), lobbySeats: $('lobbySeats'), startButton: $('startButton'),
   hostHint: $('hostHint'), dealerCards: $('dealerCards'), dealerTotal: $('dealerTotal'),
@@ -11,7 +12,7 @@ const elements = {
   selfBankroll: $('selfBankroll'), selfWager: $('selfWager'), centerMessage: $('centerMessage'),
   hitButton: $('hitButton'), standButton: $('standButton'), doubleButton: $('doubleButton'),
   nextButton: $('nextButton'), waitingText: $('waitingText'), playersList: $('playersList'),
-  playersBadge: $('playersBadge'), finalRanking: $('finalRanking'), restartButton: $('restartButton'),
+  playersBadge: $('playersBadge'), finalRanking: $('finalRanking'), shareResult: $('shareResult'), restartButton: $('restartButton'),
   finishedTitle: $('finishedTitle'), finishedMessage: $('finishedMessage'), finishedHint: $('finishedHint'),
   finalRoundNote: $('finalRoundNote'), reviewFinalHand: $('reviewFinalHand'),
   lobbyMatchSettings: $('lobbyMatchSettings'), lobbyTargetWrap: $('lobbyTargetWrap'), lobbyTarget: $('lobbyTarget'),
@@ -19,7 +20,7 @@ const elements = {
   quickGoalRule: $('quickGoalRule'),
   betForm: $('betForm'), betAmount: $('betAmount'), betBankroll: $('betBankroll'), betLimits: $('betLimits'),
   betButton: $('betButton'), betPresets: $('betPresets'), betStatus: $('betStatus'),
-  openRulesSetup: $('openRulesSetup'), openRulesGame: $('openRulesGame'),
+  openRulesSetup: $('openRulesSetup'), openRulesInvite: $('openRulesInvite'), openRulesGame: $('openRulesGame'),
   rulesDialog: $('rulesDialog'), closeRules: $('closeRules'), toast: $('toast'),
 };
 
@@ -73,6 +74,23 @@ function clearSession(roomCode) {
   if (localStorage.getItem('blackjack:lastRoom') === roomCode) localStorage.removeItem('blackjack:lastRoom');
 }
 
+function setInviteLanding(roomCode, expired = false) {
+  const invited = /^[A-Z2-9]{6}$/.test(roomCode);
+  elements.setupView.classList.toggle('invited', invited);
+  elements.inviteNotice.hidden = !invited;
+  elements.openRulesInvite.hidden = !invited;
+  elements.setupTitle.innerHTML = invited ? '朋友在等你，<br /><em>上桌来一局。</em>' : '今晚，<br /><em>来一局 21 点。</em>';
+  elements.setupIntro.textContent = invited
+    ? `房间 ${roomCode} 已填好。输入昵称就能加入朋友的牌桌，一起挑战 21 点。`
+    : '开一张私人牌桌，发链接叫上朋友。每人带着 1,000 虚拟筹码入场，自己设定获胜目标，或来一场 10 分钟挑战。';
+  elements.inviteNoticeTitle.textContent = expired ? '这个邀请可能已失效' : '朋友邀请你上桌';
+  elements.inviteNoticeText.textContent = expired
+    ? `房间 ${roomCode} 已结束或身份失效；可以尝试重新加入，或请朋友发新链接。`
+    : `房间 ${roomCode} 已填好，输入昵称即可加入。`;
+  elements.joinButton.innerHTML = invited ? '加入朋友的牌桌 <span aria-hidden="true">→</span>' : '加入牌桌 <span aria-hidden="true">→</span>';
+  if (invited) elements.joinCode.value = roomCode;
+}
+
 function setRoom(roomCode, roomToken) {
   code = roomCode.toUpperCase();
   token = roomToken;
@@ -89,7 +107,8 @@ function setRoom(roomCode, roomToken) {
   refreshState();
 }
 
-function leaveRoomUI() {
+function leaveRoomUI({ retainInvite = false, expired = false } = {}) {
+  const previousCode = code;
   closeStream();
   resetHandVisual();
   clearSession(code);
@@ -99,11 +118,12 @@ function leaveRoomUI() {
   betDraftRound = null;
   showFinalSummary = false;
   restartSettingsForMatch = '';
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', retainInvite ? `${location.pathname}?room=${encodeURIComponent(previousCode)}` : location.pathname);
   elements.gameView.hidden = true;
   elements.setupView.hidden = false;
   elements.connectionStatus.hidden = true;
   elements.joinCode.value = '';
+  setInviteLanding(retainInvite ? previousCode : '', expired);
 }
 
 async function request(path, options = {}) {
@@ -125,8 +145,9 @@ async function refreshState() {
     setConnection('已连接', 'connected');
   } catch (error) {
     if (/失效|无效|不存在|not found|unauthorized|invalid/i.test(error.message)) {
-      showToast('这个房间已结束，请重新开桌。');
-      leaveRoomUI();
+      const missingRoom = /不存在|not found/i.test(error.message);
+      showToast(missingRoom ? '这个房间已结束，请朋友重新发邀请。' : '房间身份已失效，请重新加入。');
+      leaveRoomUI({ retainInvite: true, expired: missingRoom });
     } else {
       setConnection('重连中', 'disconnected');
     }
@@ -541,21 +562,80 @@ elements.joinForm.addEventListener('submit', async (event) => {
     localStorage.setItem('blackjack:name', name);
     const result = await request('/api/rooms/join', { method: 'POST', body: JSON.stringify({ code: roomCode, name }) });
     setRoom(result.code, result.token);
-  } catch (error) { showToast(error.message || '加入失败，请检查房间码'); }
+  } catch (error) {
+    if (/不存在|已过期/i.test(error.message)) setInviteLanding(roomCode, true);
+    showToast(error.message || '加入失败，请检查房间码');
+  }
   finally { button.disabled = false; }
 });
 
-elements.copyInvite.addEventListener('click', async () => {
+function inviteUrl() {
   const localHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const origin = localHost && state?.networkUrl ? state.networkUrl : location.origin;
-  const url = `${origin}${location.pathname}?room=${encodeURIComponent(code)}`;
+  const origin = location.hostname === 'game.5iyeji.xyz'
+    ? 'https://game.5iyeji.xyz'
+    : localHost && state?.networkUrl ? state.networkUrl : location.origin;
+  return `${origin}${location.pathname}?room=${encodeURIComponent(code)}`;
+}
+
+async function copyText(value, message) {
   try {
-    await navigator.clipboard.writeText(url);
-    showToast(localHost && !state?.networkUrl ? '已复制本机链接；朋友加入需使用可访问这台电脑的地址' : '邀请链接已复制，发给朋友即可加入');
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(value);
+    showToast(message);
   } catch {
-    window.prompt('复制邀请链接', url);
+    window.prompt('复制并发给朋友', value);
   }
+}
+
+function shareContent({ title, text, url, copyValue, copiedMessage }) {
+  // Call Web Share directly from the click handler so mobile browsers retain user activation.
+  if (navigator.share) {
+    try {
+      Promise.resolve(navigator.share({ title, text, url })).catch((error) => {
+        if (error?.name !== 'AbortError') copyText(copyValue, copiedMessage);
+      });
+      return;
+    } catch { /* Use the clipboard fallback. */ }
+  }
+  copyText(copyValue, copiedMessage);
+}
+
+function shareInvite() {
+  if (!code) return;
+  const url = inviteUrl();
+  const isInProgress = state && !['lobby', 'results', 'finished'].includes(state.phase);
+  shareContent({
+    title: `来玩 21 点 · 房间 ${code}`,
+    text: `我开了 21 点牌桌，房间码 ${code}。${isInProgress ? '现在加入可旁观，下一局起参与。' : '输入昵称就能一起玩。'}`,
+    url,
+    copyValue: url,
+    copiedMessage: '邀请链接已复制，发给朋友即可加入',
+  });
+}
+
+function shareResult() {
+  if (!state || state.phase !== 'finished') return;
+  const players = [...state.players].sort((a, b) => Number(b.bankroll || 0) - Number(a.bankroll || 0));
+  const self = players.find((player) => player.id === state.selfId);
+  const rank = self ? players.findIndex((player) => player.bankroll === self.bankroll) + 1 : null;
+  const champion = players.filter((player) => state.winners?.includes(player.id)).map((player) => player.name).join('、');
+  const myResult = self ? `我拿到 ${chips(self.bankroll)} 筹码，排名第 ${rank}。` : '';
+  const championText = champion ? `本桌冠军：${champion}。` : '本桌无人获胜。';
+  const url = inviteUrl();
+  const text = `21 点朋友牌桌战绩：${myResult}${championText}来和我同桌再战！`;
+  shareContent({
+    title: '21 点 · 本桌战绩', text, url,
+    copyValue: `${text}\n${url}`,
+    copiedMessage: '战绩和牌桌链接已复制，可以发给朋友',
+  });
+}
+
+elements.copyRoomCode.addEventListener('click', () => {
+  if (code) copyText(code, `房间码 ${code} 已复制`);
 });
+elements.shareInvite.addEventListener('click', shareInvite);
+elements.lobbyShareInvite.addEventListener('click', shareInvite);
+elements.shareResult.addEventListener('click', shareResult);
 
 elements.leaveButton.addEventListener('click', () => submitAction('leave'));
 elements.startButton.addEventListener('click', () => startMatch('lobby'));
@@ -601,7 +681,7 @@ elements.reviewFinalHand.addEventListener('click', () => {
   render();
 });
 elements.restartButton.addEventListener('click', () => startMatch('restart'));
-for (const button of [elements.openRulesSetup, elements.openRulesGame]) {
+for (const button of [elements.openRulesSetup, elements.openRulesInvite, elements.openRulesGame]) {
   button.addEventListener('click', () => elements.rulesDialog.showModal());
 }
 elements.closeRules.addEventListener('click', () => elements.rulesDialog.close());
@@ -616,9 +696,11 @@ setInterval(renderTimer, 1000);
   const name = localStorage.getItem('blackjack:name') || '';
   elements.createName.value = name;
   elements.joinName.value = name;
-  const requestedRoom = (new URL(location.href).searchParams.get('room') || localStorage.getItem('blackjack:lastRoom') || '').toUpperCase();
+  const invitedRoom = (new URL(location.href).searchParams.get('room') || '').trim().toUpperCase();
+  const requestedRoom = invitedRoom || (localStorage.getItem('blackjack:lastRoom') || '').toUpperCase();
   if (!requestedRoom) return;
-  elements.joinCode.value = requestedRoom;
+  if (invitedRoom) setInviteLanding(invitedRoom);
+  else elements.joinCode.value = requestedRoom;
   let sessions = {};
   try { sessions = JSON.parse(localStorage.getItem('blackjack:sessions') || '{}'); } catch { /* Ignore invalid storage. */ }
   if (sessions[requestedRoom]) setRoom(requestedRoom, sessions[requestedRoom]);

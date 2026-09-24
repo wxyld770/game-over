@@ -4,7 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b1718" />
-    <meta name="description" content="和朋友一起玩 21 点。每人 1000 虚拟筹码起步，自选目标筹码或 10 分钟无尽挑战。" />
+    <meta name="description" content="开一桌 21 点，发链接邀请朋友一起玩。2–6 人同桌，每人 1,000 虚拟筹码，挑战目标或 10 分钟对局。" />
+    <link rel="canonical" href="https://game.5iyeji.xyz/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="21 点 · 朋友牌桌" />
+    <meta property="og:title" content="21 点 · 邀朋友上桌" />
+    <meta property="og:description" content="开一桌 21 点，发链接邀请朋友一起玩。2–6 人同桌，用虚拟筹码比比谁先赢。" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="21 点 · 邀朋友上桌" />
+    <meta name="twitter:description" content="开一桌 21 点，发链接邀请朋友一起玩。2–6 人同桌，用虚拟筹码比比谁先赢。" />
     <title>21 点 · 朋友牌桌</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
@@ -30,7 +39,7 @@
           <div class="setup-copy">
             <span class="section-kicker"><span class="kicker-line"></span> 即开即玩 · 1–6 人</span>
             <h1 id="setupTitle">今晚，<br /><em>来一局 21 点。</em></h1>
-            <p>开一张私人牌桌，发链接叫上朋友。每人带着 1,000 虚拟筹码入场，自己设定获胜目标，或来一场 10 分钟挑战。</p>
+            <p id="setupIntro">开一张私人牌桌，发链接叫上朋友。每人带着 1,000 虚拟筹码入场，自己设定获胜目标，或来一场 10 分钟挑战。</p>
             <div class="setup-notes">
               <span><b>01</b> 创建或加入房间</span>
               <span><b>02</b> 下注、要牌或停牌</span>
@@ -52,6 +61,10 @@
               <button class="button button-primary" type="submit">开一桌 <span aria-hidden="true">↗</span></button>
             </form>
             <form id="joinForm" class="entry-card entry-card-secondary">
+              <div id="inviteNotice" class="invite-notice" hidden>
+                <span class="invite-notice-icon" aria-hidden="true">✦</span>
+                <span><strong id="inviteNoticeTitle">朋友邀请你上桌</strong><small id="inviteNoticeText">填上昵称即可加入。</small></span>
+              </div>
               <div class="entry-heading">
                 <span class="entry-icon entry-icon-outline" aria-hidden="true">↳</span>
                 <div>
@@ -69,7 +82,8 @@
                   <input id="joinName" name="name" type="text" maxlength="16" autocomplete="nickname" placeholder="输入昵称" required />
                 </div>
               </div>
-              <button class="button button-outline" type="submit">加入牌桌 <span aria-hidden="true">→</span></button>
+              <button id="joinButton" class="button button-outline" type="submit">加入牌桌 <span aria-hidden="true">→</span></button>
+              <button id="openRulesInvite" class="rules-link invite-rules-link" type="button" hidden>先看看规则 <span aria-hidden="true">↗</span></button>
             </form>
           </div>
         </section>
@@ -78,7 +92,7 @@
           <div class="room-bar">
             <div class="room-identity">
               <span class="section-kicker">私人牌桌</span>
-              <div class="room-code-line">房间 <strong id="roomCode">------</strong> <button id="copyInvite" class="icon-button" type="button" aria-label="复制邀请链接" title="复制邀请链接">⧉</button></div>
+              <div class="room-code-line">房间 <strong id="roomCode">------</strong> <button id="copyRoomCode" class="icon-button" type="button" aria-label="复制房间码" title="复制房间码">⧉</button> <button id="shareInvite" class="room-invite-button" type="button">邀请朋友 <span aria-hidden="true">↗</span></button></div>
             </div>
             <div class="room-meta"><span id="roundLabel">等待开局</span><span class="meta-divider"></span><span id="matchGoalLabel" class="match-goal-label" hidden></span><span id="playerCountLabel">1 / 6 人</span><span id="matchTimerBadge" class="timer-badge match-timer" hidden></span><span id="timerBadge" class="timer-badge" hidden></span><button id="leaveButton" class="leave-button" type="button">退出牌桌</button></div>
           </div>
@@ -95,6 +109,7 @@
                     <span class="section-kicker">座位已准备好</span>
                     <h1>等朋友上桌</h1>
                     <p>把房间码或邀请链接发给朋友。每人从 1,000 筹码起步；选好本场目标，就可以开局。</p>
+                    <button id="lobbyShareInvite" class="button button-outline lobby-invite-button" type="button">分享邀请链接 <span aria-hidden="true">↗</span></button>
                     <div id="lobbySeats" class="lobby-seats" aria-label="房间玩家"></div>
                     <div id="lobbyMatchSettings" class="match-settings">
                       <span class="match-settings-title">本场怎么玩</span>
@@ -172,7 +187,10 @@
                       </div>
                       <div id="restartTargetWrap" class="target-setting"><label for="restartTarget">获胜目标</label><div class="target-input-wrap"><input id="restartTarget" type="number" inputmode="numeric" min="1001" max="1000000" step="1" value="10000" /><span>筹码</span></div></div>
                     </div>
-                    <button id="restartButton" class="button button-primary" type="button" hidden>重新挑战 <span aria-hidden="true">→</span></button>
+                    <div class="finished-actions">
+                      <button id="shareResult" class="button button-outline" type="button">分享本场战绩 <span aria-hidden="true">↗</span></button>
+                      <button id="restartButton" class="button button-primary" type="button" hidden>同桌再战 <span aria-hidden="true">→</span></button>
+                    </div>
                     <span id="finishedHint" class="subtle" hidden>任意玩家都可以开启下一场</span>
                   </div>
                 </div>

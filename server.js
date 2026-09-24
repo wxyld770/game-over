@@ -18,6 +18,101 @@ const MATCH_MS = Number(process.env.MATCH_MS || 10 * 60_000);
 const PRESENCE_GRACE_MS = 10_000;
 const MAX_PLAYERS = 6;
 const rooms = new Map();
+const METRICS_FILE = process.env.METRICS_FILE || '';
+const METRICS_TOKEN = process.env.METRICS_TOKEN || '';
+const METRIC_NAMES = [
+  'roomsCreated', 'guestsJoined', 'roomsWithFriends', 'matchesStarted',
+  'multiplayerMatchesStarted', 'roundsDealt', 'roundsSettled',
+  'friendTablesCompletedFirstRound', 'nextReadyClicks',
+  'matchesFinished', 'rematchesStarted',
+];
+
+function emptyMetricCounts() {
+  return Object.fromEntries(METRIC_NAMES.map((name) => [name, 0]));
+}
+
+function validMetricCounts(value) {
+  return value && typeof value === 'object' && METRIC_NAMES.every((name) =>
+    Number.isSafeInteger(value[name]) && value[name] >= 0);
+}
+
+let metrics = { since: new Date().toISOString(), totals: emptyMetricCounts(), days: {} };
+let metricsPersistence = METRICS_FILE ? 'ready' : 'memory';
+if (METRICS_FILE) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(METRICS_FILE, 'utf8'));
+    if (saved.version !== 1 || typeof saved.since !== 'string'
+      || !validMetricCounts(saved.totals) || !saved.days
+      || typeof saved.days !== 'object' || Array.isArray(saved.days)
+      || !Object.entries(saved.days).every(([day, counts]) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(day) && validMetricCounts(counts))) {
+      throw new Error('Invalid metrics file');
+    }
+    metrics = { since: saved.since, totals: saved.totals, days: saved.days };
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      metricsPersistence = 'error';
+      console.error('Metrics file could not be loaded; persistence disabled.');
+    }
+  }
+}
+
+function recordMetric(name) {
+  const day = new Date().toISOString().slice(0, 10);
+  metrics.days[day] ||= emptyMetricCounts();
+  metrics.totals[name] += 1;
+  metrics.days[day][name] += 1;
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  for (const recordedDay of Object.keys(metrics.days)) {
+    if (recordedDay < cutoff) delete metrics.days[recordedDay];
+  }
+  if (metricsPersistence !== 'ready') return;
+  const temporary = `${METRICS_FILE}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(temporary, JSON.stringify({ version: 1, ...metrics }), { mode: 0o600 });
+    fs.renameSync(temporary, METRICS_FILE);
+  } catch {
+    metricsPersistence = 'error';
+    try { fs.unlinkSync(temporary); } catch { /* Nothing to clean up. */ }
+    console.error('Metrics file could not be written; persistence disabled.');
+  }
+}
+
+function liveCounts() {
+  let activeRooms = 0;
+  let activeConnections = 0;
+  let onlinePlayers = 0;
+  for (const room of rooms.values()) {
+    let roomConnections = 0;
+    for (const player of room.players) {
+      roomConnections += player.clients.size;
+      if (player.clients.size) onlinePlayers += 1;
+    }
+    if (roomConnections) activeRooms += 1;
+    activeConnections += roomConnections;
+  }
+  return { rooms: rooms.size, activeRooms, activeConnections, onlinePlayers };
+}
+
+function weeklyFriendTables() {
+  const weeks = {};
+  for (const [day, counts] of Object.entries(metrics.days)) {
+    const monday = new Date(`${day}T00:00:00Z`);
+    monday.setUTCDate(monday.getUTCDate() - (monday.getUTCDay() + 6) % 7);
+    const key = monday.toISOString().slice(0, 10);
+    weeks[key] = (weeks[key] || 0) + counts.friendTablesCompletedFirstRound;
+  }
+  return weeks;
+}
+
+function metricsAuthorized(req) {
+  if (METRICS_TOKEN.length < 32) return false;
+  const provided = req.headers.authorization;
+  if (typeof provided !== 'string' || !provided.startsWith('Bearer ')) return false;
+  const actual = Buffer.from(provided.slice(7));
+  const expected = Buffer.from(METRICS_TOKEN);
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
 
 const suits = ['♠', '♥', '♣', '♦'];
 const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -281,12 +376,14 @@ function clearResultsTimer(room) {
 }
 
 function finishMatch(room, winners, message) {
+  if (room.phase === 'finished') return;
   clearRoundTimer(room);
   clearMatchTimer(room);
   clearResultsTimer(room);
   room.winners = winners;
   room.phase = 'finished';
   room.message = message;
+  recordMetric('matchesFinished');
   broadcast(room);
 }
 
@@ -326,6 +423,11 @@ function concludeAfterRound(room) {
 function scoreRound(room) {
   if (room.phase !== 'dealer-turn') return;
   clearRoundTimer(room);
+  recordMetric('roundsSettled');
+  if (!room.friendFirstRoundRecorded && participants(room).length >= 2) {
+    room.friendFirstRoundRecorded = true;
+    recordMetric('friendTablesCompletedFirstRound');
+  }
   const eligible = participants(room).filter((player) => handValue(player.cards).total <= 21 && !isBlackjack(player.cards));
   const dealerBlackjack = isBlackjack(room.dealer.cards);
   if (!dealerBlackjack && eligible.length) {
@@ -425,6 +527,7 @@ function dealRound(room) {
   clearRoundTimer(room);
   if (room.shoe.length < 78) room.shoe = makeShoe();
   room.phase = 'dealing';
+  recordMetric('roundsDealt');
   room.dealer = { cards: [], status: 'playing' };
   const active = room.players.filter((player) => player.status === 'ready');
   for (const player of active) {
@@ -523,6 +626,8 @@ function createRoom(name) {
     round: 0,
     players: [player],
     hostId: player.id,
+    friendFirstRoundRecorded: false,
+    hasHadGuest: false,
     winners: [],
     matchMode: 'target',
     targetBankroll: TARGET_BANKROLL,
@@ -541,6 +646,7 @@ function createRoom(name) {
     resultsTimer: null,
   };
   rooms.set(room.code, room);
+  recordMetric('roomsCreated');
   return { room, player };
 }
 
@@ -578,6 +684,9 @@ function handleAction(room, player, body) {
     if (mode === 'target' && (!Number.isSafeInteger(target) || target < 1_001 || target > 1_000_000)) {
       return '目标筹码须为 1001 到 1000000 的整数';
     }
+    if (room.phase === 'finished') recordMetric('rematchesStarted');
+    recordMetric('matchesStarted');
+    if (room.players.length > 1) recordMetric('multiplayerMatchesStarted');
     clearRoundTimer(room);
     clearMatchTimer(room);
     clearResultsTimer(room);
@@ -602,6 +711,7 @@ function handleAction(room, player, body) {
     beginBetting(room);
   } else if (action === 'next') {
     if (room.phase !== 'results') return '现在不能进入下一回合';
+    if (!player.readyNext) recordMetric('nextReadyClicks');
     player.readyNext = true;
     checkNextReady(room);
   } else if (action === 'bet') {
@@ -671,7 +781,7 @@ function leaveRoom(room, player) {
   else broadcast(room);
 }
 
-async function serveStatic(req, res, pathname) {
+async function serveStatic(req, res, pathname, searchParams) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res, 405, '请求方式不支持');
   const relative = pathname === '/' ? '/index.html' : pathname;
   let decoded;
@@ -684,13 +794,25 @@ async function serveStatic(req, res, pathname) {
   try {
     const stat = await fs.promises.stat(file);
     if (!stat.isFile()) return fail(res, 404, '页面不存在');
+    let body = null;
+    if (decoded === '/index.html') {
+      const requestedRoom = (searchParams.get('room') || '').trim().toUpperCase();
+      const invite = /^[A-Z2-9]{6}$/.test(requestedRoom) ? `?room=${requestedRoom}` : '';
+      const ogUrl = `https://game.5iyeji.xyz/${invite}`;
+      const html = await fs.promises.readFile(file, 'utf8');
+      body = Buffer.from(html.replace(
+        '<meta name="twitter:card" content="summary" />',
+        `<meta property="og:url" content="${ogUrl}" />\n    <meta name="twitter:card" content="summary" />`,
+      ));
+    }
     res.writeHead(200, {
       'Content-Type': contentTypes[extension],
-      'Content-Length': stat.size,
+      'Content-Length': body ? body.length : stat.size,
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     });
     if (req.method === 'HEAD') res.end();
+    else if (body) res.end(body);
     else fs.createReadStream(file).pipe(res);
   } catch {
     fail(res, 404, '页面不存在');
@@ -703,6 +825,19 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === '/api/health' && req.method === 'GET') {
       return sendJson(res, 200, { ok: true, rooms: rooms.size });
+    }
+    if (pathname === '/api/admin/metrics' && req.method === 'GET') {
+      if (!metricsAuthorized(req)) return fail(res, 404, '接口不存在');
+      return sendJson(res, 200, {
+        sampledAt: new Date().toISOString(),
+        since: metrics.since,
+        persistence: metricsPersistence,
+        dayTimezone: 'UTC',
+        totals: metrics.totals,
+        days: metrics.days,
+        weeklyFriendTables: weeklyFriendTables(),
+        live: liveCounts(),
+      });
     }
     if (pathname === '/api/rooms' && req.method === 'POST') {
       const body = await readJson(req);
@@ -722,6 +857,11 @@ const server = http.createServer(async (req, res) => {
       const player = makePlayer(name);
       if (['betting', 'dealing', 'playing', 'dealer-turn'].includes(room.phase)) player.status = 'spectating';
       room.players.push(player);
+      recordMetric('guestsJoined');
+      if (!room.hasHadGuest) {
+        room.hasHadGuest = true;
+        recordMetric('roomsWithFriends');
+      }
       touch(room, player);
       if (room.phase === 'results') checkNextReady(room);
       else broadcast(room);
@@ -757,7 +897,7 @@ const server = http.createServer(async (req, res) => {
       return fail(res, 405, '请求方式不支持');
     }
     if (pathname.startsWith('/api/')) return fail(res, 404, '接口不存在');
-    return serveStatic(req, res, pathname);
+    return serveStatic(req, res, pathname, url.searchParams);
   } catch (error) {
     if (!res.headersSent) fail(res, error.status || 500, error.status ? error.message : '服务器出了点问题');
     else res.end();

@@ -85,7 +85,9 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
 
   const homepage = await fetch(`${baseUrl}/`);
   assert.equal(homepage.status, 200);
-  assert.match(await homepage.text(), /<title>21 点 · 朋友牌桌<\/title>/);
+  const homeHtml = await homepage.text();
+  assert.match(homeHtml, /<title>21 点 · 朋友牌桌<\/title>/);
+  assert.match(homeHtml, /<meta property="og:url" content="https:\/\/game\.5iyeji\.xyz\/" \/>/);
 
   const create = await postJson(`${baseUrl}/api/rooms`, { name: 'Host' });
   assert.equal(create.status, 201);
@@ -93,6 +95,11 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
   assert.match(code, /^[A-Z2-9]{6}$/);
   assert.equal(typeof token, 'string');
   assert.ok(token.length > 0);
+
+  const inviteHtml = await (await fetch(`${baseUrl}/?room=${code}`)).text();
+  assert.ok(inviteHtml.includes(`<meta property="og:url" content="https://game.5iyeji.xyz/?room=${code}" />`));
+  const invalidInviteHtml = await (await fetch(`${baseUrl}/?room=%3Cscript%3E`)).text();
+  assert.match(invalidInviteHtml, /<meta property="og:url" content="https:\/\/game\.5iyeji\.xyz\/" \/>/);
 
   for (let seat = 2; seat <= 6; seat += 1) {
     const join = await postJson(`${baseUrl}/api/rooms/join`, {
