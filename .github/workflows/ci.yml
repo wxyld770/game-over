@@ -76,7 +76,7 @@ jobs:
       contents: read
     environment:
       name: production
-      url: http://43.108.47.201:8889/
+      url: https://game.5iyeji.xyz/
     concurrency:
       group: game-over-production
       cancel-in-progress: false
@@ -160,8 +160,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
-            http://43.108.47.201:8889/api/health \
+          curl --proto '=https' --tlsv1.2 \
+            --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+            https://game.5iyeji.xyz/api/health \
             | python3 -c 'import json,sys; assert json.load(sys.stdin)["ok"] is True'
-          curl --fail --silent --show-error --connect-timeout 10 --max-time 20 \
-            --output /dev/null http://43.108.47.201:8889/
+          curl --proto '=https' --tlsv1.2 \
+            --fail --silent --show-error --connect-timeout 10 --max-time 20 \
+            --output /dev/null https://game.5iyeji.xyz/
