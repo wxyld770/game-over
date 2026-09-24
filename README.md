@@ -76,3 +76,9 @@ npm start
 生产服务运行在 `43.108.47.201:8889`，systemd 服务名为 `game-over.service`。发布使用专门的 `game-over-deploy` SSH 账号；GitHub 仓库的 Actions secret `PROD_SSH_PRIVATE_KEY` 存放该账号的私钥。服务器上由 root 安装的 `deploy/deploy-game-over` 脚本负责校验发布包、切换版本和失败回退。服务器 SSH 主机公钥固定在 `deploy/known_hosts`，无需关闭主机身份检查。
 
 修改 `main` 上的应用代码会触发服务重启。**当前房间、牌局和筹码在内存中，重启后会清空**。只修改 CI、文档或测试，且发布包里的应用文件未变时，部署不会重启服务。上线前请先让玩家结束当前牌局。
+
+### 绑定游戏域名
+
+游戏域名使用 `game.5iyeji.xyz`。在阿里云 DNS 的 `5iyeji.xyz` 解析设置中增加一条 **A** 记录：主机记录 `game`，记录值 `43.108.47.201`，TTL 使用默认值。DNS 不填写端口号。
+
+服务器已有 Nginx 和 acme.sh。DNS 生效前，可把 `deploy/nginx-game-http.conf` 安装为 `/etc/nginx/conf.d/game-over.conf` 并执行 `nginx -t && systemctl reload nginx`。DNS 生效后，用服务器现有的 ACME webroot `/var/www/acme` 为 `game.5iyeji.xyz` 签发证书；用 acme.sh 将证书安装到 `/etc/nginx/ssl/game.5iyeji.xyz/` 并设置续期后重载 Nginx。最后把 `deploy/nginx-game-https.conf` 安装为 `/etc/nginx/conf.d/game-over.conf`，再次运行 `nginx -t && systemctl reload nginx`。HTTPS 配置为游戏的 SSE 实时事件关闭代理缓冲，避免消息延迟。
