@@ -3,17 +3,20 @@ const elements = {
   setupView: $('setupView'), gameView: $('gameView'), createForm: $('createForm'), joinForm: $('joinForm'),
   createName: $('createName'), joinName: $('joinName'), joinCode: $('joinCode'),
   connectionStatus: $('connectionStatus'), roomCode: $('roomCode'), roundLabel: $('roundLabel'),
-  playerCountLabel: $('playerCountLabel'), timerBadge: $('timerBadge'), copyInvite: $('copyInvite'),
+  playerCountLabel: $('playerCountLabel'), matchGoalLabel: $('matchGoalLabel'), matchTimerBadge: $('matchTimerBadge'), timerBadge: $('timerBadge'), copyInvite: $('copyInvite'),
   leaveButton: $('leaveButton'), lobbyStage: $('lobbyStage'), bettingStage: $('bettingStage'), playStage: $('playStage'),
   finishedStage: $('finishedStage'), lobbySeats: $('lobbySeats'), startButton: $('startButton'),
   hostHint: $('hostHint'), dealerCards: $('dealerCards'), dealerTotal: $('dealerTotal'),
   selfCards: $('selfCards'), selfTotal: $('selfTotal'), selfOutcome: $('selfOutcome'),
   selfBankroll: $('selfBankroll'), selfWager: $('selfWager'), centerMessage: $('centerMessage'),
-  hitButton: $('hitButton'), standButton: $('standButton'), doubleButton: $('doubleButton'),
+  hitButton: $('hitButton'), standButton: $('standButton'), doubleButton: $('doubleButton'), dealButton: $('dealButton'),
   nextButton: $('nextButton'), waitingText: $('waitingText'), playersList: $('playersList'),
   playersBadge: $('playersBadge'), finalRanking: $('finalRanking'), restartButton: $('restartButton'),
   finishedTitle: $('finishedTitle'), finishedMessage: $('finishedMessage'), finishedHint: $('finishedHint'),
   finalRoundNote: $('finalRoundNote'), reviewFinalHand: $('reviewFinalHand'),
+  lobbyMatchSettings: $('lobbyMatchSettings'), lobbyTargetWrap: $('lobbyTargetWrap'), lobbyTarget: $('lobbyTarget'),
+  restartMatchSettings: $('restartMatchSettings'), restartTargetWrap: $('restartTargetWrap'), restartTarget: $('restartTarget'),
+  quickGoalRule: $('quickGoalRule'),
   betForm: $('betForm'), betAmount: $('betAmount'), betBankroll: $('betBankroll'), betLimits: $('betLimits'),
   betButton: $('betButton'), betPresets: $('betPresets'), betStatus: $('betStatus'),
   openRulesSetup: $('openRulesSetup'), openRulesGame: $('openRulesGame'),
@@ -29,6 +32,10 @@ let toastTimer = null;
 let fallbackTimer = null;
 let betDraftRound = null;
 let showFinalSummary = false;
+let restartSettingsForMatch = '';
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const DEAL_STEP_MS = 450;
+const handVisual = { key: '', dealer: [], self: [], dealerTarget: [], selfTarget: [], timer: null };
 const chipFormatter = new Intl.NumberFormat('zh-CN');
 const chips = (amount) => chipFormatter.format(Number(amount) || 0);
 
@@ -70,6 +77,8 @@ function setRoom(roomCode, roomToken) {
   token = roomToken;
   betDraftRound = null;
   showFinalSummary = false;
+  restartSettingsForMatch = '';
+  resetHandVisual();
   saveSession(code, token);
   history.replaceState(null, '', `${location.pathname}?room=${encodeURIComponent(code)}`);
   elements.setupView.hidden = true;
@@ -81,12 +90,14 @@ function setRoom(roomCode, roomToken) {
 
 function leaveRoomUI() {
   closeStream();
+  resetHandVisual();
   clearSession(code);
   code = '';
   token = '';
   state = null;
   betDraftRound = null;
   showFinalSummary = false;
+  restartSettingsForMatch = '';
   history.replaceState(null, '', location.pathname);
   elements.gameView.hidden = true;
   elements.setupView.hidden = false;
@@ -145,30 +156,119 @@ function connectStream() {
   }, 3000);
 }
 
-function cardHTML(card, index = 0) {
-  if (!card || card.hidden || card.back) return `<div class="playing-card back" style="animation-delay:${Math.min(index * 45, 300)}ms" aria-label="盖着的牌"></div>`;
+function cardHTML(card, effect = '') {
+  if (!card || card.hidden || card.back) return `<div class="playing-card back ${effect}" aria-label="盖着的牌"></div>`;
   const rank = escapeHTML(card.rank);
   const suit = escapeHTML(card.suit);
   const red = card.suit === '♥' || card.suit === '♦';
-  return `<div class="playing-card ${red ? 'red' : ''}" style="animation-delay:${Math.min(index * 45, 300)}ms" aria-label="${rank}${suit}"><span class="card-rank">${rank}</span><span class="card-corner-suit">${suit}</span><span class="card-center-suit">${suit}</span><span class="card-bottom">${rank}</span></div>`;
+  return `<div class="playing-card ${red ? 'red' : ''} ${effect}" aria-label="${rank}${suit}"><span class="card-rank">${rank}</span><span class="card-corner-suit">${suit}</span><span class="card-center-suit">${suit}</span><span class="card-bottom">${rank}</span></div>`;
 }
 
-function renderCards(container, cards = [], cardCount = cards.length) {
+function cardSlots(cards = [], cardCount = cards.length) {
   const visible = Array.isArray(cards) ? cards : [];
-  const backs = Math.max(0, Number(cardCount || 0) - visible.length);
-  const all = [...visible, ...Array(backs).fill(null)];
-  container.innerHTML = all.map((card, index) => cardHTML(card, index)).join('');
+  return [...visible, ...Array(Math.max(0, Number(cardCount || 0) - visible.length)).fill(null)];
+}
+
+function sameCard(a, b) {
+  if (!a || a.hidden || a.back) return !b || !!b.hidden || !!b.back;
+  return !!b && !b.hidden && !b.back && a.rank === b.rank && a.suit === b.suit;
+}
+
+function sameHand(a, b) {
+  return a.length === b.length && a.every((card, index) => sameCard(card, b[index]));
+}
+
+function resetHandVisual() {
+  clearTimeout(handVisual.timer);
+  handVisual.key = '';
+  handVisual.dealer = [];
+  handVisual.self = [];
+  handVisual.dealerTarget = [];
+  handVisual.selfTarget = [];
+  handVisual.timer = null;
+  elements.dealerCards.replaceChildren();
+  elements.selfCards.replaceChildren();
+}
+
+function nextCardStep() {
+  const { dealer, self, dealerTarget, selfTarget } = handVisual;
+  // The first four cards arrive in table order. Even if a fast round has
+  // already ended, the dealer's second card appears face down before reveal.
+  if (self.length === 0 && selfTarget.length) return ['self', 0, selfTarget[0], 'deal'];
+  if (dealer.length === 0 && dealerTarget.length) return ['dealer', 0, dealerTarget[0], 'deal'];
+  if (self.length === 1 && selfTarget.length > 1) return ['self', 1, selfTarget[1], 'deal'];
+  if (dealer.length === 1 && dealerTarget.length > 1) return ['dealer', 1, null, 'deal'];
+  for (const side of ['dealer', 'self']) {
+    const current = handVisual[side];
+    const target = handVisual[`${side}Target`];
+    for (let index = 0; index < Math.min(current.length, target.length); index += 1) {
+      if (!sameCard(current[index], target[index])) return [side, index, target[index], 'flip'];
+    }
+    if (current.length < target.length) return [side, current.length, target[current.length], 'deal'];
+  }
+  return null;
+}
+
+function syncHandVisual(dealer, self) {
+  const key = `${code}:${state.round}`;
+  if (handVisual.key !== key) {
+    resetHandVisual();
+    handVisual.key = key;
+  }
+  handVisual.dealerTarget = cardSlots(dealer?.cards, dealer?.cardCount);
+  handVisual.selfTarget = cardSlots(self?.cards, self?.cardCount);
+  if (prefersReducedMotion.matches) {
+    clearTimeout(handVisual.timer);
+    handVisual.timer = null;
+    for (const side of ['dealer', 'self']) {
+      const target = handVisual[`${side}Target`];
+      if (!sameHand(handVisual[side], target)) {
+        elements[`${side}Cards`].innerHTML = target.map((card) => cardHTML(card)).join('');
+        handVisual[side] = [...target];
+      }
+    }
+    return false;
+  }
+  if (!handVisual.timer) {
+    const step = nextCardStep();
+    if (step) {
+      const [side, index, card, kind] = step;
+      const container = elements[`${side}Cards`];
+      if (kind === 'flip') {
+        container.children[index].outerHTML = cardHTML(card, 'flipping-card');
+        handVisual[side][index] = card;
+      } else {
+        container.insertAdjacentHTML('beforeend', cardHTML(card, 'dealing-card'));
+        handVisual[side].push(card);
+      }
+      handVisual.timer = setTimeout(() => {
+        handVisual.timer = null;
+        render();
+      }, DEAL_STEP_MS);
+    }
+  }
+  return !!handVisual.timer || !!nextCardStep();
 }
 
 function statusText(player, phase) {
   if (!player.connected) return '暂时离线';
   if (phase === 'lobby') return '等待开局';
+  if (phase === 'results') {
+    const result = { win: '获胜', lose: '失利', push: '平局扣半' }[player.roundResult?.outcome] || '本局结束';
+    return `${player.readyNext ? '已准备下一局' : '待准备下一局'} · ${result}`;
+  }
+  if (phase === 'dealing') return '正在发牌';
   if (player.status === 'spectating') return '下局加入';
   if (player.status === 'eliminated') return '筹码用尽 · 旁观中';
   if (phase === 'betting') return player.status === 'ready' ? '已下注 · 等待发牌' : '选择下注额';
-  if (phase === 'results' || phase === 'finished') return player.roundResult?.label || '本局结束';
-  const dictionary = { playing: '考虑中', stood: '已停牌', bust: '已爆牌', blackjack: '21 点', waiting: '等待发牌', done: '已完成' };
+  if (phase === 'finished') return { win: '末局获胜', lose: '末局失利', push: '末局平局扣半' }[player.roundResult?.outcome] || '本场结束';
+  const dictionary = { playing: '考虑中', doubled: '已加倍 · 待发牌', stood: '已停牌', bust: '已爆牌', blackjack: '21 点', waiting: '等待发牌', done: '已完成' };
   return dictionary[player.status] || '游戏中';
+}
+
+function readySummary(players) {
+  const online = players.filter((player) => player.connected);
+  return { ready: online.filter((player) => player.readyNext).length, total: online.length };
 }
 
 function renderPlayers(players, phase) {
@@ -176,7 +276,7 @@ function renderPlayers(players, phase) {
   elements.playersBadge.textContent = `${players.length} / 6`;
   elements.playersList.innerHTML = ordered.map((player) => {
     const self = player.id === state.selfId;
-    const wager = player.wager > 0 && ['betting', 'playing', 'results'].includes(phase) ? ` · 押 ${chips(player.wager)}` : '';
+    const wager = player.wager > 0 && ['betting', 'dealing', 'playing', 'results'].includes(phase) ? ` · 押 ${chips(player.wager)}` : '';
     return `<div class="player-row ${self ? 'self' : ''}">
       <span class="player-avatar">${escapeHTML((player.name || '?').slice(0, 1))}</span>
       <span class="player-info"><span class="player-name">${escapeHTML(player.name)}${self ? ' · 你' : ''}</span><span class="player-sub">${escapeHTML(statusText(player, phase))}${wager}</span></span>
@@ -192,13 +292,23 @@ function renderPlayers(players, phase) {
 }
 
 function renderTimer() {
-  if (!state || !['betting', 'playing'].includes(state.phase) || !state.deadlineAt) {
+  if (!state) {
+    elements.matchTimerBadge.hidden = true;
     elements.timerBadge.hidden = true;
     return;
   }
-  const seconds = Math.max(0, Math.ceil((Number(state.deadlineAt) - Date.now()) / 1000));
-  elements.timerBadge.textContent = `${state.phase === 'betting' ? '下注' : '操作'} ${seconds} 秒`;
-  elements.timerBadge.hidden = false;
+  const matchRunning = state.matchMode === 'endless' && !['lobby', 'finished'].includes(state.phase) && state.matchDeadlineAt;
+  elements.matchTimerBadge.hidden = !matchRunning;
+  if (matchRunning) {
+    const remaining = Math.max(0, Math.ceil((Number(state.matchDeadlineAt) - Date.now()) / 1000));
+    elements.matchTimerBadge.textContent = `整场 ${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+  }
+  const actionRunning = ['betting', 'playing'].includes(state.phase) && state.deadlineAt;
+  elements.timerBadge.hidden = !actionRunning;
+  if (actionRunning) {
+    const seconds = Math.max(0, Math.ceil((Number(state.deadlineAt) - Date.now()) / 1000));
+    elements.timerBadge.textContent = `${state.phase === 'betting' ? '下注' : '操作'} ${seconds} 秒`;
+  }
 }
 
 function roundResultText(player, dealer) {
@@ -241,62 +351,93 @@ function render() {
   const self = players.find((player) => player.id === state.selfId) || null;
   const canReviewFinalHand = phase === 'finished' && !!self?.roundResult && (self?.cards?.length || 0) >= 2 && (state.dealer?.cards?.length || 0) >= 2;
   const reviewingFinalHand = canReviewFinalHand && !showFinalSummary;
+  const showingHand = ['dealing', 'playing', 'results'].includes(phase) || reviewingFinalHand;
+  const goalLabel = state.matchMode === 'endless' ? '10 分钟无尽模式' : `目标 ${chips(state.targetBankroll || 10000)}`;
 
   elements.setupView.hidden = true;
   elements.gameView.hidden = false;
   elements.roomCode.textContent = state.code || code;
-  elements.roundLabel.textContent = phase === 'lobby' ? '等待开局' : reviewingFinalHand ? `第 ${state.round} 局 · 最终结算` : phase === 'finished' ? '本场结束' : `第 ${state.round || 1} 局${phase === 'betting' ? ' · 下注' : phase === 'results' ? ' · 结算' : ''}`;
+  elements.roundLabel.textContent = phase === 'lobby' ? '等待开局' : reviewingFinalHand ? `第 ${state.round} 局 · 最终结算` : phase === 'finished' ? '本场结束' : `第 ${state.round || 1} 局${phase === 'betting' ? ' · 下注' : phase === 'dealing' ? ' · 发牌' : phase === 'results' ? ' · 结算' : ''}`;
+  elements.matchGoalLabel.hidden = phase === 'lobby';
+  elements.matchGoalLabel.textContent = goalLabel;
   elements.playerCountLabel.textContent = `${players.length} / 6 人`;
+  elements.quickGoalRule.textContent = state.matchMode === 'endless'
+    ? '无尽模式整场 10 分钟；多人只剩一人有筹码时提前获胜。'
+    : `最先达到 ${chips(state.targetBankroll || 10000)} 筹码，赢下本场挑战。`;
   renderTimer();
   renderPlayers(players, phase);
 
   elements.lobbyStage.hidden = phase !== 'lobby';
   elements.bettingStage.hidden = phase !== 'betting';
-  elements.playStage.hidden = phase !== 'playing' && phase !== 'results' && !reviewingFinalHand;
+  elements.playStage.hidden = !showingHand;
   elements.finishedStage.hidden = phase !== 'finished' || reviewingFinalHand;
 
   if (phase === 'lobby') {
     elements.startButton.hidden = !state.canStart;
-    elements.hostHint.hidden = !!state.isHost;
+    elements.hostHint.hidden = !!state.canStart;
   }
 
   if (phase === 'betting') renderBetting(self);
 
-  if (phase === 'playing' || phase === 'results' || reviewingFinalHand) {
+  let animating = false;
+  if (showingHand) {
     const dealer = state.dealer || {};
-    renderCards(elements.dealerCards, dealer.cards, dealer.cardCount);
-    elements.dealerTotal.textContent = dealer.total == null ? '? 点' : `${dealer.total} 点`;
-    renderCards(elements.selfCards, self?.cards, self?.cardCount);
-    elements.selfTotal.textContent = self?.total == null ? '? 点' : `${self.total} 点`;
+    animating = syncHandVisual(dealer, self);
+    elements.dealerTotal.textContent = animating || dealer.total == null ? '? 点' : `${dealer.total} 点`;
+    elements.selfTotal.textContent = animating || self?.total == null ? '? 点' : `${self.total} 点`;
     elements.selfBankroll.textContent = chips(self?.bankroll);
     elements.selfWager.textContent = chips(self?.wager);
 
     const result = self?.roundResult;
-    elements.selfOutcome.textContent = roundResultText(self, dealer) || (self?.status === 'bust' ? '爆牌了，等待本局结算' : '');
-    elements.selfOutcome.className = `self-outcome ${result?.outcome === 'win' ? 'win' : result?.outcome === 'lose' ? 'lose' : ''}`;
-    elements.centerMessage.textContent = reviewingFinalHand ? '最终局 · 请查看双方手牌与结算原因' : phase === 'results' ? (state.message || '本局结果已揭晓') : self?.status === 'spectating' ? '下局起加入' : self?.status === 'eliminated' ? '筹码已用完，本局旁观' : self?.status === 'bust' ? '超过 21 点' : state.canHit || state.canStand ? '轮到你决定' : '等待其他玩家';
+    elements.selfOutcome.textContent = animating ? '' : roundResultText(self, dealer) || (self?.status === 'bust' ? '爆牌了，等待本局结算' : '');
+    elements.selfOutcome.className = `self-outcome ${result?.outcome === 'win' ? 'win' : result?.outcome === 'lose' ? 'lose' : result?.outcome === 'push' ? 'push' : ''}`;
+    const ready = readySummary(players);
+    elements.centerMessage.textContent = animating || phase === 'dealing'
+      ? phase === 'results' || reviewingFinalHand ? '庄家正在揭牌…' : '正在逐张发牌…'
+      : reviewingFinalHand ? '最终局 · 请查看双方手牌与结算原因'
+        : phase === 'results' ? `本局已结算 · ${ready.ready} / ${ready.total} 位在线玩家已准备`
+          : self?.status === 'spectating' ? '下局起加入'
+            : self?.status === 'eliminated' ? '筹码已用完，本局旁观'
+              : self?.status === 'doubled' ? '已加倍 · 请点击发牌'
+                : self?.status === 'bust' ? '超过 21 点'
+                  : state.canHit || state.canStand ? '轮到你决定' : '等待其他玩家';
 
     elements.hitButton.hidden = phase !== 'playing' || !state.canHit;
     elements.standButton.hidden = phase !== 'playing' || !state.canStand;
     elements.doubleButton.hidden = phase !== 'playing' || !state.canDouble;
-    elements.nextButton.hidden = !reviewingFinalHand && (phase !== 'results' || !state.canNext);
-    elements.nextButton.innerHTML = reviewingFinalHand ? '查看最终排名 <span aria-hidden="true">→</span>' : '下一局 <span aria-hidden="true">→</span>';
-    elements.waitingText.hidden = reviewingFinalHand || (phase === 'results' ? !!state.canNext : !!state.canHit || !!state.canStand || !!state.canDouble);
-    elements.waitingText.textContent = phase === 'results' ? '等待房主开启下一局下注…' : self?.status === 'spectating' ? '旁观中，下局起加入…' : self?.status === 'eliminated' ? '筹码已用完，等待本局结算…' : '等待其他玩家完成本局…';
+    elements.dealButton.hidden = phase !== 'playing' || !state.canDeal;
+    elements.nextButton.hidden = animating || (!reviewingFinalHand && (phase !== 'results' || !state.canNext));
+    elements.nextButton.innerHTML = reviewingFinalHand ? '查看最终排名 <span aria-hidden="true">→</span>' : '准备下一局 <span aria-hidden="true">→</span>';
+    const hasMove = state.canHit || state.canStand || state.canDouble || state.canDeal;
+    elements.waitingText.hidden = !animating && phase !== 'dealing' && (reviewingFinalHand || (phase === 'results' ? !!state.canNext : hasMove));
+    elements.waitingText.textContent = animating || phase === 'dealing' ? '正在发牌，请稍等…'
+      : phase === 'results' ? `你已准备，等待其他在线玩家（${ready.ready} / ${ready.total}）…`
+        : self?.status === 'spectating' ? '旁观中，下局起加入…'
+          : self?.status === 'eliminated' ? '筹码已用完，等待本局结算…'
+            : '等待其他玩家完成本局…';
   }
 
   if (phase === 'finished') {
     const winners = players.filter((player) => Array.isArray(state.winners) && state.winners.includes(player.id));
     elements.finishedTitle.textContent = winners.length === 0 ? '本桌无人获胜' : winners.length === 1 ? `${winners[0].name} 赢下牌桌！` : '并列冠军！';
-    elements.finishedMessage.textContent = state.message || (winners.length ? '有人达到 10,000 筹码。' : '全员筹码归零。');
+    elements.finishedMessage.textContent = state.message || (winners.length ? `${goalLabel}，本场排名已结算。` : '全员筹码归零。');
     elements.finalRoundNote.hidden = !canReviewFinalHand;
     elements.finalRoundNote.textContent = canReviewFinalHand ? `最后一局：${roundResultText(self, state.dealer)}` : '';
     elements.reviewFinalHand.hidden = !canReviewFinalHand;
     elements.restartButton.hidden = !state.canStart;
-    elements.finishedHint.hidden = !!state.isHost;
+    elements.restartMatchSettings.hidden = !state.canStart;
+    elements.finishedHint.hidden = !!state.canStart;
+    const matchKey = `${state.code}:${state.matchStartedAt || state.round}`;
+    if (restartSettingsForMatch !== matchKey) {
+      restartSettingsForMatch = matchKey;
+      const mode = state.matchMode === 'endless' ? 'endless' : 'target';
+      elements.restartMatchSettings.querySelector(`input[value="${mode}"]`).checked = true;
+      elements.restartTarget.value = String(state.targetBankroll || 10000);
+      updateModeControls('restart');
+    }
   }
 
-  [elements.betButton, elements.hitButton, elements.standButton, elements.doubleButton, elements.startButton, elements.nextButton, elements.reviewFinalHand, elements.restartButton].forEach((button) => { button.disabled = pending; });
+  [elements.betButton, elements.hitButton, elements.standButton, elements.doubleButton, elements.dealButton, elements.startButton, elements.nextButton, elements.reviewFinalHand, elements.restartButton].forEach((button) => { button.disabled = pending || (animating && [elements.hitButton, elements.standButton, elements.doubleButton, elements.dealButton, elements.nextButton].includes(button)); });
 }
 
 function updateState(newState) {
@@ -306,13 +447,17 @@ function updateState(newState) {
   render();
 }
 
-async function submitAction(action, { amount, throwOnError = false } = {}) {
+async function submitAction(action, { amount, mode, targetBankroll, throwOnError = false } = {}) {
   if (pending || !code || !token) return;
+  if (handVisual.timer && ['hit', 'stand', 'double', 'deal', 'next'].includes(action)) {
+    if (throwOnError) throw new Error('发牌动画尚未结束');
+    return;
+  }
   pending = true;
   render();
   try {
     const response = await request(`/api/rooms/${encodeURIComponent(code)}/action`, {
-      method: 'POST', body: JSON.stringify({ token, action, ...(amount === undefined ? {} : { amount }) }),
+      method: 'POST', body: JSON.stringify({ token, action, ...(amount === undefined ? {} : { amount }), ...(mode === undefined ? {} : { mode }), ...(targetBankroll === undefined ? {} : { targetBankroll }) }),
     });
     if (action === 'leave') {
       leaveRoomUI();
@@ -327,6 +472,37 @@ async function submitAction(action, { amount, throwOnError = false } = {}) {
     pending = false;
     render();
   }
+}
+
+function matchSettings(prefix) {
+  const container = prefix === 'restart' ? elements.restartMatchSettings : elements.lobbyMatchSettings;
+  const targetInput = prefix === 'restart' ? elements.restartTarget : elements.lobbyTarget;
+  const mode = container.querySelector('input[type="radio"]:checked')?.value || 'target';
+  return { mode, targetInput };
+}
+
+function updateModeControls(prefix) {
+  const { mode, targetInput } = matchSettings(prefix);
+  const wrap = prefix === 'restart' ? elements.restartTargetWrap : elements.lobbyTargetWrap;
+  wrap.hidden = mode !== 'target';
+  targetInput.disabled = mode !== 'target';
+}
+
+function startMatch(prefix) {
+  const { mode, targetInput } = matchSettings(prefix);
+  const targetBankroll = Number(targetInput.value);
+  if (mode === 'target' && (!Number.isSafeInteger(targetBankroll) || targetBankroll < 1001 || targetBankroll > 1000000)) {
+    showToast('目标筹码须为 1,001 到 1,000,000 之间的整数');
+    targetInput.focus();
+    return;
+  }
+  submitAction('start', { mode, targetBankroll: mode === 'target' ? targetBankroll : undefined });
+}
+
+for (const prefix of ['lobby', 'restart']) {
+  const container = prefix === 'restart' ? elements.restartMatchSettings : elements.lobbyMatchSettings;
+  container.addEventListener('change', () => updateModeControls(prefix));
+  updateModeControls(prefix);
 }
 
 elements.createForm.addEventListener('submit', async (event) => {
@@ -364,14 +540,14 @@ elements.copyInvite.addEventListener('click', async () => {
   const url = `${origin}${location.pathname}?room=${encodeURIComponent(code)}`;
   try {
     await navigator.clipboard.writeText(url);
-    showToast(localHost && !state?.networkUrl ? '已复制本机链接；朋友加入需使用同一网络的电脑地址' : '邀请链接已复制，同一网络的朋友可加入');
+    showToast(localHost && !state?.networkUrl ? '已复制本机链接；朋友加入需使用可访问这台电脑的地址' : '邀请链接已复制，发给朋友即可加入');
   } catch {
     window.prompt('复制邀请链接', url);
   }
 });
 
 elements.leaveButton.addEventListener('click', () => submitAction('leave'));
-elements.startButton.addEventListener('click', () => submitAction('start'));
+elements.startButton.addEventListener('click', () => startMatch('lobby'));
 elements.betForm.addEventListener('submit', (event) => {
   event.preventDefault();
   if (!state?.canBet) return;
@@ -403,6 +579,7 @@ elements.betAmount.addEventListener('input', () => {
 elements.hitButton.addEventListener('click', () => submitAction('hit'));
 elements.standButton.addEventListener('click', () => submitAction('stand'));
 elements.doubleButton.addEventListener('click', () => submitAction('double'));
+elements.dealButton.addEventListener('click', () => submitAction('deal'));
 elements.nextButton.addEventListener('click', () => {
   if (state?.phase === 'finished') {
     showFinalSummary = true;
@@ -413,7 +590,7 @@ elements.reviewFinalHand.addEventListener('click', () => {
   showFinalSummary = false;
   render();
 });
-elements.restartButton.addEventListener('click', () => submitAction('start'));
+elements.restartButton.addEventListener('click', () => startMatch('restart'));
 for (const button of [elements.openRulesSetup, elements.openRulesGame]) {
   button.addEventListener('click', () => elements.rulesDialog.showModal());
 }
@@ -422,6 +599,7 @@ elements.rulesDialog.addEventListener('click', (event) => {
   if (event.target === elements.rulesDialog) elements.rulesDialog.close();
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshState(); });
+prefersReducedMotion.addEventListener('change', () => render());
 setInterval(renderTimer, 1000);
 
 (function restore() {
@@ -485,15 +663,17 @@ setInterval(renderTimer, 1000);
     },
     {
       name: 'blackjack_game_action', title: '操作 21 点牌桌',
-      description: '执行开始、下注、要牌、停牌、加倍、下一局或退出房间。下注时须提供整数 amount。',
-      inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'bet', 'hit', 'stand', 'double', 'next', 'leave'] }, amount: { type: 'integer', minimum: 1, description: '下注筹码数；仅在 action 为 bet 时填写' } }, required: ['action'], additionalProperties: false },
+      description: '执行开始、下注、要牌、停牌、加倍、加倍后发牌、准备下一局或退出房间。开始时可选模式和目标；下注时须提供整数 amount。',
+      inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['start', 'bet', 'hit', 'stand', 'double', 'deal', 'next', 'leave'] }, amount: { type: 'integer', minimum: 1, description: '下注筹码数；仅在 action 为 bet 时填写' }, mode: { type: 'string', enum: ['target', 'endless'], description: '开始游戏时填写，默认 target' }, targetBankroll: { type: 'integer', minimum: 1001, maximum: 1000000, description: '目标模式的获胜筹码数；默认 10000' } }, required: ['action'], additionalProperties: false },
       annotations: { readOnlyHint: false },
       execute: async (input) => {
         if (!code) throw new Error('尚未进入房间');
-        if (!['start', 'bet', 'hit', 'stand', 'double', 'next', 'leave'].includes(input?.action)) throw new Error('无效操作');
+        if (!['start', 'bet', 'hit', 'stand', 'double', 'deal', 'next', 'leave'].includes(input?.action)) throw new Error('无效操作');
         if (input.action === 'bet' && !Number.isSafeInteger(input.amount)) throw new Error('下注时请提供整数 amount');
+        if (input.action === 'start' && input.mode !== undefined && !['target', 'endless'].includes(input.mode)) throw new Error('无效游戏模式');
+        if (input.action === 'start' && input.targetBankroll !== undefined && (!Number.isSafeInteger(input.targetBankroll) || input.targetBankroll < 1001 || input.targetBankroll > 1000000)) throw new Error('目标筹码须为 1,001 到 1,000,000');
         if (pending) throw new Error('上一步操作尚未完成');
-        return await submitAction(input.action, { amount: input.action === 'bet' ? input.amount : undefined, throwOnError: true });
+        return await submitAction(input.action, { amount: input.action === 'bet' ? input.amount : undefined, mode: input.action === 'start' ? input.mode : undefined, targetBankroll: input.action === 'start' ? input.targetBankroll : undefined, throwOnError: true });
       },
     },
   ];

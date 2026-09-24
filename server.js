@@ -10,8 +10,11 @@ const HOST = process.env.HOST || '0.0.0.0';
 const STARTING_BANKROLL = 1_000;
 const TARGET_BANKROLL = 10_000;
 const MINIMUM_BET = 50;
-const BET_MS = Number(process.env.BET_MS || 30_000);
-const TURN_MS = Number(process.env.TURN_MS || 75_000);
+const BET_MS = Number(process.env.BET_MS || 15_000);
+const TURN_MS = Number(process.env.TURN_MS || 15_000);
+const DEAL_MS = Number(process.env.DEAL_MS || 2_500);
+const MATCH_MS = Number(process.env.MATCH_MS || 10 * 60_000);
+const PRESENCE_GRACE_MS = 10_000;
 const MAX_PLAYERS = 6;
 const rooms = new Map();
 
@@ -95,6 +98,7 @@ function makePlayer(name) {
     cards: [],
     status: 'waiting',
     roundResult: null,
+    readyNext: false,
   };
 }
 
@@ -176,6 +180,10 @@ function bettors(room) {
   return room.players.filter((player) => player.status === 'betting' || player.status === 'ready');
 }
 
+function isOnline(player) {
+  return player.clients.size > 0 || Date.now() - player.lastSeen < PRESENCE_GRACE_MS;
+}
+
 function makeState(room, viewer) {
   const reveal = room.phase === 'results' || room.phase === 'finished';
   const isHost = room.hostId === viewer.id;
@@ -184,7 +192,7 @@ function makeState(room, viewer) {
     return {
       id: player.id,
       name: player.name,
-      connected: player.clients.size > 0 || Date.now() - player.lastSeen < 10_000,
+      connected: isOnline(player),
       cards: visible ? player.cards : [],
       cardCount: player.cards.length,
       total: visible && player.cards.length ? handValue(player.cards).total : null,
@@ -194,9 +202,10 @@ function makeState(room, viewer) {
       score: player.bankroll - STARTING_BANKROLL,
       playedRounds: player.playedRounds,
       roundResult: reveal ? player.roundResult : null,
+      readyNext: player.readyNext,
     };
   });
-  const dealerCards = reveal ? room.dealer.cards : room.phase === 'playing' ? room.dealer.cards.slice(0, 1) : [];
+  const dealerCards = reveal ? room.dealer.cards : ['dealing', 'playing'].includes(room.phase) ? room.dealer.cards.slice(0, 1) : [];
   const ownStatus = viewer.status;
   return {
     code: room.code,
@@ -205,7 +214,10 @@ function makeState(room, viewer) {
     round: room.round,
     totalRounds: null,
     startingBankroll: STARTING_BANKROLL,
-    targetBankroll: TARGET_BANKROLL,
+    targetBankroll: room.targetBankroll,
+    matchMode: room.matchMode,
+    matchStartedAt: room.matchStartedAt,
+    matchDeadlineAt: room.matchDeadlineAt,
     minimumBet: MINIMUM_BET,
     winners: room.winners,
     isHost,
@@ -218,13 +230,15 @@ function makeState(room, viewer) {
       status: room.dealer.status,
     },
     deadlineAt: room.phase === 'betting' || room.phase === 'playing' ? room.deadlineAt : null,
+    dealEndsAt: room.phase === 'dealing' ? room.dealEndsAt : null,
     shoeRemaining: room.shoe.length,
-    canStart: isHost && (room.phase === 'lobby' || room.phase === 'finished'),
+    canStart: room.phase === 'lobby' || room.phase === 'finished',
     canBet: room.phase === 'betting' && ownStatus === 'betting',
     canHit: room.phase === 'playing' && ownStatus === 'playing',
     canStand: room.phase === 'playing' && ownStatus === 'playing',
     canDouble: room.phase === 'playing' && ownStatus === 'playing' && viewer.cards.length === 2 && viewer.bankroll >= viewer.wager * 2,
-    canNext: isHost && room.phase === 'results',
+    canDeal: room.phase === 'playing' && ownStatus === 'doubled',
+    canNext: room.phase === 'results' && !viewer.readyNext,
     message: room.message,
   };
 }
@@ -251,6 +265,60 @@ function clearRoundTimer(room) {
   if (room.roundTimer) clearTimeout(room.roundTimer);
   room.roundTimer = null;
   room.deadlineAt = null;
+  room.dealEndsAt = null;
+}
+
+function clearMatchTimer(room) {
+  if (room.matchTimer) clearTimeout(room.matchTimer);
+  room.matchTimer = null;
+}
+
+function clearResultsTimer(room) {
+  if (room.resultsTimer) clearTimeout(room.resultsTimer);
+  room.resultsTimer = null;
+}
+
+function finishMatch(room, winners, message) {
+  clearRoundTimer(room);
+  clearMatchTimer(room);
+  clearResultsTimer(room);
+  room.winners = winners;
+  room.phase = 'finished';
+  room.message = message;
+  broadcast(room);
+}
+
+function finishByRanking(room) {
+  const highest = Math.max(0, ...room.players.map((player) => player.bankroll));
+  const leaders = highest > 0 ? room.players.filter((player) => player.bankroll === highest) : [];
+  const names = leaders.map((player) => player.name);
+  finishMatch(room, leaders.map((player) => player.id), leaders.length
+    ? `10 分钟结束，${names.join('、')} 以 ${highest} 筹码领先。`
+    : '10 分钟结束，全员筹码归零。');
+}
+
+function concludeAfterRound(room) {
+  if (room.matchMode === 'target') {
+    const atTarget = room.players.filter((player) => player.bankroll >= room.targetBankroll);
+    if (atTarget.length) {
+      const highest = Math.max(...atTarget.map((player) => player.bankroll));
+      const leaders = atTarget.filter((player) => player.bankroll === highest);
+      finishMatch(room, leaders.map((player) => player.id), `${leaders.map((player) => player.name).join('、')} 达到目标，挑战结束！`);
+      return;
+    }
+  }
+  const survivors = room.players.filter((player) => player.bankroll > 0);
+  if (room.players.length > 1 && survivors.length === 1) {
+    finishMatch(room, [survivors[0].id], `${survivors[0].name} 是最后仍有筹码的玩家，挑战结束！`);
+  } else if (survivors.length === 0) {
+    finishMatch(room, [], '全员筹码归零，挑战结束。');
+  } else if (room.matchMode === 'endless' && (room.matchExpired || Date.now() >= room.matchDeadlineAt)) {
+    finishByRanking(room);
+  } else {
+    room.phase = 'results';
+    room.message = '本局结算完成，在线玩家都点击「下一局」后继续。';
+    checkNextReady(room);
+  }
 }
 
 function scoreRound(room) {
@@ -271,7 +339,8 @@ function scoreRound(room) {
     let delta;
     let label;
     if (natural && dealerBlackjack) {
-      [outcome, delta, label] = ['push', 0, `你 ${total} 点、庄家 ${dealerTotal} 点，双方均为自然 Blackjack；平局，退回下注 ${player.wager} 筹码`];
+      delta = -Math.ceil(player.wager / 2);
+      [outcome, label] = ['push', `你 ${total} 点、庄家 ${dealerTotal} 点，双方均为自然 Blackjack；平局失去半注 ${-delta} 筹码`];
     } else if (natural) {
       delta = Math.floor(player.wager * 1.5);
       [outcome, label] = ['win', `你 ${total} 点（自然 Blackjack）、庄家 ${dealerTotal} 点${dealerTotal === 21 ? '（非自然）' : ''}；自然 Blackjack 获胜，赢得 ${delta} 筹码`];
@@ -284,35 +353,38 @@ function scoreRound(room) {
     } else if (total < dealerTotal) {
       [outcome, delta, label] = ['lose', -player.wager, `你 ${total} 点、庄家 ${dealerTotal} 点；点数低于庄家，失去 ${player.wager} 筹码`];
     } else {
-      [outcome, delta, label] = ['push', 0, `你 ${total} 点、庄家 ${dealerTotal} 点；平局，退回下注 ${player.wager} 筹码`];
+      delta = -Math.ceil(player.wager / 2);
+      [outcome, label] = ['push', `你 ${total} 点、庄家 ${dealerTotal} 点；平局失去半注 ${-delta} 筹码`];
     }
     player.bankroll += delta;
     player.roundResult = { outcome, delta, points: delta, label };
     player.status = outcome;
   }
 
-  const atTarget = room.players.filter((player) => player.bankroll >= TARGET_BANKROLL);
-  if (atTarget.length) {
-    const highest = Math.max(...atTarget.map((player) => player.bankroll));
-    room.winners = atTarget.filter((player) => player.bankroll === highest).map((player) => player.id);
-    room.phase = 'finished';
-    const names = room.players.filter((player) => room.winners.includes(player.id)).map((player) => player.name);
-    room.message = `${names.join('、')} 达到目标，挑战结束！主持人可以再开一场。`;
-  } else if (room.players.every((player) => player.bankroll === 0)) {
-    room.winners = [];
-    room.phase = 'finished';
-    room.message = '全员筹码归零，挑战结束。主持人可以再开一场。';
-  } else {
-    room.phase = 'results';
-    room.message = '本局结算完成，等待主持人开启下一局下注。';
-  }
-  broadcast(room);
+  concludeAfterRound(room);
 }
 
 function finishIfReady(room) {
   if (room.phase !== 'playing') return;
-  if (participants(room).every((player) => player.status !== 'playing')) scoreRound(room);
+  if (participants(room).every((player) => player.status !== 'playing' && player.status !== 'doubled')) scoreRound(room);
   else broadcast(room);
+}
+
+function checkNextReady(room) {
+  clearResultsTimer(room);
+  if (room.phase !== 'results') return;
+  const online = room.players.filter(isOnline);
+  if (online.length && online.every((player) => player.readyNext)) {
+    beginBetting(room);
+    return;
+  }
+  const disconnected = online.filter((player) => !player.readyNext && !player.clients.size);
+  if (disconnected.length) {
+    const soonest = Math.min(...disconnected.map((player) => player.lastSeen + PRESENCE_GRACE_MS));
+    room.resultsTimer = setTimeout(() => checkNextReady(room), Math.max(1, soonest - Date.now() + 1));
+    room.resultsTimer.unref();
+  }
+  broadcast(room);
 }
 
 function finishBetting(room) {
@@ -322,14 +394,27 @@ function finishBetting(room) {
   }
   clearRoundTimer(room);
   room.phase = 'results';
-  room.message = '本局无人下注，主持人可以开启下一局。';
-  broadcast(room);
+  room.message = '本局无人下注，在线玩家都点击「下一局」后继续。';
+  checkNextReady(room);
+}
+
+function resolveTimedOutTurns(room) {
+  if (room.phase !== 'playing') return;
+  for (const player of participants(room)) {
+    if (player.status === 'doubled') {
+      player.cards.push(draw(room));
+      player.status = handValue(player.cards).total > 21 ? 'bust' : 'stood';
+    } else if (player.status === 'playing') {
+      player.status = 'stood';
+    }
+  }
+  scoreRound(room);
 }
 
 function dealRound(room) {
   clearRoundTimer(room);
   if (room.shoe.length < 78) room.shoe = makeShoe();
-  room.phase = 'playing';
+  room.phase = 'dealing';
   room.dealer = { cards: [], status: 'playing' };
   const active = room.players.filter((player) => player.status === 'ready');
   for (const player of active) {
@@ -344,42 +429,55 @@ function dealRound(room) {
   for (const player of active) {
     if (isBlackjack(player.cards)) player.status = 'blackjack';
   }
-  room.message = `第 ${room.round} 局：请要牌、停牌或加倍。`;
-  if (isBlackjack(room.dealer.cards) || active.every((player) => player.status !== 'playing')) {
-    scoreRound(room);
-    return;
-  }
-  room.deadlineAt = Date.now() + TURN_MS;
+  room.message = `第 ${room.round} 局：正在发牌…`;
+  room.dealEndsAt = Date.now() + DEAL_MS;
   room.roundTimer = setTimeout(() => {
-    if (room.phase !== 'playing') return;
-    for (const player of participants(room)) {
-      if (player.status === 'playing') player.status = 'stood';
+    if (room.phase !== 'dealing') return;
+    room.roundTimer = null;
+    room.dealEndsAt = null;
+    room.phase = 'playing';
+    if (isBlackjack(room.dealer.cards) || active.every((player) => player.status !== 'playing')) {
+      scoreRound(room);
+      return;
     }
-    scoreRound(room);
-  }, TURN_MS);
+    if (room.matchExpired || (room.matchDeadlineAt && Date.now() >= room.matchDeadlineAt)) {
+      room.matchExpired = true;
+      resolveTimedOutTurns(room);
+      return;
+    }
+    room.message = `第 ${room.round} 局：请在 15 秒内要牌、停牌或加倍。`;
+    room.deadlineAt = Date.now() + TURN_MS;
+    room.roundTimer = setTimeout(() => resolveTimedOutTurns(room), TURN_MS);
+    broadcast(room);
+  }, DEAL_MS);
   broadcast(room);
 }
 
 function beginBetting(room) {
+  if (room.matchMode === 'endless' && (room.matchExpired || Date.now() >= room.matchDeadlineAt)) {
+    expireMatch(room);
+    return;
+  }
   clearRoundTimer(room);
+  clearResultsTimer(room);
   room.round += 1;
   room.phase = 'betting';
   room.dealer = { cards: [], status: 'waiting' };
-  const now = Date.now();
   for (const player of room.players) {
     player.cards = [];
     player.wager = 0;
     player.roundResult = null;
-    const present = player.clients.size > 0 || now - player.lastSeen < 30_000;
+    player.readyNext = false;
+    const present = isOnline(player);
     player.status = player.bankroll === 0 ? 'eliminated' : present ? 'betting' : 'spectating';
   }
-  room.message = `第 ${room.round} 局：请选择下注额，30 秒后自动押最低额。`;
+  room.message = `第 ${room.round} 局：请选择下注额，15 秒后自动押最低额。`;
   room.deadlineAt = Date.now() + BET_MS;
   room.roundTimer = setTimeout(() => {
     if (room.phase !== 'betting') return;
     for (const player of bettors(room)) {
       if (player.status !== 'betting') continue;
-      if (!player.clients.size && Date.now() - player.lastSeen >= 30_000) {
+      if (!isOnline(player)) {
         player.status = 'spectating';
         continue;
       }
@@ -391,6 +489,19 @@ function beginBetting(room) {
   broadcast(room);
 }
 
+function expireMatch(room) {
+  if (room.matchMode !== 'endless' || ['lobby', 'finished'].includes(room.phase)) return;
+  room.matchExpired = true;
+  if (room.phase === 'betting' || room.phase === 'results') {
+    finishByRanking(room);
+  } else if (room.phase === 'playing') {
+    resolveTimedOutTurns(room);
+  } else if (room.phase === 'dealing') {
+    room.message = '10 分钟已到，本局发牌后将立即结算。';
+    broadcast(room);
+  }
+}
+
 function createRoom(name) {
   const player = makePlayer(name);
   const room = {
@@ -400,36 +511,23 @@ function createRoom(name) {
     players: [player],
     hostId: player.id,
     winners: [],
+    matchMode: 'target',
+    targetBankroll: TARGET_BANKROLL,
+    matchStartedAt: null,
+    matchDeadlineAt: null,
+    matchExpired: false,
     dealer: { cards: [], status: 'waiting' },
     shoe: makeShoe(),
-    message: '把房间码发给朋友，主持人可以开始游戏。',
+    message: '把房间码发给朋友，任何人都可以开始游戏。',
     lastActivity: Date.now(),
     roundTimer: null,
     deadlineAt: null,
-    hostTransferTimer: null,
+    dealEndsAt: null,
+    matchTimer: null,
+    resultsTimer: null,
   };
   rooms.set(room.code, room);
   return { room, player };
-}
-
-function scheduleHostTransfer(room) {
-  if (room.hostTransferTimer) clearTimeout(room.hostTransferTimer);
-  room.hostTransferTimer = setTimeout(() => {
-    room.hostTransferTimer = null;
-    const host = room.players.find((player) => player.id === room.hostId);
-    if (host && host.clients.size) return;
-    if (host && Date.now() - host.lastSeen < 30_000) {
-      scheduleHostTransfer(room);
-      return;
-    }
-    const nextHost = room.players.find((player) => player.clients.size > 0);
-    if (nextHost && nextHost.id !== room.hostId) {
-      room.hostId = nextHost.id;
-      room.message = `${nextHost.name} 已接任主持人。`;
-      broadcast(room);
-    }
-  }, 30_000);
-  room.hostTransferTimer.unref();
 }
 
 function serveEvents(req, res, room, player) {
@@ -441,39 +539,57 @@ function serveEvents(req, res, room, player) {
   });
   res.write('retry: 1500\n\n');
   player.clients.add(res);
-  if (room.hostId === player.id && room.hostTransferTimer) {
-    clearTimeout(room.hostTransferTimer);
-    room.hostTransferTimer = null;
-  }
   touch(room, player);
-  broadcast(room);
+  if (room.phase === 'results') checkNextReady(room);
+  else broadcast(room);
   const heartbeat = setInterval(() => {
     try { res.write(': ping\n\n'); } catch { res.end(); }
   }, 20_000);
   res.on('close', () => {
     clearInterval(heartbeat);
     player.clients.delete(res);
-    if (room.hostId === player.id && !player.clients.size) scheduleHostTransfer(room);
-    broadcast(room);
+    if (room.phase === 'results') checkNextReady(room);
+    else broadcast(room);
   });
 }
 
-function handleAction(room, player, action, amount) {
+function handleAction(room, player, body) {
+  const { action, amount } = body;
   touch(room, player);
   if (action === 'start') {
-    if (room.hostId !== player.id || !['lobby', 'finished'].includes(room.phase)) return '现在不能开始游戏';
+    if (!['lobby', 'finished'].includes(room.phase)) return '现在不能开始游戏';
+    const mode = body.mode === undefined ? 'target' : body.mode;
+    if (mode !== 'target' && mode !== 'endless') return '游戏模式有误';
+    const target = body.targetBankroll === undefined ? TARGET_BANKROLL : body.targetBankroll;
+    if (mode === 'target' && (!Number.isSafeInteger(target) || target < 1_001 || target > 1_000_000)) {
+      return '目标筹码须为 1001 到 1000000 的整数';
+    }
+    clearRoundTimer(room);
+    clearMatchTimer(room);
+    clearResultsTimer(room);
     room.round = 0;
     room.shoe = makeShoe();
     room.winners = [];
+    room.matchMode = mode;
+    room.targetBankroll = mode === 'target' ? target : null;
+    room.matchStartedAt = Date.now();
+    room.matchDeadlineAt = mode === 'endless' ? room.matchStartedAt + MATCH_MS : null;
+    room.matchExpired = false;
     for (const seat of room.players) {
       seat.bankroll = STARTING_BANKROLL;
       seat.wager = 0;
       seat.playedRounds = 0;
+      seat.readyNext = false;
+    }
+    if (mode === 'endless') {
+      room.matchTimer = setTimeout(() => expireMatch(room), MATCH_MS);
+      room.matchTimer.unref();
     }
     beginBetting(room);
   } else if (action === 'next') {
-    if (room.hostId !== player.id || room.phase !== 'results') return '现在不能进入下一回合';
-    beginBetting(room);
+    if (room.phase !== 'results') return '现在不能进入下一回合';
+    player.readyNext = true;
+    checkNextReady(room);
   } else if (action === 'bet') {
     if (room.phase !== 'betting' || player.status !== 'betting') return '现在不能下注';
     const minimum = Math.min(MINIMUM_BET, player.bankroll);
@@ -500,6 +616,10 @@ function handleAction(room, player, action, amount) {
       return '现在不能加倍';
     }
     player.wager *= 2;
+    player.status = 'doubled';
+    broadcast(room);
+  } else if (action === 'deal') {
+    if (room.phase !== 'playing' || player.status !== 'doubled') return '现在不能发牌';
     player.cards.push(draw(room));
     player.status = handValue(player.cards).total > 21 ? 'bust' : 'stood';
     finishIfReady(room);
@@ -518,26 +638,23 @@ function leaveRoom(room, player) {
 
   if (room.players.length === 0) {
     clearRoundTimer(room);
-    if (room.hostTransferTimer) clearTimeout(room.hostTransferTimer);
+    clearMatchTimer(room);
+    clearResultsTimer(room);
     rooms.delete(room.code);
     return;
   }
   if (wasHost) {
     room.hostId = (room.players.find((seat) => seat.clients.size) || room.players[0]).id;
-    room.message = `${room.players.find((seat) => seat.id === room.hostId).name} 已接任主持人。`;
   }
   if (room.phase !== 'lobby' && room.phase !== 'finished' && room.players.every((seat) => seat.bankroll === 0)) {
-    clearRoundTimer(room);
-    room.phase = 'finished';
-    room.winners = [];
-    room.message = '全员筹码归零，挑战结束。主持人可以再开一场。';
-    broadcast(room);
+    finishMatch(room, [], '全员筹码归零，挑战结束。');
     return;
   }
   if (room.phase === 'playing') finishIfReady(room);
   else if (room.phase === 'betting' && bettors(room).every((seat) => seat.status === 'ready')) {
     finishBetting(room);
-  } else broadcast(room);
+  } else if (room.phase === 'results') checkNextReady(room);
+  else broadcast(room);
 }
 
 async function serveStatic(req, res, pathname) {
@@ -589,11 +706,11 @@ const server = http.createServer(async (req, res) => {
       if (!room) return fail(res, 404, '房间不存在或已过期');
       if (room.players.length >= MAX_PLAYERS) return fail(res, 409, '房间已满（最多 6 人）');
       const player = makePlayer(name);
-      if (room.phase === 'betting' || room.phase === 'playing') player.status = 'spectating';
+      if (['betting', 'dealing', 'playing'].includes(room.phase)) player.status = 'spectating';
       room.players.push(player);
       touch(room, player);
-      broadcast(room);
-      if (!room.players.find((seat) => seat.id === room.hostId)?.clients.size) scheduleHostTransfer(room);
+      if (room.phase === 'results') checkNextReady(room);
+      else broadcast(room);
       return sendJson(res, 201, { code: room.code, token: player.token });
     }
     const match = /^\/api\/rooms\/([A-Z2-9]{6})\/(state|events|action)$/i.exec(pathname);
@@ -619,7 +736,7 @@ const server = http.createServer(async (req, res) => {
           leaveRoom(room, player);
           return sendJson(res, 200, { left: true });
         }
-        const error = handleAction(room, player, body.action, body.amount);
+        const error = handleAction(room, player, body);
         if (error) return fail(res, 409, error);
         return sendJson(res, 200, makeState(room, player));
       }
@@ -640,7 +757,8 @@ setInterval(() => {
   for (const [code, room] of rooms) {
     if (room.lastActivity >= cutoff || room.players.some((player) => player.clients.size)) continue;
     clearRoundTimer(room);
-    if (room.hostTransferTimer) clearTimeout(room.hostTransferTimer);
+    clearMatchTimer(room);
+    clearResultsTimer(room);
     rooms.delete(code);
   }
 }, 15 * 60 * 1000).unref();
@@ -657,4 +775,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, testing: { createRoom, makePlayer, handValue, isBlackjack, scoreRound, makeState } };
+module.exports = { server, testing: { createRoom, makePlayer, handValue, isBlackjack, scoreRound, makeState, expireMatch } };

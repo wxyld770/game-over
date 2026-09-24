@@ -37,8 +37,8 @@ jobs:
           node --check server.js
           node --check public/app.js
 
-      - name: Run HTTP smoke tests
-        run: node --test test/smoke.test.js
+      - name: Run game tests
+        run: node --test test/*.test.js
 
       - name: Package tested source
         id: package
