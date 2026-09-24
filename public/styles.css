@@ -341,3 +341,5 @@ input:focus { border-color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+.hub-link { color: #e9bf72; text-decoration: none; font-size: .82rem; font-weight: 700; white-space: nowrap; }
+.hub-link:hover { text-decoration: underline; }

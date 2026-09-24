@@ -39,8 +39,12 @@ import tarfile
 
 bundle, destination = sys.argv[1:]
 allowed = {
-    'server.js', 'package.json', 'public/app.js', 'public/favicon.svg',
-    'public/index.html', 'public/styles.css',
+    'server.js', 'doudizhu-server.js', 'package.json',
+    'public/app.js', 'public/favicon.svg', 'public/index.html',
+    'public/styles.css', 'public/hub.html',
+    'public/games/doudizhu.html', 'public/games/sudoku.html',
+    'public/games/minesweeper.html', 'public/games/spider.html',
+    'public/games/jump.html', 'public/games/match3.html',
 }
 with tarfile.open(bundle, 'r:gz') as archive:
     members = archive.getmembers()
@@ -63,6 +67,7 @@ with tarfile.open(bundle, 'r:gz') as archive:
 PY
   chmod 0755 "${staging}" "${staging}/public"
   /opt/game-over/node/bin/node --check "${staging}/server.js"
+  /opt/game-over/node/bin/node --check "${staging}/doudizhu-server.js"
   /opt/game-over/node/bin/node --check "${staging}/public/app.js"
   chown -R root:root "${staging}"
   mv -T -- "${staging}" "${release}"
@@ -70,7 +75,7 @@ PY
 fi
 
 same_contents=true
-for file in server.js package.json public/app.js public/favicon.svg public/index.html public/styles.css; do
+for file in server.js doudizhu-server.js package.json public/app.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
   if ! cmp -s -- "${previous}/${file}" "${release}/${file}"; then
     same_contents=false
     break

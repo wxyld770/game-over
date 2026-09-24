@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#151e2d" />
+  <meta name="description" content="交换相邻宝石，连成三个或更多。免费在线玩消消乐。" />
+  <title>消消乐 · 小游戏大厅</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; color-scheme: dark; --paper:#f8f2e8; --muted:#b9c3d2; --gold:#f2c77f; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; color: var(--paper); background: radial-gradient(circle at 15% 0, #38435f 0, transparent 38%), radial-gradient(circle at 100% 95%, #403054 0, transparent 39%), #151e2d; }
+    button { font: inherit; cursor: pointer; }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid #f9d594; outline-offset: 3px; }
+    .shell { width: min(1050px, 100%); margin: auto; padding: 22px 22px 50px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 24px; }
+    .back { color: var(--gold); font-weight: 700; text-decoration: none; }
+    .back:hover { text-decoration: underline; }
+    .brand { font-size: .78rem; letter-spacing: .2em; color: #bec7d2; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(275px, 330px); gap: 25px; align-items: start; }
+    .board-panel, .side-panel { border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: rgba(25,34,51,.83); box-shadow: 0 26px 65px rgba(3,8,19,.22); }
+    .board-panel { padding: clamp(13px, 2.8vw, 28px); }
+    .title-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 17px; }
+    .title-line h1 { margin: 0; font-size: clamp(1.9rem, 4.2vw, 3.2rem); letter-spacing: -.04em; }
+    .chip { display: inline-flex; align-items: center; min-height: 30px; padding: 0 11px; border: 1px solid rgba(244,207,147,.45); border-radius: 999px; color: var(--gold); font-size: .76rem; font-weight: 800; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: clamp(3px, 1vw, 7px); aspect-ratio: 1; width: 100%; max-width: 610px; margin: auto; padding: clamp(7px, 1.4vw, 13px); border: 1px solid #566377; border-radius: 18px; background: #101a2a; touch-action: none; user-select: none; }
+    .gem { display: grid; place-items: center; width: 100%; min-width: 0; padding: 0; border: 1px solid rgba(255,255,255,.17); border-radius: clamp(5px, 1.2vw, 11px); box-shadow: inset 0 -5px 0 rgba(0,0,0,.14), 0 3px 8px rgba(0,0,0,.18); font-size: clamp(18px, 4.5vw, 39px); line-height: 1; transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
+    .gem:hover { filter: brightness(1.2); transform: scale(1.05); }
+    .gem.selected { position: relative; z-index: 2; transform: scale(1.12); box-shadow: 0 0 0 3px #fff3cc, 0 0 20px #ffd894; }
+    .gem[data-kind="0"] { color: #ffdddf; background: linear-gradient(145deg, #f77990, #c63f61); }
+    .gem[data-kind="1"] { color: #d4f8ff; background: linear-gradient(145deg, #52c9e3, #237eaa); }
+    .gem[data-kind="2"] { color: #f9edbf; background: linear-gradient(145deg, #f0ce67, #bc8d27); }
+    .gem[data-kind="3"] { color: #e6dafa; background: linear-gradient(145deg, #b691eb, #7853bb); }
+    .gem[data-kind="4"] { color: #e8ffd4; background: linear-gradient(145deg, #9bd96c, #4d9c5c); }
+    .gem[data-kind="5"] { color: #fff0dc; background: linear-gradient(145deg, #f5ac69, #d46c4c); }
+    .gem:disabled { cursor: default; }
+    .hint { min-height: 22px; margin: 15px 4px 0; color: #d6dfeb; font-size: .87rem; line-height: 1.55; }
+    .side-panel { padding: 26px; }
+    .eyebrow { color: var(--gold); font-size: .7rem; letter-spacing: .2em; font-weight: 800; }
+    .side-panel h2 { margin: 10px 0 20px; font-size: 1.55rem; }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat { min-height: 86px; padding: 13px; border: 1px solid rgba(255,255,255,.1); border-radius: 13px; background: rgba(255,255,255,.045); }
+    .stat span { display: block; color: var(--muted); font-size: .77rem; }
+    .stat strong { display: block; margin-top: 6px; color: #fff5d5; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+    .progress { height: 10px; margin: 22px 0 8px; border-radius: 99px; background: #0b1524; overflow: hidden; }
+    .progress > span { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #e8aa62, #f8d995); transition: width .3s ease; }
+    .progress-caption { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: .78rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+    .action { min-height: 42px; padding: 0 15px; border: 1px solid #dfb976; border-radius: 10px; color: #211c25; background: linear-gradient(135deg, #f8dd9d, #e3b86a); font-weight: 800; }
+    .action.secondary { color: var(--gold); background: transparent; }
+    .action[hidden] { display: none; }
+    .rules { margin: 25px 0 0; padding-left: 19px; color: var(--muted); font-size: .85rem; line-height: 1.8; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } .side-panel { padding: 20px; } .grid { max-width: 550px; } }
+    @media (max-width: 420px) { .shell { padding: 15px 10px 30px; } .board-panel { padding: 12px; } .title-line { padding: 0 4px; } .gem { font-size: clamp(16px, 6.2vw, 27px); } .grid { gap: 3px; padding: 6px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · MATCH THREE</span></header>
+    <main>
+      <section class="board-panel" aria-label="消消乐棋盘">
+        <div class="title-line"><h1>消消乐</h1><span class="chip" id="levelBadge">第 1 关</span></div>
+        <div class="grid" id="grid" role="grid" aria-label="8 乘 8 宝石棋盘"></div>
+        <p class="hint" id="message" role="status">点选两块相邻宝石，或在手机上滑动交换。</p>
+      </section>
+      <aside class="side-panel">
+        <span class="eyebrow">YOUR CHALLENGE</span><h2>连成三个，继续连锁</h2>
+        <div class="stats"><div class="stat"><span>本关分数</span><strong id="score">0</strong></div><div class="stat"><span>剩余步数</span><strong id="moves">24</strong></div><div class="stat"><span>过关目标</span><strong id="target">600</strong></div><div class="stat"><span>最佳关卡</span><strong id="best">1</strong></div></div>
+        <div class="progress" aria-hidden="true"><span id="progress"></span></div><div class="progress-caption"><span>目标进度</span><span id="progressText">0%</span></div>
+        <div class="actions"><button class="action" id="next" hidden>下一关 →</button><button class="action secondary" id="restart">重玩本关</button></div>
+        <ol class="rules"><li>交换相邻的两块宝石，连成横向或纵向至少三块。</li><li>一次交换可引发多次连锁，连锁越多得分越高。</li><li>在步数用完前达到目标分数，即可进入下一关。</li></ol>
+      </aside>
+    </main>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const SIZE = 8;
+      const KINDS = 6;
+      const glyphs = ['♥', '◆', '★', '✦', '⬟', '●'];
+      const names = ['红宝石', '蓝宝石', '金星', '紫水晶', '绿宝石', '琥珀'];
+      const grid = document.getElementById('grid');
+      const message = document.getElementById('message');
+      const nextButton = document.getElementById('next');
+      let board = [];
+      let selected = -1;
+      let busy = false;
+      let finished = false;
+      let score = 0;
+      let moves = 24;
+      let level = 1;
+      let best = 1;
+      let startPointer = null;
+      try {
+        const unlocked = Number(localStorage.getItem('match3:bestLevel'));
+        if (Number.isSafeInteger(unlocked) && unlocked >= 1) {
+          best = unlocked;
+          level = unlocked;
+        }
+      } catch {}
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const row = (index) => Math.floor(index / SIZE);
+      const col = (index) => index % SIZE;
+      const randomKind = () => Math.floor(Math.random() * KINDS);
+      const target = () => 500 + level * 100;
+      const adjacent = (a, b) => Math.abs(row(a) - row(b)) + Math.abs(col(a) - col(b)) === 1;
+      const swap = (a, b) => { [board[a], board[b]] = [board[b], board[a]]; };
+
+      function matches() {
+        const found = new Set();
+        for (let r = 0; r < SIZE; r += 1) {
+          for (let c = 0; c < SIZE;) {
+            const first = board[r * SIZE + c];
+            let end = c + 1;
+            while (first !== null && end < SIZE && board[r * SIZE + end] === first) end += 1;
+            if (end - c >= 3) for (let x = c; x < end; x += 1) found.add(r * SIZE + x);
+            c = end;
+          }
+        }
+        for (let c = 0; c < SIZE; c += 1) {
+          for (let r = 0; r < SIZE;) {
+            const first = board[r * SIZE + c];
+            let end = r + 1;
+            while (first !== null && end < SIZE && board[end * SIZE + c] === first) end += 1;
+            if (end - r >= 3) for (let y = r; y < end; y += 1) found.add(y * SIZE + c);
+            r = end;
+          }
+        }
+        return found;
+      }
+
+      function hasMove() {
+        for (let i = 0; i < board.length; i += 1) {
+          for (const j of [i + 1, i + SIZE]) {
+            if (j >= board.length || !adjacent(i, j)) continue;
+            swap(i, j);
+            const valid = matches().size > 0;
+            swap(i, j);
+            if (valid) return true;
+          }
+        }
+        return false;
+      }
+
+      function freshBoard() {
+        do {
+          board = Array(SIZE * SIZE).fill(null);
+          for (let i = 0; i < board.length; i += 1) {
+            const choices = Array.from({ length: KINDS }, (_, value) => value).filter((kind) =>
+              !(col(i) >= 2 && board[i - 1] === kind && board[i - 2] === kind)
+              && !(row(i) >= 2 && board[i - SIZE] === kind && board[i - 2 * SIZE] === kind));
+            board[i] = choices[Math.floor(Math.random() * choices.length)];
+          }
+        } while (!hasMove());
+      }
+
+      function render() {
+        const fragment = document.createDocumentFragment();
+        board.forEach((kind, index) => {
+          const tile = document.createElement('button');
+          tile.type = 'button';
+          tile.className = 'gem' + (index === selected ? ' selected' : '');
+          tile.dataset.index = String(index);
+          tile.dataset.kind = String(kind);
+          tile.textContent = kind === null ? '' : glyphs[kind];
+          tile.setAttribute('role', 'gridcell');
+          tile.setAttribute('aria-label', `第 ${row(index) + 1} 行第 ${col(index) + 1} 列：${names[kind] || '空'}`);
+          tile.setAttribute('aria-selected', index === selected ? 'true' : 'false');
+          tile.disabled = busy || finished || kind === null;
+          fragment.append(tile);
+        });
+        grid.replaceChildren(fragment);
+        document.getElementById('score').textContent = score;
+        document.getElementById('moves').textContent = moves;
+        document.getElementById('target').textContent = target();
+        document.getElementById('levelBadge').textContent = `第 ${level} 关`;
+        document.getElementById('best').textContent = best;
+        const percent = Math.min(100, Math.floor(score * 100 / target()));
+        document.getElementById('progress').style.width = `${percent}%`;
+        document.getElementById('progressText').textContent = `${percent}%`;
+        nextButton.hidden = !finished || score < target();
+      }
+
+      function dropAndFill() {
+        for (let c = 0; c < SIZE; c += 1) {
+          const survivors = [];
+          for (let r = SIZE - 1; r >= 0; r -= 1) {
+            const kind = board[r * SIZE + c];
+            if (kind !== null) survivors.push(kind);
+          }
+          for (let r = SIZE - 1; r >= 0; r -= 1) {
+            board[r * SIZE + c] = survivors[SIZE - 1 - r] ?? randomKind();
+          }
+        }
+      }
+
+      async function trySwap(a, b) {
+        if (busy || finished || !adjacent(a, b)) return;
+        busy = true;
+        selected = -1;
+        swap(a, b);
+        render();
+        await wait(170);
+        let hit = matches();
+        if (!hit.size) {
+          swap(a, b);
+          busy = false;
+          message.textContent = '这一换没有连成三个，换个位置试试。';
+          render();
+          return;
+        }
+        moves -= 1;
+        let chain = 0;
+        while (hit.size) {
+          chain += 1;
+          score += hit.size * 10 * chain;
+          for (const index of hit) board[index] = null;
+          render();
+          await wait(220);
+          dropAndFill();
+          render();
+          await wait(190);
+          hit = matches();
+        }
+        if (score >= target()) {
+          finished = true;
+          if (level + 1 > best) {
+            best = level + 1;
+            try { localStorage.setItem('match3:bestLevel', String(best)); } catch {}
+          }
+          message.textContent = `过关啦！本关拿到 ${score} 分，继续挑战下一关。`;
+        } else if (moves === 0) {
+          finished = true;
+          message.textContent = `步数用完了，还差 ${target() - score} 分。点“重玩本关”再试一次。`;
+        } else {
+          if (!hasMove()) {
+            freshBoard();
+            message.textContent = '棋盘没有可交换的组合，已自动重新排列。';
+          } else {
+            message.textContent = chain > 1 ? `漂亮！触发 ${chain} 次连锁。` : `消除了 ${score} 分，继续加油！`;
+          }
+        }
+        busy = false;
+        render();
+      }
+
+      function choose(index) {
+        if (busy || finished) return;
+        if (selected === index) selected = -1;
+        else if (selected >= 0 && adjacent(selected, index)) {
+          trySwap(selected, index);
+          return;
+        } else selected = index;
+        render();
+      }
+
+      function start(nextLevel = false) {
+        if (nextLevel) level += 1;
+        score = 0;
+        moves = Math.max(16, 26 - level * 2);
+        selected = -1;
+        busy = false;
+        finished = false;
+        freshBoard();
+        message.textContent = '点选两块相邻宝石，或在手机上滑动交换。';
+        render();
+      }
+
+      grid.addEventListener('click', (event) => {
+        const tile = event.target.closest('.gem');
+        if (tile && !tile.disabled) choose(Number(tile.dataset.index));
+      });
+      grid.addEventListener('pointerdown', (event) => {
+        const tile = event.target.closest('.gem');
+        startPointer = tile ? { index: Number(tile.dataset.index), x: event.clientX, y: event.clientY } : null;
+      });
+      grid.addEventListener('pointerup', (event) => {
+        if (!startPointer || busy || finished) return;
+        const start = startPointer;
+        startPointer = null;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+        const destination = Math.abs(dx) > Math.abs(dy)
+          ? start.index + (dx > 0 ? 1 : -1)
+          : start.index + (dy > 0 ? SIZE : -SIZE);
+        if (destination >= 0 && destination < board.length && adjacent(start.index, destination)) {
+          event.preventDefault();
+          trySwap(start.index, destination);
+        }
+      });
+      grid.addEventListener('pointercancel', () => { startPointer = null; });
+      document.getElementById('restart').addEventListener('click', () => { if (!busy) start(); });
+      nextButton.addEventListener('click', () => { if (finished && score >= target()) start(true); });
+      start();
+    })();
+  </script>
+</body>
+</html>

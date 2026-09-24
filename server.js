@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
+const doudizhu = require('./doudizhu-server');
 
 const SITE_DIR = path.join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -783,7 +784,18 @@ function leaveRoom(room, player) {
 
 async function serveStatic(req, res, pathname, searchParams) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res, 405, '请求方式不支持');
-  const relative = pathname === '/' ? '/index.html' : pathname;
+  const gamePages = {
+    '/blackjack': '/index.html',
+    '/sudoku': '/games/sudoku.html',
+    '/minesweeper': '/games/minesweeper.html',
+    '/spider': '/games/spider.html',
+    '/jump': '/games/jump.html',
+    '/match3': '/games/match3.html',
+    '/doudizhu': '/games/doudizhu.html',
+  };
+  const relative = pathname === '/'
+    ? (searchParams.has('room') ? '/index.html' : '/hub.html')
+    : (gamePages[pathname] || pathname);
   let decoded;
   try { decoded = decodeURIComponent(relative); } catch { return fail(res, 400, '路径有误'); }
   if (decoded.split('/').some((part) => part.startsWith('.'))) return fail(res, 404, '页面不存在');
@@ -798,7 +810,8 @@ async function serveStatic(req, res, pathname, searchParams) {
     if (decoded === '/index.html') {
       const requestedRoom = (searchParams.get('room') || '').trim().toUpperCase();
       const invite = /^[A-Z2-9]{6}$/.test(requestedRoom) ? `?room=${requestedRoom}` : '';
-      const ogUrl = `https://game.5iyeji.xyz/${invite}`;
+      const ogPath = pathname === '/' ? '/' : '/blackjack';
+      const ogUrl = `https://game.5iyeji.xyz${ogPath}${invite}`;
       const html = await fs.promises.readFile(file, 'utf8');
       body = Buffer.from(html.replace(
         '<meta name="twitter:card" content="summary" />',
@@ -822,9 +835,12 @@ async function serveStatic(req, res, pathname, searchParams) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
+  if (pathname === '/api/doudizhu' || pathname.startsWith('/api/doudizhu/')) {
+    return doudizhu.handleRequest(req, res, pathname, url);
+  }
   try {
     if (pathname === '/api/health' && req.method === 'GET') {
-      return sendJson(res, 200, { ok: true, rooms: rooms.size });
+      return sendJson(res, 200, { ok: true, rooms: rooms.size, doudizhuRooms: doudizhu.liveRoomCount() });
     }
     if (pathname === '/api/admin/metrics' && req.method === 'GET') {
       if (!metricsAuthorized(req)) return fail(res, 404, '接口不存在');

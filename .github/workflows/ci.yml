@@ -35,6 +35,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check server.js
+          node --check doudizhu-server.js
           node --check public/app.js
 
       - name: Run game tests
@@ -51,8 +52,10 @@ jobs:
             --format=ustar --sort=name --mtime='@0' \
             --owner=0 --group=0 --numeric-owner \
             --no-recursion \
-            server.js package.json \
-            public/app.js public/favicon.svg public/index.html public/styles.css
+            server.js doudizhu-server.js package.json \
+            public/app.js public/favicon.svg public/index.html public/styles.css public/hub.html \
+            public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html \
+            public/games/spider.html public/games/jump.html public/games/match3.html
           digest="$(sha256sum "${bundle}" | awk '{print $1}')"
           printf 'sha256=%s\n' "${digest}" >> "${GITHUB_OUTPUT}"
           printf 'bundle=%s\n' "${bundle}" >> "${GITHUB_OUTPUT}"

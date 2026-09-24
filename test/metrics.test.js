@@ -98,7 +98,8 @@ test('private, persistent aggregate metrics and live counts', { timeout: 20_000 
   });
   assert.equal(stream.status, 200);
   const publicHealth = await (await fetch(`${baseUrl}/api/health`)).json();
-  assert.deepEqual(Object.keys(publicHealth).sort(), ['ok', 'rooms']);
+  assert.deepEqual(Object.keys(publicHealth).sort(), ['doudizhuRooms', 'ok', 'rooms']);
+  assert.equal(publicHealth.doudizhuRooms, 0);
   await waitFor(async () => {
     const { live } = await readMetrics(baseUrl);
     return live.activeRooms === 1 && live.activeConnections === 1 && live.onlinePlayers === 1;

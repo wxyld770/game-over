@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#102c38" />
+  <meta name="description" content="按住蓄力，松开起跳，跨过一个个平台。免费在线玩跳一跳。" />
+  <title>跳一跳 · 小游戏大厅</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <style>
+    :root { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif; color-scheme: dark; color: #f8f4e9; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; background: radial-gradient(circle at 20% -5%, #226170 0, transparent 40%), #102c38; }
+    button { font: inherit; cursor: pointer; }
+    a { color: inherit; }
+    :focus-visible { outline: 3px solid #f9d68c; outline-offset: 3px; }
+    .shell { width: min(1050px, 100%); margin: auto; padding: 22px 22px 50px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 25px; }
+    .back { color: #f1d299; font-weight: 700; text-decoration: none; }
+    .back:hover { text-decoration: underline; }
+    .brand { color: #abc8cc; font-size: .76rem; letter-spacing: .18em; }
+    .intro { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 20px; }
+    .eyebrow { color: #f2d29b; font-size: .7rem; font-weight: 800; letter-spacing: .2em; }
+    h1 { margin: 8px 0 5px; font-size: clamp(2.3rem, 5vw, 4rem); line-height: 1.2; }
+    .intro p { margin: 0; color: #c7d8d9; line-height: 1.65; font-size: .9rem; }
+    .scoreboard { display: flex; gap: 10px; flex: none; }
+    .scorebox { min-width: 110px; padding: 12px 16px; border: 1px solid rgba(255,255,255,.16); border-radius: 13px; background: rgba(3,27,35,.45); }
+    .scorebox span { display: block; color: #b4cacc; font-size: .72rem; }
+    .scorebox strong { display: block; margin-top: 3px; color: #ffdc9c; font-size: 1.55rem; font-variant-numeric: tabular-nums; }
+    .game-wrap { position: relative; overflow: hidden; border: 1px solid rgba(224,245,242,.23); border-radius: 22px; background: #173f4b; box-shadow: 0 24px 55px rgba(0,14,22,.3); }
+    canvas { display: block; width: 100%; height: 450px; touch-action: none; cursor: pointer; }
+    .controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 15px; }
+    .message { margin: 0; color: #e9f0e9; min-height: 26px; line-height: 1.55; font-size: .93rem; }
+    .actions { display: flex; gap: 10px; }
+    .action { min-height: 43px; padding: 0 17px; border: 1px solid #eac788; border-radius: 10px; color: #17323a; background: linear-gradient(135deg, #ffdf9d, #e7b66b); font-weight: 800; }
+    .action:hover { filter: brightness(1.08); }
+    .action.secondary { color: #f5d79d; background: transparent; }
+    .instruction { margin-top: 27px; padding: 21px 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 17px; background: rgba(5,31,41,.45); }
+    .instruction h2 { margin: 0 0 8px; font-size: 1rem; }
+    .instruction p { margin: 0; color: #bfd3d4; font-size: .85rem; line-height: 1.75; }
+    @media (max-width: 630px) { .shell { padding: 15px 12px 35px; } .intro { align-items: start; flex-direction: column; } .scorebox { min-width: 92px; } canvas { height: 390px; } .instruction { padding: 16px; } }
+    @media (max-width: 380px) { .brand { display: none; } canvas { height: 350px; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · JUMP</span></header>
+    <div class="intro"><div><span class="eyebrow">HOLD · CHARGE · RELEASE</span><h1>跳一跳</h1><p>按住屏幕蓄力，松开跳到下一个平台。空格键也可以操作。</p></div><div class="scoreboard"><div class="scorebox"><span>当前得分</span><strong id="score">0</strong></div><div class="scorebox"><span>最高得分</span><strong id="best">0</strong></div></div></div>
+    <main>
+      <div class="game-wrap"><canvas id="game" aria-label="跳一跳游戏画面，按住蓄力，松开起跳"></canvas></div>
+      <div class="controls"><p class="message" id="message" role="status">按住画面或空格键，看到落点提示后松开。</p><div class="actions"><button class="action secondary" id="restart" type="button">重新开始</button></div></div>
+      <section class="instruction"><h2>怎么玩</h2><p>按住越久，跳得越远；平台上方的金色小圈会提示预计落点。必须从上方落到平台才算成功。走过一个平台得 1 分；掉下去就结束，可以马上重玩。</p></section>
+    </main>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+      const message = document.getElementById('message');
+      const scoreText = document.getElementById('score');
+      const bestText = document.getElementById('best');
+      const restart = document.getElementById('restart');
+      let width = 900;
+      let height = 450;
+      let scale = 1;
+      let platforms = [];
+      let player;
+      let cameraX = 0;
+      let score = 0;
+      let best = 0;
+      let charging = false;
+      let chargeSource = null;
+      let activePointerId = null;
+      let chargeStart = 0;
+      let charge = 0;
+      let state = 'ready';
+      let lastFrame = performance.now();
+      try { best = Math.max(0, Number(localStorage.getItem('jump:best')) || 0); } catch {}
+      bestText.textContent = best;
+
+      function fit() {
+        const rect = canvas.getBoundingClientRect();
+        const previousHeight = height;
+        width = rect.width;
+        height = rect.height;
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * pixelRatio);
+        canvas.height = Math.round(height * pixelRatio);
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        if (platforms.length) {
+          const delta = height - previousHeight;
+          for (const platform of platforms) platform.y += delta;
+          if (player) player.y += delta;
+        }
+      }
+
+      function nextPlatform(previous) {
+        const gap = (98 + Math.random() * 145) * scale;
+        const size = (107 + Math.random() * 32) * scale;
+        const shift = (Math.random() * 34 - 17) * scale;
+        return { x: previous.x + previous.w + gap, y: previous.y + shift, w: size, h: 25 * scale, hue: 176 + Math.random() * 42 };
+      }
+
+      function start() {
+        scale = Math.max(.74, Math.min(1, width / 760));
+        platforms = [{ x: 32 * scale, y: height - 105 * scale, w: 145 * scale, h: 25 * scale, hue: 181 }];
+        for (let i = 0; i < 3; i += 1) platforms.push(nextPlatform(platforms.at(-1)));
+        player = { x: platforms[0].x + platforms[0].w / 2, y: platforms[0].y - 19 * scale, vx: 0, vy: 0, r: 19 * scale, standing: platforms[0] };
+        cameraX = 0;
+        score = 0;
+        scoreText.textContent = '0';
+        charging = false;
+        chargeSource = null;
+        activePointerId = null;
+        charge = 0;
+        state = 'ready';
+        message.textContent = '按住画面或空格键，看到落点提示后松开。';
+      }
+
+      function beginCharge(source) {
+        if (state !== 'ready' || charging) return;
+        charging = true;
+        chargeSource = source;
+        chargeStart = performance.now();
+        charge = 0;
+        message.textContent = '正在蓄力……松开就跳！';
+      }
+
+      function cancelCharge(source) {
+        if (!charging || chargeSource !== source) return;
+        charging = false;
+        chargeSource = null;
+        charge = 0;
+        message.textContent = '蓄力已取消，按住画面或空格键再试一次。';
+      }
+
+      function release(source) {
+        if (!charging || state !== 'ready' || chargeSource !== source) return;
+        charging = false;
+        chargeSource = null;
+        charge = Math.min(1, (performance.now() - chargeStart) / 1100);
+        player.vx = (125 + 390 * charge) * scale;
+        player.vy = -(390 + 45 * charge) * scale;
+        player.standing = null;
+        state = 'jumping';
+        message.textContent = '起跳！看准下一个平台。';
+      }
+
+      function land(platform) {
+        player.y = platform.y - player.r;
+        player.vx = 0;
+        player.vy = 0;
+        player.standing = platform;
+        state = 'ready';
+        charge = 0;
+        if (platform !== platforms[0]) {
+          score += 1;
+          scoreText.textContent = score;
+          if (score > best) {
+            best = score;
+            bestText.textContent = best;
+            try { localStorage.setItem('jump:best', String(best)); } catch {}
+          }
+          while (platforms.length && platforms[0] !== platform) platforms.shift();
+          while (platforms.length < 4) platforms.push(nextPlatform(platforms.at(-1)));
+          message.textContent = `落得漂亮！已经跳过 ${score} 个平台。`;
+        } else {
+          message.textContent = '还在当前平台上，再多蓄一点力试试。';
+        }
+      }
+
+      function update(dt, now) {
+        if (charging) charge = Math.min(1, (now - chargeStart) / 1100);
+        if (state !== 'jumping') return;
+        const previousBottom = player.y + player.r;
+        player.vy += 850 * scale * dt;
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+        if (player.vy >= 0) {
+          for (const platform of platforms) {
+            if (previousBottom <= platform.y + 4 * scale
+              && player.y + player.r >= platform.y
+              && player.x + player.r * .55 >= platform.x
+              && player.x - player.r * .55 <= platform.x + platform.w) {
+              land(platform);
+              break;
+            }
+          }
+        }
+        if (state === 'jumping' && player.y - player.r > height + 80 * scale) {
+          state = 'over';
+          message.textContent = `掉下去了！本次跳过 ${score} 个平台，点击“重新开始”再来。`;
+        }
+        const desiredCamera = Math.max(0, player.x - width * .36);
+        cameraX += (desiredCamera - cameraX) * Math.min(1, dt * 5);
+      }
+
+      function roundedRect(x, y, w, h, radius) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, radius);
+      }
+
+      function draw(now) {
+        ctx.clearRect(0, 0, width, height);
+        const sky = ctx.createLinearGradient(0, 0, 0, height);
+        sky.addColorStop(0, '#194f60');
+        sky.addColorStop(1, '#102b41');
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = 'rgba(255,235,180,.06)';
+        for (let i = 0; i < 18; i += 1) {
+          const x = ((i * 173 + 40 - cameraX * .22) % (width + 100) + width + 100) % (width + 100);
+          ctx.beginPath();
+          ctx.arc(x, 40 + (i * 79) % Math.max(150, height - 120), 2 + (i % 3), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const baseline = height - 72 * scale;
+        ctx.fillStyle = 'rgba(3,22,34,.23)';
+        for (let i = 0; i < 12; i += 1) {
+          const x = i * 100 * scale - (cameraX * .4) % (100 * scale);
+          ctx.beginPath();
+          ctx.moveTo(x, height);
+          ctx.lineTo(x + 80 * scale, baseline + (i % 3) * 19 * scale);
+          ctx.lineTo(x + 160 * scale, height);
+          ctx.closePath();
+          ctx.fill();
+        }
+        platforms.forEach((platform, index) => {
+          const x = platform.x - cameraX;
+          if (x + platform.w < -25 || x > width + 25) return;
+          ctx.fillStyle = 'rgba(4,15,22,.28)';
+          roundedRect(x + 7 * scale, platform.y + 8 * scale, platform.w, platform.h + 8 * scale, 10 * scale);
+          ctx.fill();
+          ctx.fillStyle = `hsl(${platform.hue} 43% 46%)`;
+          roundedRect(x, platform.y, platform.w, platform.h, 10 * scale);
+          ctx.fill();
+          ctx.fillStyle = index === 0 ? '#d9d89c' : '#a7e3d2';
+          roundedRect(x + 6 * scale, platform.y + 2 * scale, platform.w - 12 * scale, 5 * scale, 4 * scale);
+          ctx.fill();
+        });
+
+        if (charging && player.standing) {
+          const vx = (125 + 390 * charge) * scale;
+          const vy = (390 + 45 * charge) * scale;
+          const predictedX = player.x + vx * 2 * vy / (850 * scale) - cameraX;
+          ctx.strokeStyle = '#ffe19a';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.arc(predictedX, player.standing.y - 11 * scale, 12 * scale, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          const bx = Math.max(15, Math.min(width - 150, player.x - cameraX - 65));
+          ctx.fillStyle = 'rgba(4,26,32,.7)';
+          roundedRect(bx, Math.max(12, player.y - 72 * scale), 130, 12, 6);
+          ctx.fill();
+          ctx.fillStyle = '#ffd57d';
+          roundedRect(bx, Math.max(12, player.y - 72 * scale), 130 * charge, 12, 6);
+          ctx.fill();
+        }
+
+        const px = player.x - cameraX;
+        const py = player.y;
+        ctx.fillStyle = 'rgba(0,0,0,.2)';
+        ctx.beginPath();
+        ctx.ellipse(px, Math.min(height - 8, py + player.r + 16 * scale), 22 * scale, 5 * scale, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = state === 'over' ? '#e4a187' : '#ffe1a1';
+        ctx.beginPath();
+        ctx.arc(px, py, player.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#203b47';
+        ctx.beginPath();
+        ctx.arc(px - 6 * scale, py - 3 * scale, 2 * scale, 0, Math.PI * 2);
+        ctx.arc(px + 6 * scale, py - 3 * scale, 2 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#203b47';
+        ctx.lineWidth = 2 * scale;
+        ctx.beginPath();
+        ctx.arc(px, py + 2 * scale, 5 * scale, .12, Math.PI - .12);
+        ctx.stroke();
+
+        if (state === 'over') {
+          ctx.fillStyle = 'rgba(4,20,28,.5)';
+          ctx.fillRect(0, 0, width, height);
+          ctx.fillStyle = '#fff0d6';
+          ctx.textAlign = 'center';
+          ctx.font = `700 ${Math.max(24, 34 * scale)}px sans-serif`;
+          ctx.fillText('这次没跳过去', width / 2, height / 2 - 10);
+          ctx.font = `${Math.max(14, 17 * scale)}px sans-serif`;
+          ctx.fillText('点击下方按钮，再来一次', width / 2, height / 2 + 24);
+        }
+      }
+
+      function frame(now) {
+        const dt = Math.min(.033, (now - lastFrame) / 1000 || 0);
+        lastFrame = now;
+        update(dt, now);
+        draw(now);
+        requestAnimationFrame(frame);
+      }
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (state !== 'ready' || charging) return;
+        event.preventDefault();
+        activePointerId = event.pointerId;
+        canvas.setPointerCapture(event.pointerId);
+        beginCharge('pointer');
+      });
+      canvas.addEventListener('pointerup', (event) => {
+        if (activePointerId !== event.pointerId) return;
+        event.preventDefault();
+        activePointerId = null;
+        release('pointer');
+      });
+      canvas.addEventListener('pointercancel', (event) => {
+        if (activePointerId !== event.pointerId) return;
+        activePointerId = null;
+        cancelCharge('pointer');
+      });
+      window.addEventListener('keydown', (event) => {
+        if (event.code !== 'Space' || event.repeat || event.target.tagName === 'BUTTON') return;
+        event.preventDefault();
+        beginCharge('keyboard');
+      });
+      window.addEventListener('keyup', (event) => {
+        if (event.code !== 'Space') return;
+        event.preventDefault();
+        release('keyboard');
+      });
+      window.addEventListener('blur', () => {
+        cancelCharge(chargeSource);
+        activePointerId = null;
+      });
+      restart.addEventListener('click', start);
+      window.addEventListener('resize', fit);
+      fit();
+      start();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
