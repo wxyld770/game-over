@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#151e2d">
-  <meta name="description" content="有限棋盘消消乐：交换相邻宝石，双线三连，清空整盘。没有补牌，也不会从上方掉落。">
+  <meta name="description" content="有限棋盘消消乐：交换相邻宝石，双线三连，上方宝石按重力落下，清空整盘且不补充新宝石。">
   <title>消消乐清屏挑战 · 小游戏大厅</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;color-scheme:dark;--paper:#f8f2e8;--muted:#b9c3d2;--gold:#f2c77f;--panel:#1b2739;--line:rgba(255,255,255,.15)}
     *{box-sizing:border-box}[hidden]{display:none!important}body{min-width:320px;min-height:100vh;margin:0;color:var(--paper);background:radial-gradient(circle at 15% 0,#38435f 0,transparent 38%),radial-gradient(circle at 100% 95%,#403054 0,transparent 39%),#151e2d}button{font:inherit;cursor:pointer}button:disabled{cursor:default;opacity:.5}a{color:inherit}:focus-visible{outline:3px solid #f9d594;outline-offset:3px}.shell{width:min(1090px,100%);margin:auto;padding:22px 22px 50px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:24px}.back{color:var(--gold);font-weight:700;text-decoration:none}.back:hover{text-decoration:underline}.brand{font-size:.78rem;letter-spacing:.2em;color:#bec7d2}
-    main{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,320px);gap:25px;align-items:start}.board-panel,.side-panel{border:1px solid var(--line);border-radius:24px;background:rgba(25,34,51,.86);box-shadow:0 26px 65px rgba(3,8,19,.22)}.board-panel{padding:clamp(13px,2.8vw,28px)}.title-line{display:flex;align-items:center;justify-content:space-between;gap:10px}.title-line h1{margin:0;font-size:clamp(1.9rem,4.2vw,3.2rem);letter-spacing:-.04em}.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 11px;border:1px solid rgba(244,207,147,.45);border-radius:999px;color:var(--gold);font-size:.76rem;font-weight:800;white-space:nowrap}.intro{margin:5px 0 18px;color:#d0d7e2;font-size:.89rem;line-height:1.55}.board-frame{position:relative;max-width:620px;margin:auto}.grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:clamp(3px,.8vw,6px);aspect-ratio:9/8;width:100%;padding:clamp(7px,1.3vw,12px);border:1px solid #5b6981;border-radius:18px;background:#101a2a;touch-action:none;user-select:none;-webkit-user-select:none}.gem{position:relative;display:grid;place-items:center;width:100%;min-width:0;min-height:0;padding:0;border:1px solid rgba(255,255,255,.18);border-radius:clamp(5px,1vw,10px);box-shadow:inset 0 -5px 0 rgba(0,0,0,.14),0 3px 8px rgba(0,0,0,.18);font-size:clamp(17px,3.8vw,38px);line-height:1;transition:transform .2s ease,filter .2s ease,box-shadow .2s ease,opacity .3s ease,background-color .2s ease}.gem:hover:not(.empty):not(:disabled){filter:brightness(1.18);transform:scale(1.05)}.gem.selected{z-index:2;transform:scale(1.1);box-shadow:0 0 0 3px #fff3cc,0 0 20px #ffd894}.gem.hinted{z-index:3;animation:hint-pulse .9s ease-in-out infinite alternate;box-shadow:0 0 0 3px #fff4cc,0 0 25px #ffe6a1}.gem.exchanging{animation:swap-pulse .2s ease-out}.gem.clearing{z-index:4;animation:vanish .42s cubic-bezier(.17,.8,.2,1) both}.gem.shaking{animation:shake .3s ease}.gem.empty{border-color:rgba(180,202,221,.075);background:#101a2a;box-shadow:inset 0 0 0 1px rgba(168,192,212,.025);opacity:.58}.gem[data-kind="0"]{color:#ffdddf;background:linear-gradient(145deg,#f77990,#c63f61)}.gem[data-kind="1"]{color:#d4f8ff;background:linear-gradient(145deg,#52c9e3,#237eaa)}.gem[data-kind="2"]{color:#f9edbf;background:linear-gradient(145deg,#f0ce67,#bc8d27)}.gem[data-kind="3"]{color:#e6dafa;background:linear-gradient(145deg,#b691eb,#7853bb)}.gem[data-kind="4"]{color:#e8ffd4;background:linear-gradient(145deg,#9bd96c,#4d9c5c)}.gem[data-kind="5"]{color:#fff0dc;background:linear-gradient(145deg,#f5ac69,#d46c4c)}
+    main{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,320px);gap:25px;align-items:start}.board-panel,.side-panel{border:1px solid var(--line);border-radius:24px;background:rgba(25,34,51,.86);box-shadow:0 26px 65px rgba(3,8,19,.22)}.board-panel{padding:clamp(13px,2.8vw,28px)}.title-line{display:flex;align-items:center;justify-content:space-between;gap:10px}.title-line h1{margin:0;font-size:clamp(1.9rem,4.2vw,3.2rem);letter-spacing:-.04em}.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 11px;border:1px solid rgba(244,207,147,.45);border-radius:999px;color:var(--gold);font-size:.76rem;font-weight:800;white-space:nowrap}.intro{margin:5px 0 18px;color:#d0d7e2;font-size:.89rem;line-height:1.55}.board-frame{position:relative;max-width:620px;margin:auto}.grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:clamp(3px,.8vw,6px);aspect-ratio:9/8;width:100%;padding:clamp(7px,1.3vw,12px);border:1px solid #5b6981;border-radius:18px;background:#101a2a;touch-action:none;user-select:none;-webkit-user-select:none}.gem{position:relative;display:grid;place-items:center;width:100%;min-width:0;min-height:0;padding:0;border:1px solid rgba(255,255,255,.18);border-radius:clamp(5px,1vw,10px);box-shadow:inset 0 -5px 0 rgba(0,0,0,.14),0 3px 8px rgba(0,0,0,.18);font-size:clamp(17px,3.8vw,38px);line-height:1;transition:transform .2s ease,filter .2s ease,box-shadow .2s ease,opacity .3s ease,background-color .2s ease}.gem:hover:not(.empty):not(:disabled){filter:brightness(1.18);transform:scale(1.05)}.gem.selected{z-index:2;transform:scale(1.1);box-shadow:0 0 0 3px #fff3cc,0 0 20px #ffd894}.gem.hinted{z-index:3;animation:hint-pulse .9s ease-in-out infinite alternate;box-shadow:0 0 0 3px #fff4cc,0 0 25px #ffe6a1}.gem.exchanging{z-index:5;animation:swap-place .21s ease-out both}.gem.falling{z-index:3;animation:gravity-drop var(--fall-ms,400ms) cubic-bezier(.2,.84,.3,1) both}.gem.clearing{z-index:4;animation:vanish .42s cubic-bezier(.17,.8,.2,1) both}.gem.shaking{animation:shake .3s ease}.gem.empty{border-color:rgba(180,202,221,.075);background:#101a2a;box-shadow:inset 0 0 0 1px rgba(168,192,212,.025);opacity:.58}.gem[data-kind="0"]{color:#ffdddf;background:linear-gradient(145deg,#f77990,#c63f61)}.gem[data-kind="1"]{color:#d4f8ff;background:linear-gradient(145deg,#52c9e3,#237eaa)}.gem[data-kind="2"]{color:#f9edbf;background:linear-gradient(145deg,#f0ce67,#bc8d27)}.gem[data-kind="3"]{color:#e6dafa;background:linear-gradient(145deg,#b691eb,#7853bb)}.gem[data-kind="4"]{color:#e8ffd4;background:linear-gradient(145deg,#9bd96c,#4d9c5c)}.gem[data-kind="5"]{color:#fff0dc;background:linear-gradient(145deg,#f5ac69,#d46c4c)}
     .board-frame.won .grid{animation:win-glow .85s ease-in-out 2}.board-frame.lost .grid{animation:lose-shake .55s ease}.end-overlay{position:absolute;inset:7px;z-index:10;display:grid;place-items:center;padding:22px;border-radius:14px;background:rgba(8,20,34,.83);backdrop-filter:blur(5px);animation:overlay-in .3s ease}.end-card{width:min(370px,100%);padding:24px;text-align:center;border:1px solid rgba(255,226,155,.54);border-radius:18px;background:linear-gradient(155deg,#293d4e,#192536);box-shadow:0 20px 60px #0007}.end-symbol{display:block;font-size:3rem;line-height:1;animation:pop .6s ease both}.end-card h2{margin:10px 0 7px;color:#ffe0a1;font-size:1.85rem}.end-card p{margin:0 0 17px;color:#d8dfeb;line-height:1.65}.end-card .action{width:100%}.end-card .action+.action{margin-top:8px}.end-card.loss h2{color:#ffc0b4}
     .hint{min-height:42px;margin:15px 4px 0;color:#e0e7f0;font-size:.88rem;line-height:1.55}.hint.error{color:#ffc1b3}.hint.success{color:#c9f0c5}.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}.tool{flex:1;min-width:105px;min-height:43px;padding:7px 12px;border:1px solid rgba(242,199,127,.62);border-radius:10px;background:rgba(242,199,127,.08);color:#f6d99e;font-weight:800}.tool:hover:not(:disabled){background:rgba(242,199,127,.18)}.side-panel{padding:26px}.eyebrow{color:var(--gold);font-size:.7rem;letter-spacing:.2em;font-weight:800}.side-panel h2{margin:10px 0 8px;font-size:1.55rem}.side-intro{margin:0 0 20px;color:var(--muted);font-size:.87rem;line-height:1.65}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.stat{min-height:82px;padding:13px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.045)}.stat span{display:block;color:var(--muted);font-size:.77rem}.stat strong{display:block;margin-top:6px;color:#fff5d5;font-size:1.4rem;font-variant-numeric:tabular-nums}.stat strong.low{color:#ffc4b4}.progress{height:10px;margin:22px 0 8px;border-radius:99px;background:#0b1524;overflow:hidden}.progress>span{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#e8aa62,#f8d995);transition:width .38s ease}.progress-caption{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.78rem}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}.action{min-height:43px;padding:0 15px;border:1px solid #dfb976;border-radius:10px;color:#211c25;background:linear-gradient(135deg,#f8dd9d,#e3b86a);font-weight:800}.action:hover:not(:disabled){filter:brightness(1.08)}.action.secondary{color:var(--gold);background:transparent}.actions .action{flex:1}.rules{margin:25px 0 0;padding-left:19px;color:var(--muted);font-size:.85rem;line-height:1.8}.rules li{margin:5px 0}.mode-row{margin-top:17px;padding-top:16px;border-top:1px solid var(--line)}.mode-row p{margin:0 0 8px;color:#cbd5df;font-size:.82rem}.mode-button{width:100%}
-    @keyframes vanish{0%{transform:scale(1);opacity:1;filter:brightness(1)}35%{transform:scale(1.25) rotate(7deg);opacity:1;filter:brightness(1.55)}100%{transform:scale(.08) rotate(-24deg);opacity:0;filter:brightness(2)}}@keyframes hint-pulse{to{transform:scale(1.14);filter:brightness(1.35)}}@keyframes swap-pulse{50%{transform:scale(.83)}}@keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}@keyframes win-glow{50%{box-shadow:0 0 0 6px #f9d58a99,0 0 55px #f9d58a55}}@keyframes lose-shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}@keyframes overlay-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}@keyframes pop{0%{transform:scale(.4) rotate(-16deg);opacity:0}75%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
+    @keyframes vanish{0%{transform:scale(1);opacity:1;filter:brightness(1)}35%{transform:scale(1.25) rotate(7deg);opacity:1;filter:brightness(1.55)}100%{transform:scale(.08) rotate(-24deg);opacity:0;filter:brightness(2)}}@keyframes hint-pulse{to{transform:scale(1.14);filter:brightness(1.35)}}@keyframes swap-place{from{transform:translate(var(--swap-x),var(--swap-y)) scale(.96)}to{transform:translate(0,0) scale(1)}}@keyframes gravity-drop{0%{transform:translateY(var(--fall-y));filter:brightness(1.12)}78%{transform:translateY(3px)}100%{transform:translateY(0);filter:brightness(1)}}@keyframes shake{25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}@keyframes win-glow{50%{box-shadow:0 0 0 6px #f9d58a99,0 0 55px #f9d58a55}}@keyframes lose-shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}@keyframes overlay-in{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}@keyframes pop{0%{transform:scale(.4) rotate(-16deg);opacity:0}75%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}
     @media(max-width:760px){main{grid-template-columns:1fr}.side-panel{padding:20px}.grid{max-width:620px}.side-intro{margin-bottom:14px}}@media(max-width:420px){.shell{padding:15px 10px 30px}.board-panel{padding:11px}.title-line{padding:0 4px}.intro{padding:0 4px;font-size:.82rem}.grid{gap:3px;padding:6px;border-radius:12px}.gem{font-size:clamp(15px,5.3vw,24px);border-radius:5px}.tool{min-width:85px;font-size:.84rem;padding:7px 5px}.hint{font-size:.83rem}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
   </style>
 </head>
@@ -25,16 +25,16 @@
         <div class="title-line"><h1>消消乐</h1><span class="chip" id="levelBadge">第 1 局</span></div>
         <p class="intro">交换相邻宝石，让两条三连同时出现，消掉满屏每一颗。</p>
         <div class="board-frame" id="boardFrame"><div class="grid" id="grid" role="grid" aria-label="8 行 9 列宝石棋盘"></div><div class="end-overlay" id="endOverlay" hidden><div class="end-card" id="endCard"><span class="end-symbol" id="endSymbol">✦</span><h2 id="endTitle"></h2><p id="endMessage"></p><button class="action" id="endPrimary" type="button"></button><button class="action secondary" id="endSecondary" type="button"></button></div></div></div>
-        <p class="hint" id="message" role="status" aria-live="polite">点两颗相邻宝石交换；手机上也可滑动，键盘可用方向键选格。</p>
+        <p class="hint" id="message" role="status" aria-live="polite">点两颗相邻宝石，或按住向相邻格滑动交换；键盘可用方向键选格。</p>
         <div class="tools"><button class="tool" id="hint" type="button">✦ 提示</button><button class="tool" id="undo" type="button">↶ 撤销</button><button class="tool" id="reshuffle" type="button">⤨ 重排剩余</button></div>
       </section>
       <aside class="side-panel">
-        <span class="eyebrow">CLEAR THE WHOLE BOARD</span><h2>把满屏消掉</h2><p class="side-intro">每次成功交换消去 6 颗。没有新宝石，也没有从上方掉落。</p>
+        <span class="eyebrow">CLEAR THE WHOLE BOARD</span><h2>把满屏消掉</h2><p class="side-intro">每次成功交换消去 6 颗，上方宝石会落下，但不会补充新宝石。</p>
         <div class="stats"><div class="stat"><span>已消除</span><strong id="cleared">0 / 72</strong></div><div class="stat"><span>成功交换</span><strong id="moves">0</strong></div><div class="stat"><span id="timeLabel">剩余时间</span><strong id="time">03:00</strong></div><div class="stat"><span>最快清屏</span><strong id="best">—</strong></div></div>
         <div class="progress" aria-hidden="true"><span id="progress"></span></div><div class="progress-caption"><span>清屏进度</span><span id="progressText">0%</span></div>
         <div class="actions"><button class="action" id="restart" type="button">重玩本局</button><button class="action secondary" id="next" type="button" hidden>下一局 →</button></div>
         <div class="mode-row"><p>当前：<span id="modeName">3 分钟挑战</span>。切换模式会重新开局。</p><button class="action secondary mode-button" id="mode" type="button">切换为不限时</button></div>
-        <ol class="rules"><li>只需交换两颗相邻宝石；一次要同时形成两条三连，六颗会一起消失。单条三连会退回。</li><li>宝石停在原位，不下落、不补充；清空全部 72 颗即获胜。</li><li>误操作不会扣步。提示会标出一对可交换的宝石；撤销可恢复上一步，重排只移动现有宝石。</li><li>限时模式 3 分钟；想慢慢玩，可以切换不限时。</li></ol>
+        <ol class="rules"><li>点击两颗相邻宝石，或从一颗向邻格滑动；同时连成两条三连，就会消除这 6 颗。</li><li>上方宝石按重力掉进空位，不会从顶部补充；清空全部 72 颗即获胜。</li><li>误操作不会扣步。提示会标出一对可交换的宝石；撤销可恢复上一步，重排只移动现有宝石。</li><li>限时模式 3 分钟；想慢慢玩，可以切换不限时。</li></ol>
       </aside>
     </main>
   </div>
@@ -71,15 +71,17 @@
     }
     function makeBoard() {
       const board = Array(TOTAL).fill(null);
-      const palettes = [];
+      // Each three-column lane owns a distinct pair of colours. Every two-cell
+      // column inside a block alternates colours, so falling intact blocks can
+      // never create a match by themselves or strand unmatchable single gems.
+      const palettes = [0, 1, 2];
+      for (let i = palettes.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [palettes[i], palettes[j]] = [palettes[j], palettes[i]];
+      }
       const winningPairs = [];
       for (let block = 0; block < BLOCK_COUNT; block += 1) {
-        const br = Math.floor(block / BLOCK_COLS), bc = block % BLOCK_COLS;
-        const forbidden = new Set();
-        if (bc > 0) forbidden.add(palettes[block - 1]);
-        if (br > 0) forbidden.add(palettes[block - BLOCK_COLS]);
-        const palette = pick([0, 1, 2].filter(id => !forbidden.has(id)));
-        palettes[block] = palette;
+        const palette = palettes[block % BLOCK_COLS];
         const shape = pattern(block, [palette * 2, palette * 2 + 1]);
         shape.indices.forEach((index, position) => { board[index] = shape.values[position]; });
         winningPairs[block] = shape.pair;
@@ -129,6 +131,22 @@
       }
       return null;
     }
+    function applyGravity(board) {
+      const settled = Array(TOTAL).fill(null);
+      const drops = [];
+      for (let c = 0; c < COLS; c += 1) {
+        let destinationRow = ROWS - 1;
+        for (let r = ROWS - 1; r >= 0; r -= 1) {
+          const from = r * COLS + c;
+          if (board[from] === null) continue;
+          const to = destinationRow * COLS + c;
+          settled[to] = board[from];
+          if (to !== from) drops.push({ from, to });
+          destinationRow -= 1;
+        }
+      }
+      return { board: settled, drops };
+    }
     function reorderBoard(board) {
       const reordered = board.slice();
       for (let block = 0; block < BLOCK_COUNT; block += 1) {
@@ -164,7 +182,7 @@
     let elapsedAtFinish = 0;
     let bestMs = null;
     let pointerStart = null;
-    let suppressClick = false;
+    let lastSwipe = null;
     try {
       const savedLevel = Number(localStorage.getItem('match3:clearLevel'));
       const savedBest = Number(localStorage.getItem('match3:clearBestMs'));
@@ -227,7 +245,7 @@
       $('endSymbol').textContent = won ? '✦' : '⌛';
       $('endTitle').textContent = won ? '全屏清空！' : '时间到';
       $('endMessage').textContent = won
-        ? `72 颗全部消除，耗时 ${formatTime(elapsedAtFinish)}。没有一颗新宝石掉下来！`
+        ? `72 颗全部消除，耗时 ${formatTime(elapsedAtFinish)}。上方宝石逐层落下，全程没有补充新宝石！`
         : `还剩 ${TOTAL - cleared} 颗。此局仍有清屏路径，再试一次或切换不限时。`;
       $('endPrimary').textContent = won ? '继续下一局 →' : '重试这一局';
       $('endSecondary').textContent = won ? '重玩这一局' : '切换不限时';
@@ -265,19 +283,38 @@
       }
       history.push(snapshot());
       if (startedAt === null) startedAt = Date.now();
+      const aRect = tiles[a].getBoundingClientRect();
+      const bRect = tiles[b].getBoundingClientRect();
       busy = true; board = move.swapped; moves += 1;
       render();
+      tiles[a].style.setProperty('--swap-x', `${bRect.left - aRect.left}px`);
+      tiles[a].style.setProperty('--swap-y', `${bRect.top - aRect.top}px`);
+      tiles[b].style.setProperty('--swap-x', `${aRect.left - bRect.left}px`);
+      tiles[b].style.setProperty('--swap-y', `${aRect.top - bRect.top}px`);
       tiles[a].classList.add('exchanging'); tiles[b].classList.add('exchanging');
-      await wait(155);
+      await wait(210);
       for (const index of move.cleared) tiles[index].classList.add('clearing');
       await wait(400);
       for (const index of move.cleared) board[index] = null;
+      const settled = applyGravity(board);
+      board = settled.board;
       cleared += move.cleared.length;
+      render();
+      let longestFall = 0;
+      for (const { from, to } of settled.drops) {
+        const distance = tiles[to].getBoundingClientRect().top - tiles[from].getBoundingClientRect().top;
+        const duration = Math.min(490, 300 + Math.round(distance * .34));
+        tiles[to].style.setProperty('--fall-y', `${-distance}px`);
+        tiles[to].style.setProperty('--fall-ms', `${duration}ms`);
+        tiles[to].classList.add('falling');
+        longestFall = Math.max(longestFall, duration);
+      }
+      if (longestFall) await wait(longestFall + 20);
       busy = false;
       if (cleared === TOTAL) finish(true);
       else if (timed && currentElapsed() >= LIMIT_MS) finish(false);
       else {
-        setMessage(`漂亮！双线消除 ${move.cleared.length} 颗，还剩 ${TOTAL - cleared} 颗。`, 'success');
+        setMessage(`漂亮！消除 ${move.cleared.length} 颗，上方宝石落下；还剩 ${TOTAL - cleared} 颗。`, 'success');
         render();
       }
     }
@@ -319,7 +356,7 @@
       await wait(220);
       board = reorderBoard(board);
       busy = false;
-      setMessage('剩余宝石已重新排列，没有增加或掉落；仍可全部消完。');
+      setMessage('剩余宝石已重新排列，没有补充新宝石；仍可全部消完。');
       render();
     }
     function start(nextLevel = false) {
@@ -331,27 +368,37 @@
       cleared = 0; moves = 0; hintsUsed = 0; startedAt = null; elapsedAtFinish = 0;
       $('endOverlay').hidden = true;
       $('boardFrame').classList.remove('won', 'lost');
-      setMessage('点两颗相邻宝石交换；手机上也可滑动。每次要同时连成两条三连。');
+      setMessage('点两颗相邻宝石，或按住滑向邻格交换。每次要同时连成两条三连。');
       render();
     }
     grid.addEventListener('click', event => {
-      if (suppressClick) { suppressClick = false; return; }
       const tile = event.target.closest('.gem');
+      const samePointer = event.pointerId === undefined || event.pointerId <= 0 || event.pointerId === lastSwipe?.id;
+      if (lastSwipe && samePointer && tile && Number(tile.dataset.index) === lastSwipe.from
+          && performance.now() - lastSwipe.at < (lastSwipe.type === 'mouse' ? 120 : 400)
+          && Math.hypot(event.clientX - lastSwipe.x, event.clientY - lastSwipe.y) < 26) {
+        lastSwipe = null;
+        return;
+      }
       if (tile && !tile.disabled) choose(Number(tile.dataset.index));
     });
     grid.addEventListener('pointerdown', event => {
+      if (pointerStart) return;
       const tile = event.target.closest('.gem');
-      pointerStart = tile && !tile.disabled ? { index: Number(tile.dataset.index), x: event.clientX, y: event.clientY, id: event.pointerId } : null;
+      pointerStart = tile && !tile.disabled ? { index: Number(tile.dataset.index), x: event.clientX, y: event.clientY, id: event.pointerId, type: event.pointerType } : null;
       if (pointerStart) tile.setPointerCapture(event.pointerId);
     });
     grid.addEventListener('pointerup', event => {
-      if (!pointerStart || busy || finished) return;
+      if (!pointerStart || pointerStart.id !== event.pointerId) return;
       const from = pointerStart; pointerStart = null;
+      if (busy || finished) return;
       const dx = event.clientX - from.x, dy = event.clientY - from.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+      lastSwipe = { at: performance.now(), x: event.clientX, y: event.clientY, id: from.id, type: from.type, from: from.index };
+      const bounds = grid.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right
+          || event.clientY < bounds.top || event.clientY > bounds.bottom) return;
       const to = Math.abs(dx) > Math.abs(dy) ? from.index + (dx > 0 ? 1 : -1) : from.index + (dy > 0 ? COLS : -COLS);
-      suppressClick = true;
-      setTimeout(() => { suppressClick = false; }, 0);
       if (adjacent(from.index, to)) trySwap(from.index, to);
     });
     grid.addEventListener('pointercancel', () => { pointerStart = null; });
