@@ -1,0 +1,25 @@
+server.js
+  s_8b62f2c845e793::t_c73de22b806946 427-428,629-630
+  s_8b62f2c845e793::t_1991644c3c85a8 21-25,28-96,108-115,379,386,426,530,649,687-689,714,784,797-807,810,815,829-834,836-837,839-841,860-864
+  s_8b62f2c845e793::t_963d329b99c3c1 26-27,97-107,429-430,835,838
+test/metrics.test.js
+  s_8b62f2c845e793::t_a54d76563fbfd7 1-50,52-102,105-106,108-131,138-150,158
+  s_8b62f2c845e793::t_9d58a754de033a 151-157
+  s_8b62f2c845e793::t_86dd26a71bc250 132-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "57a3ff618d3cb2f9ef6e451ff437f435a920da08",
+  "prompts": {},
+  "sessions": {
+    "s_8b62f2c845e793": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd16-67e7-7740-9440-c700c00ee457",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
