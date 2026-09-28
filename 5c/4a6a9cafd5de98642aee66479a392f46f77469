@@ -1,0 +1,107 @@
+test/metrics.test.js
+  s_168e1bfdeccdef::t_f8f67a9f1635aa 94-100,103-104,119,141
+test/smoke.test.js
+  s_168e1bfdeccdef::t_b935dc6af26f15 103-106,131-135,143-148,155-170,177-200
+  s_168e1bfdeccdef::t_9abf85c1034f70 116-117,127-128,149-154,171-176
+public/index.html
+  s_168e1bfdeccdef::t_e86943ced8626e 226
+public/games/jump.html
+  s_168e1bfdeccdef::t_b2541987539681 75-76,103
+  s_168e1bfdeccdef::t_169f0edf77fbd9 10,15-18,28,34-36,41,47-73,83-85,87-93,95-101
+  s_168e1bfdeccdef::t_4f19e6062be7fc 180-181,192-195,282-286,328-336
+  s_168e1bfdeccdef::t_b86e17bf4e5828 434,461,465,468,471,477,479,482,489,497,513-514,517-518,524,568,571,600,617,622,630-670,674
+  s_168e1bfdeccdef::t_ec8646ef3eea8c 326-327,337-339,358-359,364,400-414,418
+  s_168e1bfdeccdef::t_568c2926099558 115-135,138,153,156,161-179,182-191,199-232,235-256,259-262,270-281,287-302
+jump-redis-store.js
+  s_168e1bfdeccdef::t_a85f6cefbbd061 1-184
+public/games/spider.html
+  s_168e1bfdeccdef::t_b2541987539681 208-209,281
+public/styles.css
+  s_168e1bfdeccdef::t_01b88a2a06ef94 87-88
+test/jump-redis-store.test.js
+  s_168e1bfdeccdef::t_a85f6cefbbd061 1-148,150-156,158-201,209-230
+  s_168e1bfdeccdef::t_f025404cef99ce 149,157,202-208
+package.json
+  s_168e1bfdeccdef::t_11b093ce5fe7de 7-8,11
+test/rules.test.js
+  s_168e1bfdeccdef::t_f8f67a9f1635aa 63-65
+test/turn-timeout.test.js
+  s_168e1bfdeccdef::t_f8f67a9f1635aa 40-42
+public/jump-rules.js
+  s_168e1bfdeccdef::t_29d58f7a548b22 9
+  s_168e1bfdeccdef::t_029b0cab1f7898 13,32,142
+  s_168e1bfdeccdef::t_51be27bcdc99bc 134
+  s_168e1bfdeccdef::t_378ba15c46842a 1-8,10-12,14-31,33-133,135-141,143
+public/games/doudizhu.html
+  s_168e1bfdeccdef::t_1323fd39d55e58 270
+  s_168e1bfdeccdef::t_eb984cebc25e23 352,788,795,799,807-808,825,836-842,846,858,869-870,877,901,927,939,970
+  s_168e1bfdeccdef::t_9227a2626904df 24-25,279
+  s_168e1bfdeccdef::t_1022dcfb5a0210 266-269,271-273,280,290-291,301
+package-lock.json
+  ai_agent 1-115
+doudizhu-server.js
+  s_168e1bfdeccdef::t_24e3a5b74342ac 23,28,132-144,692-694,711-713,715,719-727,729,735,745-747
+jump-leaderboard.js
+  s_168e1bfdeccdef::t_29d58f7a548b22 9,19,144
+  s_168e1bfdeccdef::t_a0af37153b1926 40,92-93
+  s_168e1bfdeccdef::t_51be27bcdc99bc 253-256,265-290
+  s_168e1bfdeccdef::t_cc5d6d65d65d89 1-8,10-18,20-39,41-91,94-143,145-252,257-264,291-303
+deploy/nginx-game-https.conf
+  s_168e1bfdeccdef::t_3bff585ad1b612 2-6,36
+  s_168e1bfdeccdef::t_4f19e6062be7fc 38
+public/games/sudoku.html
+  s_168e1bfdeccdef::t_b2541987539681 26,46
+public/games/minesweeper.html
+  s_168e1bfdeccdef::t_b2541987539681 17,35
+.gitignore
+  s_168e1bfdeccdef::t_11b093ce5fe7de 5
+README.md
+  s_168e1bfdeccdef::t_df5e6501bcf80c 100
+  s_168e1bfdeccdef::t_b1a528ff1726de 12,19,23,78-93,96-99
+  s_168e1bfdeccdef::t_4f19e6062be7fc 94-95
+test/jump-rules.test.js
+  s_168e1bfdeccdef::t_29d58f7a548b22 80,94,103-109,135
+  s_168e1bfdeccdef::t_51be27bcdc99bc 1-17,33-73,110-134,136-139
+  s_168e1bfdeccdef::t_029b0cab1f7898 18-32,74-79,81-93,95-102
+.github/workflows/ci.yml
+  s_168e1bfdeccdef::t_9435f93da6e91b 34-42,48-49,51-52,55-57,70-71
+public/app.js
+  s_168e1bfdeccdef::t_c0c0bc0a5824fd 34-36,99-102,114,121-123,147-151,155-169,172,174-183,185-190,194,216
+  s_168e1bfdeccdef::t_4c878cfa232446 184
+public/games/match3.html
+  s_168e1bfdeccdef::t_95824519c758fc 17,39
+deploy/deploy-game-over
+  s_168e1bfdeccdef::t_e3499c21274079 87-95,97-99
+  s_168e1bfdeccdef::t_9435f93da6e91b 18-19,44-46,72-86,96,100,107
+server.js
+  s_168e1bfdeccdef::t_66b79ccb14663d 6,26-29,31,145,150,226-260,701,912-913,915-917,938-940,942,946-954,956,962,972-974,994-999
+  s_168e1bfdeccdef::t_11b093ce5fe7de 8-11,888-890,1019-1033
+test/jump-leaderboard.test.js
+  s_168e1bfdeccdef::t_ef433f5b0eaa89 81,164,178-180
+  s_168e1bfdeccdef::t_51be27bcdc99bc 1-14,49-80,82-141,143-154,183-252,260-306,309
+  s_168e1bfdeccdef::t_88023224ccfe48 253-259
+  s_168e1bfdeccdef::t_29d58f7a548b22 15-34,36-48,142,155-163,165-177,181-182
+  s_168e1bfdeccdef::t_a0af37153b1926 307-308
+  s_168e1bfdeccdef::t_910f6b7a1ee254 35
+public/hub.html
+  s_168e1bfdeccdef::t_95824519c758fc 89
+  s_168e1bfdeccdef::t_3bff585ad1b612 67,86
+test/doudizhu.test.js
+  s_168e1bfdeccdef::t_a8e49abad7c729 62-63,66,69,75-77,84-85,90,97-106,177-179,233-235,238-240,244-247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "5c4a6a9cafd5de98642aee66479a392f46f77469",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
