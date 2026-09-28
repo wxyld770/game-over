@@ -4,9 +4,13 @@
   "private": true,
   "description": "Browser mini game hub with multiplayer card games and solo challenges",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.19"
+  },
+  "dependencies": {
+    "redis": "5.12.1"
   }
 }

@@ -21,6 +21,8 @@
     .back { color: var(--gold); text-decoration: none; font-size: .88rem; font-weight: 800; }
     .back:hover { text-decoration: underline; }
     .brand { color: #aac6b5; font-size: .73rem; letter-spacing: .2em; }
+    .feedback-link { color:var(--muted); font-size:.76rem; text-decoration:none; white-space:nowrap; }
+    .feedback-link:hover { color:var(--gold); text-decoration:underline; }
     .hero { display: flex; justify-content: space-between; align-items: end; gap: 18px; padding: 30px 0 25px; }
     .eyebrow { color: var(--gold); font-size: .72rem; font-weight: 800; letter-spacing: .18em; }
     h1 { margin: 10px 0 5px; font-size: clamp(2.5rem, 5vw, 4.15rem); line-height: 1.15; }
@@ -261,13 +263,21 @@
     @keyframes tableImpact { 20% { transform:translateX(-3px); } 45% { transform:translateX(3px); } 70% { transform:translateX(-2px); } }
     @media (max-width:720px) { .table-head { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; } .table-head h2 { white-space:nowrap; } .table-indicators { justify-content:flex-start; gap:6px; } .table-arena { grid-template-rows:minmax(112px,auto) minmax(155px,auto) minmax(52px,auto) minmax(85px,auto); margin-top:15px; } .player { width:min(205px,97%); grid-template-columns:31px minmax(0,1fr); column-gap:6px; padding:8px 7px; } .seat-avatar { width:31px; height:31px; font-size:.83rem; } .player.seat-self { width:min(250px,80%); } .player-name { font-size:.72rem; } .player-meta { margin-top:4px; font-size:.59rem; } .seat-location { font-size:.55rem; } .table-arena.play-from-left { --fly-x:-94px; --fly-y:-83px; } .table-arena.play-from-right { --fly-x:94px; --fly-y:-83px; } .card + .card { margin-left:-23px; } .hand { height:147px; } .hand-viewport { min-height:153px; } }
     @media (max-width:430px) { .table-arena { grid-template-rows:minmax(113px,auto) minmax(159px,auto) minmax(52px,auto) minmax(83px,auto); } .table-arena::before { inset:48px 3% 38px; } .player { min-height:81px; width:99%; } .player.seat-self { width:min(218px,80%); } .player-name { font-size:.69rem; } .player-meta { font-size:.57rem; } .center { min-height:152px; padding-inline:0; } .center-message { font-size:.72rem; } .hand { height:143px; padding-top:34px; } .hand-viewport { min-height:149px; } .card + .card { margin-left:-24px; } }
+    body.in-game .hero { display:none; }
+    .mobile-turn-bar { display:none; }
+    @media (max-width:720px) {
+      .mobile-turn-bar { position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:39px; margin:7px 0; padding:5px 12px; border:1px solid rgba(245,202,120,.45); border-radius:8px; background:#102e29; box-shadow:0 5px 13px rgba(0,0,0,.3); font-size:.78rem; font-weight:800; }
+      .mobile-turn-bar > span:first-child { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+      .mobile-turn-bar .timer { flex:none; }
+      .my-hand-panel { scroll-margin-bottom:6px; }
+    }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
   </style>
 </head>
 <body>
   <div class="shell">
-    <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · DOU DIZHU</span></header>
-    <div class="hero"><div><span class="eyebrow">SOLO OR FRIENDS · 3 PLAYER TABLE</span><h1>斗地主<span class="title-suit">♠</span></h1><p>一个人和两名电脑较量，或叫上两位朋友在线同桌。叫分抢地主，轮流出牌，先出完手牌的一方获胜。</p></div><div class="hero-visual" aria-hidden="true"><span class="hero-card"><b>A</b><i>♠</i></span><span class="hero-card"><b>K</b><i>♥</i></span><span class="hero-card"><b>J</b><i>♣</i></span></div><span class="status" id="connection" hidden>连接中</span></div>
+    <header><a class="back" href="/">← 游戏大厅</a><span class="brand">GAME OVER · DOU DIZHU</span><a class="feedback-link" href="mailto:wxyld770@gmail.com?subject=GAME%20OVER%20%E5%8F%8D%E9%A6%88">反馈</a></header>
+    <div class="hero"><div><span class="eyebrow">SOLO OR FRIENDS · 3 PLAYER TABLE</span><h1>斗地主<span class="title-suit">♠</span></h1><p>一个人和两名电脑较量，或叫上两位朋友在线同桌。叫分抢地主，轮流出牌，先出完手牌的一方获胜。</p></div><div class="hero-visual" aria-hidden="true"><span class="hero-card"><b>A</b><i>♠</i></span><span class="hero-card"><b>K</b><i>♥</i></span><span class="hero-card"><b>J</b><i>♣</i></span></div></div>
 
     <main>
       <section class="setup" id="setup">
@@ -277,7 +287,8 @@
       <p class="note" id="setupError" role="alert"></p>
 
       <section id="gameView" hidden>
-        <div class="roombar panel"><span class="room-mode" id="roomMode">房间</span><strong id="roomCode"></strong><span class="spacer"></span><button class="btn secondary" id="copyLink" type="button" hidden>复制邀请链接</button><button class="btn danger" id="leave" type="button">离开房间</button></div>
+        <div class="roombar panel"><span class="room-mode" id="roomMode">房间</span><strong id="roomCode"></strong><span class="status" id="connection" hidden>连接中</span><span class="spacer"></span><button class="btn secondary" id="copyLink" type="button" hidden>复制邀请链接</button><button class="btn danger" id="leave" type="button">离开房间</button></div>
+        <div class="mobile-turn-bar" id="mobileTurnBar" hidden><span id="mobilePhase"></span><span class="timer" id="mobileTimer"></span></div>
         <section class="table panel" id="gameTable" aria-label="斗地主牌桌">
           <div class="table-head"><div class="table-title"><span class="table-kicker">LIVE TABLE · 经典三人局</span><h2 id="phaseTitle">等待玩家</h2></div><div class="table-indicators"><span class="role-summary" id="roleSummary">地主 vs 农民</span><span class="timer" id="timer"></span></div></div>
           <div class="table-arena" id="tableArena">
@@ -287,7 +298,7 @@
             <div class="play-effect" id="playEffect" aria-live="polite" aria-atomic="true" hidden></div>
           </div>
         </section>
-        <section class="my-hand-panel panel"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><div class="hand-meta"><span id="handTip">点选想出的牌</span><strong id="selectedCount">已选 0 张</strong></div></div><div class="hand-viewport" id="handViewport" aria-label="可横向浏览的手牌"><div class="hand" id="hand" role="group" aria-label="你的手牌，点击或按住滑动选择"></div></div><div class="hand-rail"><button class="rail-button" id="handPrev" type="button" aria-label="向左浏览手牌">‹</button><span>轻扫浏览 · 长按滑选</span><button class="rail-button" id="handNext" type="button" aria-label="向右浏览手牌">›</button></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></section>
+        <section class="my-hand-panel panel" id="myHandPanel"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><div class="hand-meta"><span id="handTip">点选想出的牌</span><strong id="selectedCount">已选 0 张</strong></div></div><div class="hand-viewport" id="handViewport" aria-label="可横向浏览的手牌"><div class="hand" id="hand" role="group" aria-label="你的手牌，点击或按住滑动选择"></div></div><div class="hand-rail"><button class="rail-button" id="handPrev" type="button" aria-label="向左浏览手牌">‹</button><span>轻扫浏览 · 长按滑选</span><button class="rail-button" id="handNext" type="button" aria-label="向右浏览手牌">›</button></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></section>
         <section class="result panel" id="result" hidden><h2 id="resultTitle"></h2><p id="resultMessage"></p><button class="btn" id="again" type="button">再来一局</button></section>
       </section>
 
@@ -338,6 +349,7 @@
       async function request(path, options = {}) {
         const response = await fetch(path, {
           ...options,
+          credentials: 'same-origin',
           headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
           signal: AbortSignal.timeout(10000),
         });
@@ -773,15 +785,18 @@
       function renderTimer() {
         if (!state || !state.deadlineAt || !['bidding', 'playing'].includes(state.phase)) {
           $('timer').textContent = '';
+          $('mobileTimer').textContent = '';
           return;
         }
         let deadline = typeof state.deadlineAt === 'number' ? state.deadlineAt : Date.parse(state.deadlineAt);
         if (deadline < 1e12) deadline *= 1000;
         const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
         $('timer').textContent = `剩余 ${seconds} 秒`;
+        $('mobileTimer').textContent = $('timer').textContent;
       }
       function render() {
         if (!state) return;
+        document.body.classList.add('in-game');
         $('setup').hidden = true;
         $('setupError').textContent = '';
         $('gameView').hidden = false;
@@ -789,6 +804,8 @@
         $('roomCode').textContent = state.code;
         $('copyLink').hidden = state.mode !== 'online';
         $('phaseTitle').textContent = `第 ${state.round || 1} 局 · ${phaseName[state.phase] || '斗地主'}`;
+        $('mobilePhase').textContent = state.currentTurnId === state.selfId ? '轮到你' : `${phaseName[state.phase] || '斗地主'} · ${turnName(state.currentTurnId)}`;
+        $('mobileTurnBar').hidden = !['bidding', 'playing'].includes(state.phase);
         $('gameTable').classList.toggle('your-turn', state.currentTurnId === state.selfId && state.phase !== 'finished');
         $('connection').hidden = false;
         $('connection').textContent = '牌桌已连接';
@@ -805,6 +822,7 @@
         if (signature === lastRenderedSignature) return;
         lastRenderedSignature = signature;
         const previousPhase = state?.phase;
+        const wasMyTurn = state && ['bidding', 'playing'].includes(state.phase) && state.currentTurnId === state.selfId;
         state = nextState;
         if (previousPhase !== nextState.phase) {
           chosen.clear();
@@ -815,10 +833,17 @@
           }
         }
         render();
+        if (!wasMyTurn && ['bidding', 'playing'].includes(nextState.phase) && nextState.currentTurnId === nextState.selfId
+            && window.matchMedia('(max-width:720px)').matches) {
+          requestAnimationFrame(() => $('myHandPanel').scrollIntoView({
+            block: 'end',
+            behavior: window.matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth',
+          }));
+        }
       }
       async function refresh() {
         if (!roomCode || !token) return;
-        try { receive(await request(`${roomPath('state')}?token=${encodeURIComponent(token)}`)); }
+        try { receive(await request(roomPath('state'))); }
         catch (error) {
           $('connection').hidden = false;
           $('connection').textContent = '连接中断，正在重试';
@@ -830,7 +855,7 @@
       }
       function subscribe() {
         if (events) events.close();
-        events = new EventSource(`${roomPath('events')}?token=${encodeURIComponent(token)}`);
+        events = new EventSource(roomPath('events'));
         events.onmessage = (event) => {
           try { receive(JSON.parse(event.data)); } catch {}
         };
@@ -841,14 +866,15 @@
         if (polling) clearInterval(polling);
         polling = setInterval(refresh, 5000);
       }
-      function connect(code, identity) {
+      async function connect(code, identity) {
+        const sessionState = await post(`${apiRoot}/${code}/session`, { token: identity });
         roomCode = code;
         token = identity;
         storeSession(code, identity);
         history.replaceState(null, '', `/doudizhu?room=${code}`);
         $('connection').hidden = false;
         $('connection').textContent = '连接中';
-        refresh();
+        receive(sessionState);
         subscribe();
       }
       function disconnect(updateUrl = true) {
@@ -872,6 +898,7 @@
         $('connection').hidden = true;
         $('gameView').hidden = true;
         $('setup').hidden = false;
+        document.body.classList.remove('in-game');
         if (updateUrl) history.replaceState(null, '', '/doudizhu');
       }
       async function sendAction(action, extra = {}) {
@@ -897,7 +924,7 @@
           if (mode === 'solo') {
             await post(`${apiRoot}/${room.code}/action`, { token: room.token, action: 'start' });
           }
-          connect(room.code, room.token);
+          await connect(room.code, room.token);
         } catch (error) { showError(error.message); }
       }
       async function join() {
@@ -909,7 +936,7 @@
           if (!/^[A-Z2-9]{6}$/.test(code)) throw new Error('请输入有效的 6 位房间码。');
           try { localStorage.setItem('doudizhu:name', name); } catch {}
           const room = await post(`${apiRoot}/join`, { code, name });
-          connect(room.code, room.token);
+          await connect(room.code, room.token);
         } catch (error) { showError(error.message); }
       }
       $('createSolo').addEventListener('click', () => create('solo'));
@@ -940,7 +967,7 @@
       if (/^[A-Z2-9]{6}$/.test(invite)) {
         $('joinCode').value = invite;
         const savedToken = getSession(invite);
-        if (savedToken) connect(invite, savedToken);
+        if (savedToken) connect(invite, savedToken).catch((error) => showError(error.message));
         else showError('已填好房间码，输入昵称后即可加入。');
       }
     })();

@@ -37,7 +37,9 @@ test('a timed-out hand auto-stands, then waits before the dealer reveals and dra
   }
 
   async function state() {
-    const response = await fetch(`${baseUrl}/api/rooms/${room.code}/state?token=${encodeURIComponent(player.token)}`);
+    const response = await fetch(`${baseUrl}/api/rooms/${room.code}/state`, {
+      headers: { Cookie: `blackjack_session=${player.token}` },
+    });
     assert.equal(response.status, 200);
     return response.json();
   }

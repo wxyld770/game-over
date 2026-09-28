@@ -3,7 +3,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const os = require('node:os');
+const net = require('node:net');
 const doudizhu = require('./doudizhu-server');
+const { createJumpLeaderboard } = require('./jump-leaderboard');
+const jumpRedisUrl = process.env.JUMP_REDIS_URL || '';
+const jumpStore = jumpRedisUrl ? require('./jump-redis-store').createRedisStore({ url: jumpRedisUrl }) : undefined;
+const jump = createJumpLeaderboard({ store: jumpStore });
 
 const SITE_DIR = path.join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -18,7 +23,12 @@ const DEALER_PAUSE_MS = Math.max(0, Number(process.env.DEALER_PAUSE_MS ?? 1_000)
 const MATCH_MS = Number(process.env.MATCH_MS || 10 * 60_000);
 const PRESENCE_GRACE_MS = 10_000;
 const MAX_PLAYERS = 6;
+const MAX_ROOMS = 100;
+const CREATE_WINDOW_MS = 10 * 60_000;
+const MAX_CREATES_PER_ADDRESS = 12;
+const MAX_SSE_PER_PLAYER = 2;
 const rooms = new Map();
+const createAttempts = new Map();
 const METRICS_FILE = process.env.METRICS_FILE || '';
 const METRICS_TOKEN = process.env.METRICS_TOKEN || '';
 const METRIC_NAMES = [
@@ -132,11 +142,12 @@ const contentTypes = {
   '.woff2': 'font/woff2',
 };
 
-function sendJson(res, status, data) {
+function sendJson(res, status, data, extraHeaders = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
+    ...extraHeaders,
   });
   res.end(JSON.stringify(data));
 }
@@ -210,6 +221,41 @@ function getRoom(code) {
 
 function getPlayer(room, token) {
   return room && room.players.find((player) => player.token === token);
+}
+
+function clientAddress(req) {
+  const address = req.socket.remoteAddress || 'unknown';
+  if (['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address)) {
+    const proxied = req.headers['x-real-ip'];
+    if (typeof proxied === 'string' && net.isIP(proxied.trim())) return proxied.trim();
+  }
+  return address;
+}
+
+function reserveRoomCreation(req) {
+  if (rooms.size >= MAX_ROOMS) return '房间数量已达上限，请稍后再试';
+  const address = clientAddress(req);
+  const now = Date.now();
+  const recent = (createAttempts.get(address) || []).filter((time) => time > now - CREATE_WINDOW_MS);
+  if (recent.length >= MAX_CREATES_PER_ADDRESS) {
+    createAttempts.set(address, recent);
+    return '创建房间过于频繁，请稍后再试';
+  }
+  recent.push(now);
+  createAttempts.set(address, recent);
+  return null;
+}
+
+function sessionCookie(req, roomCode, token) {
+  const address = req.socket.remoteAddress || '';
+  const trustedProxy = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
+  const secure = req.socket.encrypted || (trustedProxy && req.headers['x-forwarded-proto'] === 'https');
+  return `blackjack_session=${token || ''}; Path=/api/rooms/${roomCode}/; HttpOnly; SameSite=Strict${secure ? '; Secure' : ''}${token ? '; Max-Age=604800' : '; Max-Age=0'}`;
+}
+
+function cookieToken(req) {
+  const match = /(?:^|;\s*)blackjack_session=([^;]*)/.exec(req.headers.cookie || '');
+  return match ? match[1] : null;
 }
 
 function localNetworkUrl() {
@@ -652,6 +698,7 @@ function createRoom(name) {
 }
 
 function serveEvents(req, res, room, player) {
+  if (player.clients.size >= MAX_SSE_PER_PLAYER) return fail(res, 429, '该玩家的实时连接过多');
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -838,6 +885,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/doudizhu' || pathname.startsWith('/api/doudizhu/')) {
     return doudizhu.handleRequest(req, res, pathname, url);
   }
+  if (pathname === '/api/jump' || pathname.startsWith('/api/jump/')) {
+    return jump.handleRequest(req, res, pathname, url);
+  }
   try {
     if (pathname === '/api/health' && req.method === 'GET') {
       return sendJson(res, 200, { ok: true, rooms: rooms.size, doudizhuRooms: doudizhu.liveRoomCount() });
@@ -859,8 +909,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const name = checkName(body.name);
       if (!name) return fail(res, 400, '昵称需要 1–18 个字符');
+      const limitError = reserveRoomCreation(req);
+      if (limitError) return fail(res, 429, limitError);
       const { room, player } = createRoom(name);
-      return sendJson(res, 201, { code: room.code, token: player.token });
+      return sendJson(res, 201, { code: room.code, token: player.token }, {
+        'Set-Cookie': sessionCookie(req, room.code, player.token),
+      });
     }
     if (pathname === '/api/rooms/join' && req.method === 'POST') {
       const body = await readJson(req);
@@ -881,20 +935,31 @@ const server = http.createServer(async (req, res) => {
       touch(room, player);
       if (room.phase === 'results') checkNextReady(room);
       else broadcast(room);
-      return sendJson(res, 201, { code: room.code, token: player.token });
+      return sendJson(res, 201, { code: room.code, token: player.token }, {
+        'Set-Cookie': sessionCookie(req, room.code, player.token),
+      });
     }
-    const match = /^\/api\/rooms\/([A-Z2-9]{6})\/(state|events|action)$/i.exec(pathname);
+    const match = /^\/api\/rooms\/([A-Z2-9]{6})\/(state|events|action|session)$/i.exec(pathname);
     if (match) {
       const room = getRoom(match[1]);
       if (!room) return fail(res, 404, '房间不存在或已过期');
+      if (match[2] === 'session' && req.method === 'POST') {
+        const body = await readJson(req);
+        const player = getPlayer(room, body.token);
+        if (!player) return fail(res, 403, '房间身份无效');
+        touch(room, player);
+        return sendJson(res, 200, { ok: true }, {
+          'Set-Cookie': sessionCookie(req, room.code, player.token),
+        });
+      }
       if (match[2] === 'state' && req.method === 'GET') {
-        const player = getPlayer(room, url.searchParams.get('token'));
+        const player = getPlayer(room, cookieToken(req));
         if (!player) return fail(res, 403, '房间身份无效');
         touch(room, player);
         return sendJson(res, 200, makeState(room, player));
       }
       if (match[2] === 'events' && req.method === 'GET') {
-        const player = getPlayer(room, url.searchParams.get('token'));
+        const player = getPlayer(room, cookieToken(req));
         if (!player) return fail(res, 403, '房间身份无效');
         return serveEvents(req, res, room, player);
       }
@@ -904,7 +969,9 @@ const server = http.createServer(async (req, res) => {
         if (!player) return fail(res, 403, '房间身份无效');
         if (body.action === 'leave') {
           leaveRoom(room, player);
-          return sendJson(res, 200, { left: true });
+          return sendJson(res, 200, { left: true }, {
+            'Set-Cookie': sessionCookie(req, room.code, null),
+          });
         }
         const error = handleAction(room, player, body);
         if (error) return fail(res, 409, error);
@@ -924,6 +991,12 @@ const server = http.createServer(async (req, res) => {
 // Clear abandoned rooms without disturbing an active game or open event stream.
 setInterval(() => {
   const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  const windowStart = Date.now() - CREATE_WINDOW_MS;
+  for (const [address, attempts] of createAttempts) {
+    const recent = attempts.filter((time) => time > windowStart);
+    if (recent.length) createAttempts.set(address, recent);
+    else createAttempts.delete(address);
+  }
   for (const [code, room] of rooms) {
     if (room.lastActivity >= cutoff || room.players.some((player) => player.clients.size)) continue;
     clearRoundTimer(room);
@@ -943,6 +1016,21 @@ if (require.main === module) {
       }).unref();
     }
   });
+  if (jumpStore) {
+    let stopping = false;
+    const stop = () => {
+      if (stopping) return;
+      stopping = true;
+      const deadline = setTimeout(() => process.exit(0), 5000);
+      deadline.unref();
+      server.close(async () => {
+        await jumpStore.close();
+        process.exit(0);
+      });
+    };
+    process.once('SIGTERM', stop);
+    process.once('SIGINT', stop);
+  }
 }
 
 module.exports = { server, testing: { createRoom, makePlayer, handValue, isBlackjack, scoreRound, makeState, expireMatch } };

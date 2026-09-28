@@ -15,6 +15,8 @@ bundle="${incoming}/release.tar.gz"
 releases=/opt/game-over/releases
 active=/opt/game-over/app
 service=game-over.service
+node_bin=/opt/game-over/node/bin
+dependency_user=nobody
 
 [[ -d "${incoming}" && ! -L "${incoming}" ]] || exit 2
 [[ -f "${bundle}" && ! -L "${bundle}" ]] || exit 2
@@ -39,8 +41,9 @@ import tarfile
 
 bundle, destination = sys.argv[1:]
 allowed = {
-    'server.js', 'doudizhu-server.js', 'package.json',
-    'public/app.js', 'public/favicon.svg', 'public/index.html',
+    'server.js', 'doudizhu-server.js', 'jump-leaderboard.js',
+    'jump-redis-store.js', 'package.json', 'package-lock.json',
+    'public/app.js', 'public/jump-rules.js', 'public/favicon.svg', 'public/index.html',
     'public/styles.css', 'public/hub.html',
     'public/games/doudizhu.html', 'public/games/sudoku.html',
     'public/games/minesweeper.html', 'public/games/spider.html',
@@ -66,16 +69,42 @@ with tarfile.open(bundle, 'r:gz') as archive:
         target.chmod(0o644)
 PY
   chmod 0755 "${staging}" "${staging}/public"
-  /opt/game-over/node/bin/node --check "${staging}/server.js"
-  /opt/game-over/node/bin/node --check "${staging}/doudizhu-server.js"
-  /opt/game-over/node/bin/node --check "${staging}/public/app.js"
+  "${node_bin}/node" --check "${staging}/server.js"
+  "${node_bin}/node" --check "${staging}/doudizhu-server.js"
+  "${node_bin}/node" --check "${staging}/jump-leaderboard.js"
+  "${node_bin}/node" --check "${staging}/jump-redis-store.js"
+  "${node_bin}/node" --check "${staging}/public/app.js"
+  "${node_bin}/node" --check "${staging}/public/jump-rules.js"
+
+  [[ -x "${node_bin}/npm" && -x /usr/sbin/runuser && -x /usr/bin/timeout ]] || {
+    echo 'The Node/npm toolchain or restricted install runtime is missing.' >&2
+    exit 2
+  }
+  dependency_group="$(id -gn "${dependency_user}")"
+  dependency_cache="${staging}/.npm-cache"
+  install -d -m 0755 -o "${dependency_user}" -g "${dependency_group}" "${staging}/node_modules"
+  install -d -m 0700 -o "${dependency_user}" -g "${dependency_group}" "${dependency_cache}"
+  (
+    cd "${staging}"
+    /usr/bin/timeout --signal=TERM --kill-after=5s 180s \
+      /usr/sbin/runuser -u "${dependency_user}" -- /usr/bin/env -i \
+      PATH="${node_bin}:/usr/bin:/bin" \
+      "${node_bin}/npm" --prefix "${staging}" --cache "${dependency_cache}" \
+      --userconfig=/dev/null --globalconfig="${staging}/.npm-globalrc" \
+      ci --omit=dev --ignore-scripts --no-audit --no-fund --engine-strict \
+      --registry=https://registry.npmjs.org --strict-ssl=true --fetch-retries=1 --fetch-timeout=30000
+    /usr/sbin/runuser -u "${dependency_user}" -- /usr/bin/env -i \
+      PATH="${node_bin}:/usr/bin:/bin" \
+      "${node_bin}/node" -e 'require(process.argv[1] + "/node_modules/redis")' "${staging}"
+  )
+  rm -rf -- "${dependency_cache}"
   chown -R root:root "${staging}"
   mv -T -- "${staging}" "${release}"
   trap - EXIT
 fi
 
 same_contents=true
-for file in server.js doudizhu-server.js package.json public/app.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
+for file in server.js doudizhu-server.js jump-leaderboard.js jump-redis-store.js package.json package-lock.json public/app.js public/jump-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
   if ! cmp -s -- "${previous}/${file}" "${release}/${file}"; then
     same_contents=false
     break

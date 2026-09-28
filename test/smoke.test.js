@@ -100,6 +100,10 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
   assert.match(code, /^[A-Z2-9]{6}$/);
   assert.equal(typeof token, 'string');
   assert.ok(token.length > 0);
+  const cookie = create.headers.get('set-cookie');
+  assert.match(cookie, new RegExp(`^blackjack_session=[^;]+; Path=/api/rooms/${code}/; HttpOnly; SameSite=Strict`));
+  assert.doesNotMatch(cookie, /; Secure/);
+  const hostCookie = cookie.split(';')[0];
 
   const inviteHtml = await (await fetch(`${baseUrl}/?room=${code}`)).text();
   assert.match(inviteHtml, /<title>21 点 · 朋友牌桌<\/title>/);
@@ -109,6 +113,8 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
   const invalidInviteHtml = await (await fetch(`${baseUrl}/?room=%3Cscript%3E`)).text();
   assert.match(invalidInviteHtml, /<meta property="og:url" content="https:\/\/game\.5iyeji\.xyz\/" \/>/);
 
+  let guestToken;
+  let guestCookie;
   for (let seat = 2; seat <= 6; seat += 1) {
     const join = await postJson(`${baseUrl}/api/rooms/join`, {
       code,
@@ -118,9 +124,15 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
     const joined = await join.json();
     assert.equal(joined.code, code);
     assert.ok(joined.token);
+    guestToken = joined.token;
+    guestCookie = join.headers.get('set-cookie').split(';')[0];
   }
 
-  const state = await fetch(`${baseUrl}/api/rooms/${code}/state?token=${encodeURIComponent(token)}`);
+  const queryIdentity = await fetch(`${baseUrl}/api/rooms/${code}/state?token=${encodeURIComponent(token)}`);
+  assert.equal(queryIdentity.status, 403, 'query tokens must not authorize GET requests');
+  const missingStreamIdentity = await fetch(`${baseUrl}/api/rooms/${code}/events?token=${encodeURIComponent(token)}`);
+  assert.equal(missingStreamIdentity.status, 403);
+  const state = await fetch(`${baseUrl}/api/rooms/${code}/state`, { headers: { Cookie: hostCookie } });
   assert.equal(state.status, 200);
   const room = await state.json();
   assert.equal(room.players.length, 6);
@@ -128,4 +140,62 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
 
   const full = await postJson(`${baseUrl}/api/rooms/join`, { code, name: 'Player 7' });
   assert.equal(full.status, 409);
+
+  const badSession = await postJson(`${baseUrl}/api/rooms/${code}/session`, { token: 'wrong' });
+  assert.equal(badSession.status, 403);
+  const restored = await postJson(`${baseUrl}/api/rooms/${code}/session`, { token });
+  assert.equal(restored.status, 200);
+  assert.equal(restored.headers.get('set-cookie').split(';')[0], hostCookie);
+  const secureSession = await fetch(`${baseUrl}/api/rooms/${code}/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https' },
+    body: JSON.stringify({ token }),
+  });
+  assert.match(secureSession.headers.get('set-cookie'), /; Secure;/);
+
+  const streams = [];
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      const controller = new AbortController();
+      const response = await fetch(`${baseUrl}/api/rooms/${code}/events`, {
+        headers: { Cookie: hostCookie }, signal: controller.signal,
+      });
+      assert.equal(response.status, 200);
+      streams.push(controller);
+    }
+    const excess = await fetch(`${baseUrl}/api/rooms/${code}/events`, { headers: { Cookie: hostCookie } });
+    assert.equal(excess.status, 429);
+  } finally {
+    for (const controller of streams) controller.abort();
+  }
+
+  const leave = await postJson(`${baseUrl}/api/rooms/${code}/action`, { token: guestToken, action: 'leave' });
+  assert.equal(leave.status, 200);
+  assert.match(leave.headers.get('set-cookie'), /; Max-Age=0$/);
+  const formerGuest = await fetch(`${baseUrl}/api/rooms/${code}/state`, { headers: { Cookie: guestCookie } });
+  assert.equal(formerGuest.status, 403);
+
+  for (let index = 0; index < 11; index += 1) {
+    const response = await postJson(`${baseUrl}/api/rooms`, { name: `Host ${index}` });
+    assert.equal(response.status, 201);
+  }
+  const rateLimited = await postJson(`${baseUrl}/api/rooms`, { name: 'Too many' });
+  assert.equal(rateLimited.status, 429);
+  assert.match((await rateLimited.json()).error, /频繁/);
+
+  for (let index = 0; index < 88; index += 1) {
+    const response = await fetch(`${baseUrl}/api/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Real-IP': `192.0.2.${index + 1}` },
+      body: JSON.stringify({ name: `Other ${index}` }),
+    });
+    assert.equal(response.status, 201);
+  }
+  const atCapacity = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Real-IP': '198.51.100.1' },
+    body: JSON.stringify({ name: 'At capacity' }),
+  });
+  assert.equal(atCapacity.status, 429);
+  assert.match((await atCapacity.json()).error, /上限/);
 });

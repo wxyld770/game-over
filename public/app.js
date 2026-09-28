@@ -31,6 +31,9 @@ let stream = null;
 let pending = false;
 let toastTimer = null;
 let fallbackTimer = null;
+let sessionReady = false;
+let sessionPromise = null;
+let roomVersion = 0;
 let betDraftRound = null;
 let selectedBetPreset = 'min';
 let showFinalSummary = false;
@@ -93,6 +96,10 @@ function setInviteLanding(roomCode, expired = false) {
 }
 
 function setRoom(roomCode, roomToken) {
+  closeStream();
+  roomVersion += 1;
+  sessionReady = false;
+  sessionPromise = null;
   code = roomCode.toUpperCase();
   token = roomToken;
   betDraftRound = null;
@@ -104,13 +111,16 @@ function setRoom(roomCode, roomToken) {
   elements.setupView.hidden = true;
   elements.gameView.hidden = false;
   setConnection('连接中');
-  connectStream();
+  fallbackTimer = setInterval(refreshState, 2500);
   refreshState();
 }
 
 function leaveRoomUI({ retainInvite = false, expired = false } = {}) {
   const previousCode = code;
   closeStream();
+  roomVersion += 1;
+  sessionReady = false;
+  sessionPromise = null;
   resetHandVisual();
   clearSession(code);
   code = '';
@@ -134,17 +144,54 @@ async function request(path, options = {}) {
   });
   let data;
   try { data = await response.json(); } catch { data = {}; }
-  if (!response.ok) throw new Error(data.error || data.message || `请求失败 (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.error || data.message || `请求失败 (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
+}
+
+async function ensureSession() {
+  if (sessionReady) return;
+  const version = roomVersion;
+  const pending = sessionPromise || request(`/api/rooms/${encodeURIComponent(code)}/session`, {
+    method: 'POST', body: JSON.stringify({ token }),
+  });
+  sessionPromise = pending;
+  try {
+    await pending;
+    if (roomVersion === version) sessionReady = true;
+  } finally {
+    if (sessionPromise === pending) sessionPromise = null;
+  }
 }
 
 async function refreshState() {
   if (!code || !token) return;
+  const version = roomVersion;
   try {
-    const data = await request(`/api/rooms/${encodeURIComponent(code)}/state?token=${encodeURIComponent(token)}`);
+    await ensureSession();
+    if (version !== roomVersion) return;
+    const statePath = `/api/rooms/${encodeURIComponent(code)}/state`;
+    let data;
+    try {
+      data = await request(statePath);
+    } catch (error) {
+      if (error.status !== 403) throw error;
+      sessionReady = false;
+      closeStream();
+      fallbackTimer = setInterval(refreshState, 2500);
+      await ensureSession();
+      if (version !== roomVersion) return;
+      data = await request(statePath);
+    }
+    if (version !== roomVersion) return;
+    if (!stream && window.EventSource) connectStream();
     updateState(data);
     setConnection('已连接', 'connected');
   } catch (error) {
+    if (version !== roomVersion) return;
     if (/失效|无效|不存在|not found|unauthorized|invalid/i.test(error.message)) {
       const missingRoom = /不存在|not found/i.test(error.message);
       showToast(missingRoom ? '这个房间已结束，请朋友重新发邀请。' : '房间身份已失效，请重新加入。');
@@ -166,7 +213,7 @@ function connectStream() {
     fallbackTimer = setInterval(refreshState, 2500);
     return;
   }
-  stream = new EventSource(`/api/rooms/${encodeURIComponent(code)}/events?token=${encodeURIComponent(token)}`);
+  stream = new EventSource(`/api/rooms/${encodeURIComponent(code)}/events`);
   const receive = (event) => {
     try { updateState(JSON.parse(event.data)); } catch { /* Ignore malformed event. */ }
   };

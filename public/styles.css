@@ -84,7 +84,8 @@ input:focus { border-color: var(--gold); }
 .button-primary { color: #16382e; background: linear-gradient(130deg, #f2d69c, #dfb568); box-shadow: 0 8px 24px rgba(0, 0, 0, .16); }
 .button-outline { border-color: rgba(230, 201, 147, .54); color: var(--gold-light); background: rgba(12, 31, 27, .32); }
 .entry-card .button { width: 100%; margin-top: 17px; justify-content: space-between; }
-.footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; min-height: 70px; border-top: 1px solid var(--line); color: #72877e; font-size: .78rem; letter-spacing: .04em; }
+.footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 15px; min-height: 70px; border-top: 1px solid var(--line); color: #72877e; font-size: .78rem; letter-spacing: .04em; }
+.footer a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Game */
 .game-view { padding: 25px 0 45px; }

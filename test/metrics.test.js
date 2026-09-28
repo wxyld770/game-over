@@ -91,10 +91,17 @@ test('private, persistent aggregate metrics and live counts', { timeout: 20_000 
   const guestName = 'PrivacyGuest_4935';
   const { code, token: hostToken } = await post(baseUrl, '/api/rooms', { name: hostName });
   const { token: guestToken } = await post(baseUrl, '/api/rooms/join', { code, name: guestName });
+  const session = await fetch(`${baseUrl}/api/rooms/${code}/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: hostToken }),
+  });
+  assert.equal(session.status, 200);
+  const hostCookie = session.headers.get('set-cookie').split(';')[0];
 
   const streamController = new AbortController();
-  const stream = await fetch(`${baseUrl}/api/rooms/${code}/events?token=${hostToken}`, {
-    signal: streamController.signal,
+  const stream = await fetch(`${baseUrl}/api/rooms/${code}/events`, {
+    signal: streamController.signal, headers: { Cookie: hostCookie },
   });
   assert.equal(stream.status, 200);
   const publicHealth = await (await fetch(`${baseUrl}/api/health`)).json();
@@ -109,7 +116,7 @@ test('private, persistent aggregate metrics and live counts', { timeout: 20_000 
 
   await post(baseUrl, `/api/rooms/${code}/action`, { token: hostToken, action: 'start' });
   await waitFor(async () => {
-    const state = await (await fetch(`${baseUrl}/api/rooms/${code}/state?token=${hostToken}`)).json();
+    const state = await (await fetch(`${baseUrl}/api/rooms/${code}/state`, { headers: { Cookie: hostCookie } })).json();
     return state.phase === 'results';
   });
   const settled = await readMetrics(baseUrl);
@@ -131,7 +138,7 @@ test('private, persistent aggregate metrics and live counts', { timeout: 20_000 
   await post(baseUrl, `/api/rooms/${code}/action`, { token: guestToken, action: 'next' });
   assert.equal((await readMetrics(baseUrl)).totals.nextReadyClicks, 2);
   await waitFor(async () => {
-    const state = await (await fetch(`${baseUrl}/api/rooms/${code}/state?token=${hostToken}`)).json();
+    const state = await (await fetch(`${baseUrl}/api/rooms/${code}/state`, { headers: { Cookie: hostCookie } })).json();
     return state.phase === 'results' && state.round === 2;
   });
   assert.equal((await readMetrics(baseUrl)).totals.friendTablesCompletedFirstRound, 1,

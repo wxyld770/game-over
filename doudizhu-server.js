@@ -20,11 +20,12 @@ const DECK = Object.freeze([
 const rooms = new Map();
 const createAttempts = new Map();
 
-function sendJson(res, status, data) {
+function sendJson(res, status, data, headers = {}) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
+    ...headers,
   });
   res.end(JSON.stringify(data));
 }
@@ -126,6 +127,19 @@ function getRoom(code) {
 function getPlayer(room, token) {
   if (typeof token !== 'string' || !token) return null;
   return room.players.find((player) => !player.isAi && !player.left && player.token === token) || null;
+}
+
+function sessionCookie(req, code, token) {
+  const localProxy = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+  const secure = req.socket.encrypted || (localProxy && req.headers['x-forwarded-proto'] === 'https');
+  return `ddz_${code}=${token || ''}; Path=/api/doudizhu/rooms/${code}/; HttpOnly; SameSite=Strict${secure ? '; Secure' : ''}${token ? '' : '; Max-Age=0'}`;
+}
+
+function sessionToken(req, code) {
+  const name = `ddz_${code}=`;
+  const cookies = typeof req.headers.cookie === 'string' ? req.headers.cookie.split(';') : [];
+  const entry = cookies.map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith(name));
+  return entry ? entry.slice(name.length) : '';
 }
 
 function isOnline(player) {
@@ -675,7 +689,9 @@ async function handleRequest(req, res, pathname, url) {
       const limitError = reserveRoomCreation(req);
       if (limitError) return fail(res, 429, limitError);
       const { room, player } = createRoom(name, mode);
-      return sendJson(res, 201, { code: room.code, token: player.token });
+      return sendJson(res, 201, { code: room.code, token: player.token }, {
+        'Set-Cookie': sessionCookie(req, room.code, player.token),
+      });
     }
     if (pathname === '/api/doudizhu/rooms/join' && req.method === 'POST') {
       const body = await readJson(req);
@@ -692,20 +708,31 @@ async function handleRequest(req, res, pathname, url) {
       touch(room, player);
       if (room.phase === 'finished') maybeStartNextRound(room);
       else broadcast(room);
-      return sendJson(res, 201, { code: room.code, token: player.token });
+      return sendJson(res, 201, { code: room.code, token: player.token }, {
+        'Set-Cookie': sessionCookie(req, room.code, player.token),
+      });
     }
-    const match = /^\/api\/doudizhu\/rooms\/([A-Z2-9]{6})\/(state|events|action)$/i.exec(pathname);
+    const match = /^\/api\/doudizhu\/rooms\/([A-Z2-9]{6})\/(state|events|action|session)$/i.exec(pathname);
     if (match) {
       const room = getRoom(match[1]);
       if (!room) return fail(res, 404, '房间不存在或已过期');
+      if (match[2] === 'session' && req.method === 'POST') {
+        const body = await readJson(req);
+        const player = getPlayer(room, body.token);
+        if (!player) return fail(res, 403, '房间身份无效');
+        touch(room, player);
+        return sendJson(res, 200, state(room, player), {
+          'Set-Cookie': sessionCookie(req, room.code, player.token),
+        });
+      }
       if (match[2] === 'state' && req.method === 'GET') {
-        const player = getPlayer(room, url.searchParams.get('token'));
+        const player = getPlayer(room, sessionToken(req, room.code));
         if (!player) return fail(res, 403, '房间身份无效');
         touch(room, player);
         return sendJson(res, 200, state(room, player));
       }
       if (match[2] === 'events' && req.method === 'GET') {
-        const player = getPlayer(room, url.searchParams.get('token'));
+        const player = getPlayer(room, sessionToken(req, room.code));
         if (!player) return fail(res, 403, '房间身份无效');
         return serveEvents(req, res, room, player);
       }
@@ -715,7 +742,9 @@ async function handleRequest(req, res, pathname, url) {
         if (!player) return fail(res, 403, '房间身份无效');
         if (body.action === 'leave') {
           leaveRoom(room, player);
-          return sendJson(res, 200, { left: true });
+          return sendJson(res, 200, { left: true }, {
+            'Set-Cookie': sessionCookie(req, room.code, ''),
+          });
         }
         touch(room, player);
         let error;

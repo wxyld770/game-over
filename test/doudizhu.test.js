@@ -59,35 +59,51 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
     await new Promise((resolve) => server.close(resolve));
   });
 
-  async function post(endpoint, body) {
+  const cookie = (code, token) => `ddz_${code}=${token}`;
+  async function post(endpoint, body, headers = {}) {
     const response = await fetch(`${base}/api/doudizhu${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
     });
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, body: await response.json(), setCookie: response.headers.get('set-cookie') };
   }
   async function action(code, token, name, extra = {}) {
     return post(`/rooms/${code}/action`, { token, action: name, ...extra });
   }
   async function state(code, token) {
-    const response = await fetch(`${base}/api/doudizhu/rooms/${code}/state?token=${encodeURIComponent(token)}`);
+    const response = await fetch(`${base}/api/doudizhu/rooms/${code}/state`, {
+      headers: { Cookie: cookie(code, token) },
+    });
     assert.equal(response.status, 200);
     return response.json();
   }
   async function onlineRoom(names) {
     const first = await post('/rooms', { name: names[0], mode: 'online' });
     assert.equal(first.status, 201);
+    assert.match(first.setCookie, new RegExp(`^ddz_${first.body.code}=`));
+    assert.match(first.setCookie, /HttpOnly; SameSite=Strict/);
     const guests = [];
     for (const name of names.slice(1)) {
       const guest = await post('/rooms/join', { code: first.body.code, name });
       assert.equal(guest.status, 201);
+      assert.match(guest.setCookie, new RegExp(`^ddz_${first.body.code}=`));
       guests.push(guest.body);
     }
     return { code: first.body.code, users: [first.body, ...guests] };
   }
 
   const { code, users } = await onlineRoom(['甲', '乙', '丙']);
+  const stateUrl = `${base}/api/doudizhu/rooms/${code}/state`;
+  assert.equal((await fetch(stateUrl)).status, 403, '读取房间需要会话 Cookie');
+  assert.equal((await fetch(`${stateUrl}?token=${users[0].token}`)).status, 403, 'URL token 不能用于读取房间');
+  assert.equal((await fetch(stateUrl, { headers: { Cookie: cookie(code, 'wrong') } })).status, 403);
+  const restore = await post(`/rooms/${code}/session`, { token: users[0].token }, { 'X-Forwarded-Proto': 'https' });
+  assert.equal(restore.status, 200);
+  assert.equal(restore.body.selfId, rooms.get(code).players[0].id);
+  assert.match(restore.setCookie, /; Secure(?:;|$)/, 'HTTPS 代理下 Cookie 应标记 Secure');
+  assert.equal((await post(`/rooms/${code}/session`, { token: 'wrong' })).status, 403);
+  assert.equal((await fetch(`${base}/api/doudizhu/rooms/${code}/events?token=${users[0].token}`)).status, 403, 'SSE 不接受 URL token');
   const health = await (await fetch(`${base}/api/health`)).json();
   assert.equal(typeof health.doudizhuRooms, 'number');
   assert.ok(health.doudizhuRooms >= 1);
@@ -158,7 +174,9 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   assert.equal(room.players.length, 3);
   assert.ok(!room.players.some((player) => player.id === win.body.players[staleIndex].id));
   assert.equal((await state(code, users[turnIndex].token)).readyCount, 2, '其余在线者的准备状态保留');
-  const staleIdentity = await fetch(`${base}/api/doudizhu/rooms/${code}/state?token=${encodeURIComponent(users[staleIndex].token)}`);
+  const staleIdentity = await fetch(stateUrl, {
+    headers: { Cookie: cookie(code, users[staleIndex].token) },
+  });
   assert.equal(staleIdentity.status, 403, '被替换的离线身份不能再进入');
   const replacementReady = await action(code, replacement.body.token, 'start');
   assert.equal(replacementReady.status, 200);
@@ -212,12 +230,21 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   for (let index = 0; index < limits.MAX_SSE_PER_PLAYER; index += 1) {
     const controller = new AbortController();
     controllers.push(controller);
-    const stream = await fetch(`${base}/api/doudizhu/rooms/${waiting.code}/events?token=${encodeURIComponent(waiting.users[0].token)}`, { signal: controller.signal });
+    const stream = await fetch(`${base}/api/doudizhu/rooms/${waiting.code}/events`, {
+      headers: { Cookie: cookie(waiting.code, waiting.users[0].token) }, signal: controller.signal,
+    });
     assert.equal(stream.status, 200);
   }
-  const tooManyStreams = await fetch(`${base}/api/doudizhu/rooms/${waiting.code}/events?token=${encodeURIComponent(waiting.users[0].token)}`);
+  const tooManyStreams = await fetch(`${base}/api/doudizhu/rooms/${waiting.code}/events`, {
+    headers: { Cookie: cookie(waiting.code, waiting.users[0].token) },
+  });
   assert.equal(tooManyStreams.status, 429);
   for (const controller of controllers) controller.abort();
+
+  const departing = await post('/rooms', { name: '离开测试', mode: 'solo' });
+  const left = await action(departing.body.code, departing.body.token, 'leave');
+  assert.equal(left.status, 200);
+  assert.match(left.setCookie, /Max-Age=0/, '离开时清除该房间会话 Cookie');
 
   const solo = await post('/rooms', { name: '单机', mode: 'solo' });
   assert.equal(solo.status, 201);

@@ -23,6 +23,7 @@
     @media(max-width:600px){.keypad{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.digit{height:50px;font-size:1.28rem}.tool-row{grid-template-columns:repeat(3,minmax(0,1fr))}.tool-btn{min-height:49px}.puzzle-meta{font-size:.7rem}.save-mark{display:none}.finish-banner{flex-wrap:wrap}.finish-banner button{width:100%}}
     @media(max-width:390px){.shell{padding-left:8px;padding-right:8px}.game-card{padding:9px}.cell{font-size:clamp(1rem,6vw,1.6rem)}.cell .candidates{font-size:.49rem}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    .feedback-link{margin:20px 0 0;text-align:right;font-size:.8rem;color:var(--muted)}.feedback-link a{text-decoration:underline;text-underline-offset:3px}
   </style>
 </head>
 <body>
@@ -42,6 +43,7 @@
       </section>
       <aside class="side-card"><h2>玩法规则</h2><ol><li>把 1～9 填进每一行、每一列和每个 3×3 宫。</li><li>选中数字会高亮棋盘里相同的数字；重复格会标红。</li><li>打开“笔记”后，数字会作为候选记录，不会直接填入。</li><li>卡住时点“提示”，误操作可撤销；进度会自动保存在本机。</li></ol><div class="tip">键盘：方向键移动，1～9 填数，Backspace / Delete 擦除，N 切换笔记，H 获取提示，Ctrl/⌘ + Z 撤销。手机上可直接点击棋盘和大号数字键。</div></aside>
     </main>
+    <p class="feedback-link"><a href="mailto:wxyld770@gmail.com?subject=GAME%20OVER%20%E5%8F%8D%E9%A6%88">意见反馈</a></p>
   </div>
   <script>
   (() => {

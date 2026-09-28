@@ -60,7 +60,9 @@ test('Blackjack match rules through HTTP', { timeout: 30_000 }, async (t) => {
   }
 
   async function state(room, player) {
-    const response = await fetch(`${baseUrl}/api/rooms/${room.code}/state?token=${encodeURIComponent(player.token)}`);
+    const response = await fetch(`${baseUrl}/api/rooms/${room.code}/state`, {
+      headers: { Cookie: `blackjack_session=${player.token}` },
+    });
     assert.equal(response.status, 200);
     return response.json();
   }

@@ -31,15 +31,30 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.19.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Install Redis integration test runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends redis-server
 
       - name: Check JavaScript syntax
         run: |
           node --check server.js
           node --check doudizhu-server.js
+          node --check jump-leaderboard.js
+          node --check jump-redis-store.js
           node --check public/app.js
+          node --check public/jump-rules.js
+          bash -n deploy/deploy-game-over
 
       - name: Run game tests
-        run: node --test test/*.test.js
+        run: |
+          redis-server --version
+          JUMP_TEST_REDIS_SERVER="$(command -v redis-server)" node --test test/*.test.js
 
       - name: Package tested source
         id: package
@@ -52,8 +67,8 @@ jobs:
             --format=ustar --sort=name --mtime='@0' \
             --owner=0 --group=0 --numeric-owner \
             --no-recursion \
-            server.js doudizhu-server.js package.json \
-            public/app.js public/favicon.svg public/index.html public/styles.css public/hub.html \
+            server.js doudizhu-server.js jump-leaderboard.js jump-redis-store.js package.json package-lock.json \
+            public/app.js public/jump-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html \
             public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html \
             public/games/spider.html public/games/jump.html public/games/match3.html
           digest="$(sha256sum "${bundle}" | awk '{print $1}')"
