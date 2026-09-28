@@ -1,0 +1,21 @@
+.github/workflows/ci.yml
+  s_168e1bfdeccdef::t_a5f9a2b064e556 186-188
+deploy/deploy-game-over
+  s_168e1bfdeccdef::t_a5f9a2b064e556 114-123,129-131,137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "40f69ce02c9e73877e0ce762439797cbae88b494",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
