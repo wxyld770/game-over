@@ -146,7 +146,7 @@
     .player.me { box-shadow:inset 0 0 0 1px rgba(190,246,213,.18),inset 0 1px rgba(255,255,255,.1); }
     .player.active { transform:translateY(-4px); border-color:#ffdf9e; box-shadow:0 0 0 2px rgba(253,219,153,.24),0 0 28px rgba(252,199,97,.22),inset 0 1px rgba(255,255,255,.13); }
     .player.active::after { content:"当前回合"; position:absolute; top:-11px; left:11px; padding:3px 7px; border-radius:999px; background:#f3ca80; color:#204035; font-size:.6rem; font-weight:900; box-shadow:0 3px 9px rgba(0,0,0,.2); }
-    .seat-turn-timer { position:absolute; top:-12px; right:11px; min-width:48px; padding:3px 8px; border:1px solid rgba(255,224,164,.65); border-radius:999px; color:#ffebbd; background:#315e4d; box-shadow:0 3px 9px rgba(0,0,0,.23); font-size:.65rem; font-weight:950; font-variant-numeric:tabular-nums; text-align:center; }
+    .seat-turn-timer { position:absolute; z-index:7; top:-12px; right:11px; min-width:48px; padding:3px 8px; border:1px solid rgba(255,224,164,.65); border-radius:999px; color:#ffebbd; background:#315e4d; box-shadow:0 3px 9px rgba(0,0,0,.23); font-size:.65rem; font-weight:950; font-variant-numeric:tabular-nums; text-align:center; white-space:nowrap; }
     .seat-turn-timer.urgent { border-color:#ffc0aa; color:#fff8e9; background:#943f33; animation:timerUrgent .8s ease-in-out infinite alternate; }
     .player-name { font-size:.95rem; }
     .badge { border-radius:999px; padding:3px 7px; font-weight:800; }
@@ -217,6 +217,13 @@
     .result h2 { font-size:2rem; }
     .result.win h2 { color:#ffe3a9; text-shadow:0 3px 19px rgba(248,202,105,.24); }
     .result.lose h2 { color:#f8d7c5; }
+    .hand-live[hidden],.round-ready[hidden] { display:none; }
+    .my-hand-panel.ready-mode { display:grid; min-height:245px; place-items:center; }
+    .round-ready { position:relative; z-index:1; width:min(100%,560px); padding:23px 12px; text-align:center; }
+    .round-ready-kicker { color:#f1cc83; font-size:.67rem; font-weight:900; letter-spacing:.14em; }
+    .round-ready h2 { margin:7px 0 8px; color:#fff0c7; font-size:1.65rem; }
+    .round-ready p { margin:0 auto 19px; color:#c7dbce; font-size:.84rem; line-height:1.65; }
+    .round-ready .btn { min-width:150px; }
     @keyframes dealCard { from { opacity:0; transform:translateY(40px) rotate(-10deg) scale(.89); } to { opacity:1; transform:translateY(var(--arc,0px)) rotate(var(--tilt,0deg)) scale(1); } }
     @keyframes playedIn { from { opacity:0; transform:translateY(30px) scale(.86); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes resultIn { from { opacity:0; transform:translateY(18px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
@@ -226,15 +233,23 @@
     @media (max-width:430px) { .shell { padding:11px 9px 36px; } .brand { font-size:.61rem; } .hero { min-height:139px; } h1 { font-size:3.1rem; } .table { padding:18px 11px 15px; } .table-kicker { display:none; } .table-head h2 { font-size:1.1rem; } .role-summary,.timer { min-height:25px; padding:3px 7px; font-size:.64rem; } .players { gap:5px; } .player { min-height:83px; padding:9px 5px; } .player-name { gap:3px; font-size:.72rem; } .badge { padding:2px 5px; font-size:.58rem; } .player-meta { font-size:.62rem; } .center-message { font-size:.79rem; } .hand-head { gap:4px; } .hand-head h2 { font-size:1rem; } .hand-meta { gap:4px; } .hand-meta span { display:none; } .hand-meta strong { font-size:.67rem; } .card { width:63px; height:94px; padding:5px 6px; } .card + .card { margin-left:-35px; } .card-center { font-size:2.03rem; } .hand { height:132px; padding-left:13px; padding-right:13px; } .hand-viewport { min-height:137px; } .hand-rail { font-size:.66rem; } .actions .btn { min-width:76px; padding:0 11px; } }
     /* Each player's seat belongs to a corner of the table from this viewer's perspective. */
     .table { min-height:0; }
-    .table-arena { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:minmax(102px,auto) minmax(154px,auto) minmax(48px,auto) minmax(84px,auto); align-items:center; margin-top:18px; isolation:isolate; }
+    .table-arena { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:minmax(48px,auto) minmax(102px,auto) minmax(174px,auto) minmax(84px,auto); align-items:center; margin-top:18px; isolation:isolate; }
     .table-arena::before { content:""; position:absolute; z-index:-1; inset:44px 12% 39px; border:1px dashed rgba(248,226,180,.13); border-radius:50%; pointer-events:none; }
     .players { display:contents; margin:0; }
-    .player { width:min(230px,92%); min-height:82px; display:grid; grid-template-columns:39px minmax(0,1fr) auto; align-content:center; column-gap:9px; padding:10px 11px; }
-    .player.seat-left { grid-column:1; grid-row:1; justify-self:start; }
-    .player.seat-right { grid-column:2; grid-row:1; justify-self:end; }
+    .player { z-index:5; width:min(230px,92%); min-height:82px; display:grid; grid-template-columns:39px minmax(0,1fr) auto; align-content:center; column-gap:9px; padding:10px 11px; }
+    .player.seat-left { grid-column:1; grid-row:2; justify-self:start; }
+    .player.seat-right { grid-column:2; grid-row:2; justify-self:end; }
     .player.seat-self { grid-column:1 / -1; grid-row:4; justify-self:center; width:min(285px,76%); }
+    .player.seat-self.active::after { display:none; }
+    .player.seat-self .seat-turn-timer { top:auto; right:auto; bottom:calc(100% + 7px); left:50%; min-width:128px; padding:6px 12px; transform:translateX(-50%); border-width:2px; color:#203c31; background:#f5cf82; box-shadow:0 5px 18px rgba(0,0,0,.3),0 0 0 4px rgba(247,212,141,.12); font-size:.77rem; }
+    .player.seat-self .seat-turn-timer.urgent { color:#fff8e9; background:#943f33; }
     .player.empty { opacity:.59; border-style:dashed; }
-    .seat-avatar { grid-column:1; grid-row:1 / 3; display:grid; place-items:center; align-self:center; width:39px; height:39px; border:1px solid rgba(255,238,197,.4); border-radius:50%; color:#ffe2aa; background:radial-gradient(circle at 30% 25%,#558670,#1a4c3f 72%); box-shadow:0 5px 13px rgba(0,0,0,.2); font-size:1.04rem; font-weight:900; }
+    .seat-avatar { grid-column:1; grid-row:1 / 3; display:grid; place-items:center; align-self:center; width:39px; height:39px; padding:0; border:1px solid rgba(255,238,197,.4); border-radius:50%; color:#ffe2aa; background:radial-gradient(circle at 30% 25%,#558670,#1a4c3f 72%); box-shadow:0 5px 13px rgba(0,0,0,.2); font:inherit; font-size:1.04rem; font-weight:900; }
+    button.seat-avatar { position:relative; appearance:none; -webkit-appearance:none; cursor:pointer; line-height:1; transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease,filter .16s ease; }
+    button.seat-avatar::after { content:"🍅"; position:absolute; right:-8px; bottom:-7px; display:grid; place-items:center; width:20px; height:20px; border:1px solid rgba(255,232,195,.7); border-radius:50%; background:#f8e3ba; box-shadow:0 3px 8px rgba(0,0,0,.3); font-size:.72rem; line-height:1; transform:scale(.86); transition:transform .16s ease; }
+    button.seat-avatar:hover { border-color:#ffe0a0; filter:brightness(1.13); transform:translateY(-2px); box-shadow:0 7px 16px rgba(0,0,0,.26),0 0 0 3px rgba(255,220,146,.13); }
+    button.seat-avatar:hover::after { transform:scale(1.08) rotate(-8deg); }
+    button.seat-avatar:focus-visible { outline:3px solid #ffe29b; outline-offset:3px; }
     .player.landlord .seat-avatar { color:#352b1c; background:radial-gradient(circle at 30% 25%,#ffecba,#d2a24e 75%); }
     .player.active .seat-avatar { animation:seatPulse 1.45s ease-in-out infinite; }
     .player-name { grid-column:2; grid-row:1; min-width:0; font-size:.86rem; line-height:1.25; }
@@ -246,20 +261,52 @@
     .player.cards-critical .player-card-count { border-color:#ff9e82; color:#fff2dc; background:#913e32; box-shadow:0 0 0 3px rgba(255,137,107,.13),0 0 19px rgba(255,108,76,.25); animation:cardCountUrgent 1.15s ease-in-out infinite; }
     .player.cards-empty .player-card-count { color:#17392f; background:#f3cf86; animation:none; }
     .seat-location { color:#f0d397; font-size:.64rem; font-weight:700; white-space:nowrap; }
-    .center { grid-column:1 / -1; grid-row:2; justify-self:center; width:min(100%,760px); min-height:145px; padding:12px 5px 8px; }
-    .played-cards { width:100%; }
-    .bottom { grid-column:1 / -1; grid-row:3; justify-self:center; margin:0 auto; }
+    .seat-reveal { position:absolute; z-index:7; top:calc(100% + 13px); display:flex; align-items:center; width:max-content; max-width:min(38vw,360px); min-height:57px; overflow-x:auto; padding:4px 7px 7px; border:1px solid rgba(248,221,164,.23); border-radius:8px; background:rgba(5,37,31,.72); box-shadow:0 8px 18px rgba(0,0,0,.2); scrollbar-width:thin; }
+    .player.seat-left .seat-reveal { left:5px; }
+    .player.seat-right .seat-reveal { right:5px; }
+    .seat-reveal .mini-card + .mini-card { margin-left:-20px; }
+    .seat-reveal-empty { padding:0 8px; color:#f3d18f; font-size:.72rem; font-weight:850; white-space:nowrap; }
+    .center { z-index:3; grid-column:1 / -1; grid-row:3; align-self:center; justify-self:center; width:min(92%,440px); min-height:0; padding:7px 5px; pointer-events:none; }
+    .center .bids { pointer-events:auto; }
+    .active-play { z-index:4; grid-column:1 / -1; grid-row:3; display:grid; width:min(62%,520px); min-width:0; align-self:start; justify-self:center; justify-items:center; gap:3px; padding-top:5px; text-align:center; }
+    .active-play[hidden] { display:none; }
+    .active-play.seat-left { transform:translateX(-38%); }
+    .active-play.seat-right { transform:translateX(38%); }
+    .active-play.seat-self { align-self:end; transform:none; }
+    .active-play-label { display:inline-flex; max-width:100%; align-items:center; gap:5px; padding:3px 8px; border:1px solid rgba(255,229,172,.25); border-radius:999px; color:#ffe5ad; background:rgba(7,48,37,.62); font-size:.65rem; font-weight:850; white-space:nowrap; }
+    .active-play .played-cards { width:100%; min-height:61px; }
+    .active-play .played-cards { justify-content:center; }
+    .bottom { grid-column:1 / -1; grid-row:1; align-self:center; justify-self:center; margin:0 auto 4px; }
     .table-arena.play-from-left { --fly-x:-145px; --fly-y:-88px; --fly-rotate:-15deg; }
     .table-arena.play-from-right { --fly-x:145px; --fly-y:-88px; --fly-rotate:15deg; }
     .table-arena.play-from-self { --fly-x:0px; --fly-y:100px; --fly-rotate:-4deg; }
     .mini-card.entering { animation:playedIn .49s cubic-bezier(.16,.82,.29,1.12) both; }
-    .play-effect { position:absolute; z-index:8; top:36%; left:50%; width:min(86%,350px); transform:translate(-50%,-50%); text-align:center; pointer-events:none; }
-    .play-effect::before { content:""; position:absolute; inset:-31px -15px; border:3px solid rgba(255,229,151,.8); border-radius:50%; animation:effectRing .86s ease-out both; }
-    .play-effect strong { position:relative; display:block; color:#fff4c7; font-size:clamp(2.1rem,6vw,3.6rem); font-weight:1000; letter-spacing:.08em; text-shadow:0 3px #9c3c29,0 6px 18px rgba(14,9,5,.72); animation:effectWord .7s cubic-bezier(.18,.9,.3,1.3) both; }
+    .play-effect { --effect-color:#ffde81; position:absolute; z-index:8; top:36%; left:50%; width:min(86%,370px); transform:translate(-50%,-50%); color:var(--effect-color); text-align:center; pointer-events:none; }
+    .play-effect::before { content:""; position:absolute; inset:-31px -15px; border:3px solid color-mix(in srgb,var(--effect-color) 82%,transparent); border-radius:50%; animation:effectRing .86s ease-out both; }
+    .play-effect .effect-glyph { position:relative; display:block; height:45px; color:var(--effect-color); font-size:2.65rem; font-style:normal; line-height:1; text-shadow:0 4px 15px rgba(0,0,0,.38); animation:effectGlyph .72s cubic-bezier(.18,.9,.3,1.2) both; }
+    .play-effect strong { position:relative; display:block; color:#fff4c7; font-size:clamp(2.1rem,6vw,3.6rem); font-weight:1000; letter-spacing:0; text-shadow:0 3px #9c3c29,0 6px 18px rgba(14,9,5,.72); animation:effectWord .7s cubic-bezier(.18,.9,.3,1.3) both; }
     .play-effect small { position:relative; display:inline-block; margin-top:5px; padding:4px 12px; border:1px solid rgba(255,228,151,.5); border-radius:999px; color:#fff2cd; background:rgba(43,24,16,.66); font-size:.73rem; font-weight:800; }
-    .play-effect.rocket strong { color:#fce7ff; text-shadow:0 3px #7f3d9c,0 6px 18px rgba(14,9,5,.72); }
-    .play-effect .spark { position:absolute; top:35%; left:50%; width:6px; height:19px; border-radius:8px; background:#ffde81; box-shadow:0 0 10px #ffe4a1; transform:rotate(var(--angle)) translateY(-12px); animation:effectSpark .85s ease-out both; animation-delay:var(--spark-delay); }
+    .play-effect .spark { position:absolute; top:35%; left:50%; width:6px; height:19px; border-radius:8px; background:var(--effect-color); box-shadow:0 0 10px var(--effect-color); transform:rotate(var(--angle)) translateY(-12px); animation:effectSpark .85s ease-out both; animation-delay:var(--spark-delay); }
+    .play-effect.sequence::before { inset:-19px -34px; border-radius:9px; animation:effectSweep .8s ease-out both; }
+    .play-effect.sequence .effect-glyph { height:34px; font-size:2rem; }
+    .play-effect.straight { --effect-color:#9cf1cf; }
+    .play-effect.pair-straight { --effect-color:#a9dfff; }
+    .play-effect.plane { --effect-color:#ffe29a; }
+    .play-effect.plane .effect-glyph { animation:planeFly .82s cubic-bezier(.17,.78,.25,1.1) both; }
+    .play-effect.bomb { --effect-color:#ffcf69; }
+    .play-effect.rocket { --effect-color:#f5c8ff; width:min(96%,520px); }
+    .play-effect.rocket::before { inset:-72px -35px; border-width:6px; animation-duration:1.28s; }
+    .play-effect.rocket::after { content:""; position:absolute; inset:-48px 5px; border:3px solid rgba(255,239,255,.82); border-radius:50%; animation:rocketRing 1.15s .12s ease-out both; }
+    .play-effect.rocket .effect-glyph { height:58px; font-size:4rem; animation:rocketRise .9s cubic-bezier(.16,.9,.22,1.15) both; }
+    .play-effect.rocket strong { color:#fff0ff; font-size:clamp(3.2rem,9vw,5.4rem); text-shadow:0 4px #7f3d9c,0 9px 30px rgba(38,8,45,.82); }
     .table.bomb-impact { animation:tableImpact .42s ease-out; }
+    .table.rocket-impact { animation:rocketImpact .72s ease-out; }
+    .interaction-layer { position:absolute; z-index:10; inset:0; overflow:hidden; pointer-events:none; }
+    .tomato-interaction { position:absolute; inset:0; }
+    .tomato-projectile,.tomato-splat { position:absolute; left:var(--from-x); top:var(--from-y); translate:-50% -50%; }
+    .tomato-projectile { z-index:2; font-size:clamp(1.75rem,4vw,2.45rem); filter:drop-shadow(0 5px 4px rgba(0,0,0,.42)); animation:tomatoFlight .76s cubic-bezier(.24,.64,.36,1) both; }
+    .tomato-splat { z-index:1; left:var(--to-x); top:var(--to-y); min-width:58px; padding:6px 9px; border:2px solid rgba(255,224,192,.78); border-radius:50%; color:#fff7dc; background:#b52624; box-shadow:0 0 0 7px rgba(206,48,39,.2),0 7px 15px rgba(0,0,0,.32); font-size:.8rem; font-weight:1000; text-align:center; opacity:0; animation:tomatoSplat .58s .64s cubic-bezier(.17,.86,.27,1.22) both; }
+    .interaction-announcement { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
     .hand { padding-top:36px; }
     .card + .card { margin-left:-25px; }
     .card.selected { border-color:#f6c46c; box-shadow:0 7px 0 rgba(5,19,19,.16),0 11px 19px rgba(0,0,0,.28),inset 0 0 0 2px #fdfbf5; transform:translateY(calc(var(--arc,0px) - 19px)) rotate(var(--tilt,0deg)); }
@@ -268,12 +315,20 @@
     @keyframes playedIn { from { opacity:0; transform:translate(var(--fly-x,0px),var(--fly-y,35px)) rotate(var(--fly-rotate,0deg)); } 70% { opacity:1; transform:translate(0,-7px) rotate(0); } to { opacity:1; transform:translate(0,0) rotate(0); } }
     @keyframes seatPulse { 50% { box-shadow:0 0 0 5px rgba(255,218,142,.23),0 0 25px rgba(255,216,136,.3); } }
     @keyframes effectRing { from { opacity:.95; transform:scale(.3); } to { opacity:0; transform:scale(1.35); } }
+    @keyframes rocketRing { from { opacity:1; transform:scale(.2) rotate(8deg); } to { opacity:0; transform:scale(1.85) rotate(-8deg); } }
+    @keyframes effectSweep { from { opacity:0; transform:translateX(-34px) scaleX(.35); } 45% { opacity:1; } to { opacity:0; transform:translateX(34px) scaleX(1.2); } }
+    @keyframes effectGlyph { from { opacity:0; transform:translateY(18px) scale(.7); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes planeFly { from { opacity:0; transform:translateX(-150px) translateY(25px) rotate(-9deg); } 72% { opacity:1; transform:translateX(10px) translateY(-5px) rotate(3deg); } to { opacity:1; transform:translateX(0) translateY(0) rotate(0); } }
+    @keyframes rocketRise { from { opacity:0; transform:translateY(74px) scale(.58); } 65% { opacity:1; transform:translateY(-9px) scale(1.16); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes effectWord { from { opacity:0; transform:translateY(25px) scale(.72) rotate(-8deg); } 70% { opacity:1; transform:translateY(-5px) scale(1.08) rotate(2deg); } to { opacity:1; transform:translateY(0) scale(1) rotate(0); } }
     @keyframes effectSpark { from { opacity:1; transform:rotate(var(--angle)) translateY(-10px) scale(1); } to { opacity:0; transform:rotate(var(--angle)) translateY(-130px) scale(.3); } }
     @keyframes tableImpact { 20% { transform:translateX(-3px); } 45% { transform:translateX(3px); } 70% { transform:translateX(-2px); } }
+    @keyframes rocketImpact { 12% { transform:translate(-7px,2px) scale(1.006); filter:brightness(1.18); } 28% { transform:translate(7px,-2px) scale(1.01); } 46% { transform:translate(-5px,1px); filter:brightness(1.08); } 64% { transform:translate(4px,-1px); } 82% { transform:translateX(-2px); } }
+    @keyframes tomatoFlight { 0% { left:var(--from-x); top:var(--from-y); opacity:.85; transform:rotate(-22deg) scale(.72); } 52% { left:var(--mid-x); top:var(--mid-y); opacity:1; transform:rotate(310deg) scale(1.12); } 88% { opacity:1; } 100% { left:var(--to-x); top:var(--to-y); opacity:0; transform:rotate(690deg) scale(.48); } }
+    @keyframes tomatoSplat { 0% { opacity:0; transform:scale(.28) rotate(-12deg); } 55% { opacity:1; transform:scale(1.2) rotate(5deg); } 100% { opacity:0; transform:scale(1.02) rotate(0); } }
     @keyframes cardCountUrgent { 50% { transform:scale(1.08); box-shadow:0 0 0 5px rgba(255,137,107,.16),0 0 25px rgba(255,108,76,.38); } }
-    @media (max-width:720px) { .table-head { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; } .table-head h2 { white-space:nowrap; } .table-indicators { justify-content:flex-start; gap:6px; } .table-arena { grid-template-rows:minmax(112px,auto) minmax(155px,auto) minmax(52px,auto) minmax(85px,auto); margin-top:15px; } .player { width:min(205px,97%); grid-template-columns:31px minmax(0,1fr) auto; column-gap:6px; padding:8px 7px; } .seat-avatar { width:31px; height:31px; font-size:.83rem; } .player.seat-self { width:min(250px,80%); } .player-name { font-size:.72rem; } .player-meta { margin-top:4px; font-size:.59rem; } .player-card-count { min-width:43px; min-height:45px; padding:4px 6px; } .player-card-count strong { font-size:1.18rem; } .player-card-count small { font-size:.5rem; } .seat-location { font-size:.55rem; } .table-arena.play-from-left { --fly-x:-94px; --fly-y:-83px; } .table-arena.play-from-right { --fly-x:94px; --fly-y:-83px; } .card + .card { margin-left:-23px; } .hand { height:147px; } .hand-viewport { min-height:153px; } }
-    @media (max-width:430px) { .table-arena { grid-template-rows:minmax(113px,auto) minmax(159px,auto) minmax(52px,auto) minmax(83px,auto); } .table-arena::before { inset:48px 3% 38px; } .player { min-height:81px; width:99%; } .player.seat-self { width:min(218px,80%); } .player-name { font-size:.69rem; } .player-meta { font-size:.57rem; } .center { min-height:152px; padding-inline:0; } .center-message { font-size:.72rem; } .hand { height:143px; padding-top:34px; } .hand-viewport { min-height:149px; } .card + .card { margin-left:-24px; } }
+    @media (max-width:720px) { .table-head { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; } .table-head h2 { white-space:nowrap; } .table-indicators { justify-content:flex-start; gap:6px; } .table-arena { grid-template-rows:minmax(52px,auto) minmax(112px,auto) minmax(174px,auto) minmax(85px,auto); margin-top:15px; } .player { width:min(205px,97%); grid-template-columns:31px minmax(0,1fr) auto; column-gap:6px; padding:8px 7px; } .seat-avatar { width:31px; height:31px; font-size:.83rem; } .player.seat-self { width:min(250px,80%); } .player.seat-self .seat-turn-timer { min-width:116px; padding:5px 9px; font-size:.7rem; } .player-name { font-size:.72rem; } .player-meta { margin-top:4px; font-size:.59rem; } .player-card-count { min-width:43px; min-height:45px; padding:4px 6px; } .player-card-count strong { font-size:1.18rem; } .player-card-count small { font-size:.5rem; } .seat-location { font-size:.55rem; } .seat-reveal { top:calc(100% + 9px); max-width:44vw; min-height:52px; padding-inline:4px; } .seat-reveal .mini-card + .mini-card { margin-left:-22px; } .active-play { width:60%; } .active-play.seat-left { transform:translateX(-28%); } .active-play.seat-right { transform:translateX(28%); } .active-play.seat-self { width:76%; } .active-play-label { max-width:92%; overflow:hidden; font-size:.58rem; text-overflow:ellipsis; } .active-play .played-cards { min-height:57px; padding-inline:2px; } .table-arena.play-from-left { --fly-x:-94px; --fly-y:-83px; } .table-arena.play-from-right { --fly-x:94px; --fly-y:-83px; } .card + .card { margin-left:-23px; } .hand { height:147px; } .hand-viewport { min-height:153px; } }
+    @media (max-width:430px) { .table-arena { grid-template-rows:minmax(52px,auto) minmax(113px,auto) minmax(177px,auto) minmax(83px,auto); } .table-arena::before { inset:48px 3% 38px; } .player { min-height:81px; width:99%; } .player.seat-self { width:min(218px,80%); } .player-name { font-size:.69rem; } .player-meta { font-size:.57rem; } .center { width:80%; padding-inline:0; } .center-message { font-size:.72rem; } .active-play .mini-card + .mini-card { margin-left:-11px; } .hand { height:143px; padding-top:34px; } .hand-viewport { min-height:149px; } .card + .card { margin-left:-24px; } .result { padding:23px 17px; } }
     body.in-game .hero { display:none; }
     .mobile-turn-bar { display:none; }
     @media (max-width:720px) {
@@ -282,7 +337,7 @@
       .mobile-turn-bar .timer { flex:none; }
       .my-hand-panel { scroll-margin-bottom:6px; }
     }
-    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-delay:0ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
   </style>
 </head>
 <body>
@@ -304,16 +359,18 @@
           <div class="table-head"><div class="table-title"><span class="table-kicker">LIVE TABLE · 经典三人局</span><h2 id="phaseTitle">等待玩家</h2></div><div class="table-indicators"><span class="role-summary" id="roleSummary">地主 vs 农民</span><span class="timer" id="timer"></span></div></div>
           <div class="table-arena" id="tableArena">
             <div class="players" id="players"></div>
-            <div class="center"><span class="center-label" id="centerLabel"></span><div class="played-cards" id="playedCards"></div><p class="center-message" id="centerMessage"></p><div class="bids" id="bidHistory"></div></div>
+            <div class="active-play" id="activePlay" hidden><span class="active-play-label" id="activePlayLabel"></span><div class="played-cards" id="playedCards"></div></div>
+            <div class="center"><span class="center-label" id="centerLabel"></span><p class="center-message" id="centerMessage"></p><div class="bids" id="bidHistory"></div></div>
             <div class="bottom" id="bottomCards"></div>
             <div class="play-effect" id="playEffect" aria-live="polite" aria-atomic="true" hidden></div>
+            <div class="interaction-layer" id="interactionLayer" aria-live="polite" aria-atomic="false"></div>
           </div>
         </section>
-        <section class="my-hand-panel panel" id="myHandPanel"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><div class="hand-meta"><span id="handTip">点选想出的牌</span><strong id="selectedCount">已选 0 张</strong></div></div><div class="hand-viewport" id="handViewport" aria-label="可横向浏览的手牌"><div class="hand" id="hand" role="group" aria-label="你的手牌，点击或按住滑动选择"></div></div><div class="hand-rail"><button class="rail-button" id="handPrev" type="button" aria-label="向左浏览手牌">‹</button><span>轻扫浏览 · 长按滑选</span><button class="rail-button" id="handNext" type="button" aria-label="向右浏览手牌">›</button></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></section>
-        <section class="result panel" id="result" hidden><h2 id="resultTitle"></h2><p id="resultMessage"></p><button class="btn" id="again" type="button">再来一局</button></section>
+        <section class="my-hand-panel panel" id="myHandPanel"><div class="hand-live" id="handLive"><div class="hand-head"><h2>你的手牌 <span id="handCount"></span></h2><div class="hand-meta"><span id="handTip">点选想出的牌</span><strong id="selectedCount">已选 0 张</strong></div></div><div class="hand-viewport" id="handViewport" aria-label="可横向浏览的手牌"><div class="hand" id="hand" role="group" aria-label="你的手牌，点击或按住滑动选择"></div></div><div class="hand-rail"><button class="rail-button" id="handPrev" type="button" aria-label="向左浏览手牌">‹</button><span>轻扫浏览 · 长按滑选</span><button class="rail-button" id="handNext" type="button" aria-label="向右浏览手牌">›</button></div><div class="actions" id="actions"></div><p class="hint" id="actionError" role="alert"></p></div><div class="round-ready" id="roundReady" hidden><span class="round-ready-kicker">NEXT ROUND</span><h2 id="readyTitle">准备下一局</h2><p id="readyMessage"></p><button class="btn" id="again" type="button">准备下一局</button></div></section>
+        <section class="result panel" id="result" hidden><h2 id="resultTitle"></h2><p id="resultMessage"></p></section>
       </section>
 
-      <details class="rules panel"><summary>斗地主规则与牌型</summary><p>一副牌共 54 张。三人各得 17 张，留 3 张底牌。依次叫分（0 分表示不叫，最高 3 分），叫分最高的人当地主并获得底牌；其余两人为农民。地主先出牌，之后顺时针轮流出牌。必须出能压过上家的同牌型，或选择过牌；两人连续过牌后，上一位出牌者重新自由出牌。</p><ul><li>单张、对子、三张按牌点比较；三带一、三带二也看三张牌点。</li><li>顺子至少 5 张、连对至少 3 对、飞机至少 2 个连续三张；2 和大小王不能参与顺子、连对或飞机。</li><li>四带二、炸弹（四张同点）和王炸（大小王）都可出现。炸弹压过普通牌，王炸最大。</li><li>地主先出完全部手牌，地主获胜；任一农民先出完，两位农民共同获胜。炸弹和王炸会使本局倍数翻倍。单机和联机都使用虚拟积分，没有真实货币。</li></ul></details>
+      <details class="rules panel"><summary>斗地主规则与牌型</summary><p>一副牌共 54 张。三人各得 17 张，留 3 张底牌。依次叫分（0 分表示不叫，最高 3 分），叫分最高的人当地主并获得底牌；其余两人为农民。地主先出牌，之后顺时针轮流出牌。必须出能压过上家的同牌型，或选择过牌；两人连续过牌后，上一位出牌者重新自由出牌。</p><ul><li>单张、对子、三张按牌点比较；三张可以带一张单牌，不支持三带一对。</li><li>顺子至少 5 张、连对至少 3 对、飞机至少 2 个连续三张；飞机可以带与连续三张组数相同的单牌或对子；2 和大小王不能参与顺子、连对或飞机。</li><li>四带二、炸弹（四张同点）和王炸（大小王）都可出现。炸弹压过普通牌，王炸最大。</li><li>地主先出完全部手牌，地主获胜；任一农民先出完，两位农民共同获胜。炸弹和王炸会使本局倍数翻倍。单机和联机都使用虚拟积分，没有真实货币。</li></ul></details>
     </main>
   </div>
   <script>
@@ -367,7 +424,16 @@
       const sessionsKey = 'doudizhu:sessions';
       const chosen = new Set();
       const phaseName = { lobby: '等待玩家', bidding: '叫分抢地主', playing: '轮流出牌', finished: '本局结束' };
-      const playName = { single: '单张', pair: '对子', triple: '三张', 'triple-single': '三带一', 'triple-pair': '三带二', straight: '顺子', 'pair-straight': '连对', plane: '飞机', 'plane-single': '飞机带单', 'plane-pair': '飞机带对', 'four-two-single': '四带二', 'four-two-pair': '四带两对', bomb: '炸弹', rocket: '王炸' };
+      const playName = { single: '单张', pair: '对子', triple: '三张', 'triple-single': '三带一', straight: '顺子', 'pair-straight': '连对', plane: '飞机', 'plane-single': '飞机带单', 'plane-pair': '飞机带对', 'four-two-single': '四带二', 'four-two-pair': '四带两对', bomb: '炸弹', rocket: '王炸' };
+      const playEffectMeta = Object.freeze({
+        bomb: { title: '炸 弹', detail: () => '威力翻倍 · ×2', className: 'bomb', glyph: '✹', sparks: 14, duration: 1400, impact: 'bomb-impact' },
+        rocket: { title: '王 炸', detail: () => '全场最大 · 倍率 ×2', className: 'rocket', glyph: '♛', sparks: 28, duration: 1800, impact: 'rocket-impact' },
+        straight: { title: '顺 子', detail: (play) => `${play.count || play.cards?.length || 5} 张连牌`, className: 'sequence straight', glyph: '→', sparks: 8, duration: 1150 },
+        'pair-straight': { title: '连 对', detail: (play) => `${play.chainLength || Math.max(3, Math.floor((play.count || play.cards?.length || 6) / 2))} 连对`, className: 'sequence pair-straight', glyph: '⇉', sparks: 10, duration: 1200 },
+        plane: { title: '飞 机', detail: (play) => `连续 ${play.chainLength || 2} 组三张`, className: 'plane', glyph: '✈', sparks: 12, duration: 1350 },
+        'plane-single': { title: '飞 机', detail: (play) => `带 ${play.chainLength || 2} 张单牌`, className: 'plane plane-single', glyph: '✈', sparks: 12, duration: 1350 },
+        'plane-pair': { title: '飞 机', detail: (play) => `带 ${play.chainLength || 2} 对`, className: 'plane plane-pair', glyph: '✈', sparks: 12, duration: 1350 },
+      });
       const suitIsRed = (suit) => suit === '♥' || suit === '♦';
       let roomCode = '';
       let token = '';
@@ -382,6 +448,11 @@
       let dragFrame = 0;
       let lastPointerActivation = { id: '', time: 0 };
       let effectTimer = null;
+      let lastInteractionId = '';
+      let lastInteractionCreatedAt = 0;
+      let interactionPending = false;
+      const seenInteractionIds = new Set();
+      const interactionTimers = new Set();
       let hintCycle = null;
 
       function storeSession(code, value) {
@@ -706,6 +777,7 @@
           const item = document.createElement('div');
           const seat = seatFor(player.id);
           item.className = `player seat-${seat}`;
+          item.dataset.playerId = player.id;
           if (player.id === state.selfId) item.classList.add('me');
           if (player.id === state.currentTurnId) item.classList.add('active');
           if (state.landlordId) item.classList.add(player.id === state.landlordId ? 'landlord' : 'farmer');
@@ -713,10 +785,19 @@
           if (cardCount <= 5) item.classList.add('cards-low');
           if (cardCount <= 2) item.classList.add('cards-critical');
           if (cardCount === 0) item.classList.add('cards-empty');
-          const avatar = document.createElement('span');
+          const canInteract = player.id !== state.selfId && !player.left;
+          const avatar = document.createElement(canInteract ? 'button' : 'span');
           avatar.className = 'seat-avatar';
           avatar.textContent = player.isAi ? '机' : [...player.name][0] || '友';
-          avatar.setAttribute('aria-hidden', 'true');
+          if (canInteract) {
+            avatar.type = 'button';
+            avatar.dataset.interactionTarget = player.id;
+            avatar.setAttribute('aria-label', `向${player.name}扔番茄`);
+            avatar.title = `向${player.name}扔番茄`;
+            avatar.addEventListener('click', () => sendTomato(player.id));
+          } else {
+            avatar.setAttribute('aria-hidden', 'true');
+          }
           const name = document.createElement('div');
           name.className = 'player-name';
           const location = document.createElement('span');
@@ -759,11 +840,27 @@
           countLabel.textContent = cardCount ? '剩余张数' : '已出完';
           count.append(countNumber, countLabel);
           item.append(avatar, name, meta, count);
-          if (player.id === state.currentTurnId && state.phase === 'playing') {
+          if (state.phase === 'finished' && player.id !== state.selfId) {
+            const reveal = document.createElement('div');
+            reveal.className = 'seat-reveal';
+            reveal.setAttribute('aria-label', `${player.name} 的剩余手牌`);
+            const cards = Array.isArray(player.hand)
+              ? [...player.hand].sort((a, b) => a.value - b.value || a.id - b.id) : [];
+            if (cards.length) reveal.replaceChildren(...cards.map((card) => cardNode(card)));
+            else {
+              const empty = document.createElement('span');
+              empty.className = 'seat-reveal-empty';
+              empty.textContent = '已出完';
+              reveal.append(empty);
+            }
+            item.append(reveal);
+          }
+          if (player.id === state.currentTurnId && ['bidding', 'playing'].includes(state.phase)) {
             const turnTimer = document.createElement('span');
             turnTimer.className = 'seat-turn-timer';
             turnTimer.dataset.turnTimer = '';
-            turnTimer.setAttribute('aria-label', `${player.name} 的出牌倒计时`);
+            turnTimer.dataset.selfTurn = String(player.id === state.selfId);
+            turnTimer.setAttribute('aria-label', `${player.name} 的${state.phase === 'bidding' ? '叫分' : '出牌'}倒计时`);
             item.append(turnTimer);
           }
           return item;
@@ -786,37 +883,113 @@
           ? `♛ 地主 ${turnName(state.landlordId)} · ×${state.multiplier || 1}`
           : '♛ 地主待定 · 等待叫分';
       }
-      function showPlayEffect(type) {
+      function showPlayEffect(play) {
         if (effectTimer) clearTimeout(effectTimer);
+        effectTimer = null;
         const effect = $('playEffect');
-        effect.className = `play-effect ${type}`;
+        const table = $('gameTable');
+        effect.hidden = true;
+        effect.className = 'play-effect';
+        effect.replaceChildren();
+        table.classList.remove('bomb-impact', 'rocket-impact');
+        const config = playEffectMeta[play?.type];
+        if (!config) return;
+        void effect.offsetWidth;
+        effect.className = `play-effect ${config.className}`;
+        const glyph = document.createElement('i');
+        glyph.className = 'effect-glyph';
+        glyph.textContent = config.glyph;
+        glyph.setAttribute('aria-hidden', 'true');
         const title = document.createElement('strong');
-        title.textContent = type === 'rocket' ? '王 炸' : '炸 弹';
+        title.textContent = config.title;
         const detail = document.createElement('small');
-        detail.textContent = '威力翻倍 · ×2';
-        const sparks = Array.from({ length: type === 'rocket' ? 16 : 12 }, (_, index) => {
+        detail.textContent = config.detail(play);
+        const sparks = Array.from({ length: config.sparks }, (_, index) => {
           const spark = document.createElement('i');
           spark.className = 'spark';
-          spark.style.setProperty('--angle', `${index * (360 / (type === 'rocket' ? 16 : 12))}deg`);
-          spark.style.setProperty('--spark-delay', `${index * 18}ms`);
+          spark.style.setProperty('--angle', `${index * (360 / config.sparks)}deg`);
+          spark.style.setProperty('--spark-delay', `${index * (play.type === 'rocket' ? 11 : 18)}ms`);
           spark.setAttribute('aria-hidden', 'true');
           return spark;
         });
-        effect.replaceChildren(...sparks, title, detail);
+        effect.replaceChildren(...sparks, glyph, title, detail);
         effect.hidden = false;
-        $('gameTable').classList.remove('bomb-impact');
-        void $('gameTable').offsetWidth;
-        $('gameTable').classList.add('bomb-impact');
+        if (config.impact) {
+          void table.offsetWidth;
+          table.classList.add(config.impact);
+        }
         effectTimer = setTimeout(() => {
           effect.hidden = true;
           effect.replaceChildren();
-          $('gameTable').classList.remove('bomb-impact');
+          table.classList.remove('bomb-impact', 'rocket-impact');
           effectTimer = null;
+        }, config.duration);
+      }
+      function seatAvatar(playerId) {
+        const seat = [...$('players').querySelectorAll('.player[data-player-id]')]
+          .find((item) => item.dataset.playerId === playerId);
+        return seat?.querySelector('.seat-avatar') || null;
+      }
+      function showTomatoInteraction(interaction) {
+        if (!interaction || interaction.type !== 'tomato') return;
+        const fromAvatar = seatAvatar(interaction.fromPlayerId);
+        const targetAvatar = seatAvatar(interaction.targetPlayerId);
+        const arena = $('tableArena');
+        if (!fromAvatar || !targetAvatar || !arena) return;
+        const arenaRect = arena.getBoundingClientRect();
+        const point = (element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            x: rect.left - arenaRect.left + rect.width / 2,
+            y: rect.top - arenaRect.top + rect.height / 2,
+          };
+        };
+        const from = point(fromAvatar);
+        const target = point(targetAvatar);
+        const arc = Math.max(48, Math.min(96, Math.abs(target.x - from.x) * .24 + 42));
+        const wrapper = document.createElement('div');
+        wrapper.className = 'tomato-interaction';
+        wrapper.dataset.interactionId = interaction.id;
+        wrapper.style.setProperty('--from-x', `${from.x}px`);
+        wrapper.style.setProperty('--from-y', `${from.y}px`);
+        wrapper.style.setProperty('--mid-x', `${(from.x + target.x) / 2}px`);
+        wrapper.style.setProperty('--mid-y', `${Math.max(18, Math.min(from.y, target.y) - arc)}px`);
+        wrapper.style.setProperty('--to-x', `${target.x}px`);
+        wrapper.style.setProperty('--to-y', `${target.y}px`);
+        const projectile = document.createElement('span');
+        projectile.className = 'tomato-projectile';
+        projectile.textContent = '🍅';
+        projectile.setAttribute('aria-hidden', 'true');
+        const splat = document.createElement('span');
+        splat.className = 'tomato-splat';
+        splat.textContent = '命中！';
+        splat.setAttribute('aria-hidden', 'true');
+        const announcement = document.createElement('span');
+        announcement.className = 'interaction-announcement';
+        announcement.textContent = `${turnName(interaction.fromPlayerId)}向${turnName(interaction.targetPlayerId)}扔了番茄`;
+        wrapper.append(projectile, splat, announcement);
+        $('interactionLayer').append(wrapper);
+        const timer = setTimeout(() => {
+          wrapper.remove();
+          interactionTimers.delete(timer);
         }, 1400);
+        interactionTimers.add(timer);
       }
       function renderCenter() {
         const last = state.lastPlay;
-        $('centerLabel').textContent = last ? `${turnName(last.playerId)}出了 ${playName[last.type] || last.type || '牌'}` : (state.phase === 'lobby' ? '等朋友入座' : state.phase === 'bidding' ? '叫分决定谁当地主' : '新一轮出牌');
+        if (!last) showPlayEffect(null);
+        const activePlay = $('activePlay');
+        const activeSeat = last ? seatFor(last.playerId) : '';
+        activePlay.className = `active-play${activeSeat ? ` seat-${activeSeat}` : ''}`;
+        activePlay.hidden = !last;
+        $('centerLabel').hidden = !!last;
+        $('centerLabel').textContent = state.phase === 'lobby' ? '等朋友入座' : state.phase === 'bidding' ? '叫分决定谁当地主' : '新一轮出牌';
+        if (last) {
+          const location = activeSeat === 'self' ? '你' : activeSeat === 'left' ? '上家' : '下家';
+          $('activePlayLabel').textContent = `${location} · ${turnName(last.playerId)} · ${playName[last.type] || last.type || '出牌'}`;
+        } else {
+          $('activePlayLabel').textContent = '';
+        }
         const cards = Array.isArray(last?.cards) ? last.cards : [];
         const signature = last ? `${last.playerId}:${cards.map((card) => card.id).join(',')}` : '';
         const animate = !!signature && signature !== lastPlaySignature;
@@ -825,7 +998,7 @@
           const arena = $('tableArena');
           arena.classList.remove('play-from-left', 'play-from-right', 'play-from-self');
           arena.classList.add(`play-from-${seatFor(last.playerId)}`);
-          if (last.type === 'bomb' || last.type === 'rocket') showPlayEffect(last.type);
+          showPlayEffect(last);
         }
         $('playedCards').replaceChildren(...cards.map((card, index) => {
           const element = cardNode(card);
@@ -851,6 +1024,9 @@
       function renderResult() {
         const complete = state.phase === 'finished';
         $('result').hidden = !complete;
+        $('myHandPanel').classList.toggle('ready-mode', complete);
+        $('handLive').hidden = complete;
+        $('roundReady').hidden = !complete;
         if (!complete) return;
         const meWon = (state.winners || []).includes(state.selfId);
         $('result').classList.toggle('win', meWon);
@@ -861,8 +1037,12 @@
         const neededCount = state.neededCount ?? (state.mode === 'solo' ? 1 : 3);
         const iAmReady = (state.nextReadyIds || []).includes(state.selfId);
         const winningSide = state.winningTeam === 'landlord' ? '地主' : '农民';
-        $('resultMessage').textContent = `${winningSide}获胜 · ${winnerNames || '等待结算'}。底分 ${state.baseScore || 1} × 倍数 ${state.multiplier || 1}。已准备 ${readyCount}/${neededCount}${iAmReady ? '，等待其他人准备。' : '。'}`;
-        $('again').textContent = '准备下一局';
+        $('resultMessage').textContent = `${winningSide}获胜 · ${winnerNames || '等待结算'}。底分 ${state.baseScore || 1} × 倍数 ${state.multiplier || 1}。`;
+        $('readyTitle').textContent = iAmReady ? '你已准备' : (state.mode === 'solo' ? '再来一局' : '准备下一局');
+        $('readyMessage').textContent = iAmReady
+          ? `已准备 ${readyCount}/${neededCount}，等待其他玩家。`
+          : (state.mode === 'solo' ? '本局手牌已收起，开始后会发放新一局手牌。' : `当前已准备 ${readyCount}/${neededCount}，全部玩家准备后自动发牌。`);
+        $('again').textContent = state.mode === 'solo' ? '开始下一局' : '准备下一局';
         $('again').hidden = !state.canStart;
       }
       function renderTimer() {
@@ -872,19 +1052,24 @@
           $('mobileTimer').textContent = '';
           $('timer').classList.remove('urgent');
           $('mobileTimer').classList.remove('urgent');
-          for (const timer of seatTimers) timer.textContent = '';
+          for (const timer of seatTimers) {
+            timer.textContent = '';
+            timer.classList.remove('urgent');
+          }
           return;
         }
         let deadline = typeof state.deadlineAt === 'number' ? state.deadlineAt : Date.parse(state.deadlineAt);
         if (deadline < 1e12) deadline *= 1000;
         const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-        $('timer').textContent = `${turnName(state.currentTurnId)} · ${seconds} 秒`;
+        const myTurn = state.currentTurnId === state.selfId;
+        const action = state.phase === 'bidding' ? '叫分' : '出牌';
+        $('timer').textContent = `${myTurn ? '你的回合' : turnName(state.currentTurnId)} · ${seconds} 秒`;
         $('mobileTimer').textContent = $('timer').textContent;
         const urgent = seconds <= 5;
         $('timer').classList.toggle('urgent', urgent);
         $('mobileTimer').classList.toggle('urgent', urgent);
         for (const timer of seatTimers) {
-          timer.textContent = `${seconds} 秒`;
+          timer.textContent = timer.dataset.selfTurn === 'true' ? `请${action} · ${seconds} 秒` : `${seconds} 秒`;
           timer.classList.toggle('urgent', urgent);
         }
       }
@@ -915,6 +1100,26 @@
         const signature = JSON.stringify(nextState);
         if (signature === lastRenderedSignature) return;
         lastRenderedSignature = signature;
+        if (!state) {
+          const initialCards = Array.isArray(nextState.lastPlay?.cards) ? nextState.lastPlay.cards : [];
+          lastPlaySignature = nextState.lastPlay
+            ? `${nextState.lastPlay.playerId}:${initialCards.map((card) => card.id).join(',')}` : '';
+        }
+        const interaction = nextState.interaction;
+        const interactionCreatedAt = Number(interaction?.createdAt) || 0;
+        const showInteraction = interaction?.id
+          && interaction.id !== lastInteractionId
+          && !seenInteractionIds.has(interaction.id)
+          && interaction.type === 'tomato'
+          && interactionCreatedAt >= lastInteractionCreatedAt;
+        if (interaction?.id) {
+          seenInteractionIds.add(interaction.id);
+          if (seenInteractionIds.size > 24) seenInteractionIds.delete(seenInteractionIds.values().next().value);
+          if (interactionCreatedAt >= lastInteractionCreatedAt) {
+            lastInteractionId = interaction.id;
+            lastInteractionCreatedAt = interactionCreatedAt;
+          }
+        }
         const previousPhase = state?.phase;
         const previousHintKey = hintStateKey(state);
         const wasMyTurn = state && ['bidding', 'playing'].includes(state.phase) && state.currentTurnId === state.selfId;
@@ -929,6 +1134,7 @@
           }
         }
         render();
+        if (showInteraction) requestAnimationFrame(() => showTomatoInteraction(interaction));
         if (!wasMyTurn && ['bidding', 'playing'].includes(nextState.phase) && nextState.currentTurnId === nextState.selfId
             && window.matchMedia('(max-width:720px)').matches) {
           requestAnimationFrame(() => $('myHandPanel').scrollIntoView({
@@ -985,18 +1191,39 @@
         chosen.clear();
         previousHandIds.clear();
         lastPlaySignature = '';
+        lastInteractionId = '';
+        lastInteractionCreatedAt = 0;
+        interactionPending = false;
+        seenInteractionIds.clear();
         hintCycle = null;
         if (effectTimer) clearTimeout(effectTimer);
         effectTimer = null;
+        for (const timer of interactionTimers) clearTimeout(timer);
+        interactionTimers.clear();
         $('playEffect').hidden = true;
         $('playEffect').replaceChildren();
-        $('gameTable').classList.remove('bomb-impact');
+        $('interactionLayer').replaceChildren();
+        $('gameTable').classList.remove('bomb-impact', 'rocket-impact');
         stopDrag();
         $('connection').hidden = true;
         $('gameView').hidden = true;
         $('setup').hidden = false;
         document.body.classList.remove('in-game');
         if (updateUrl) history.replaceState(null, '', '/doudizhu');
+      }
+      async function sendTomato(targetId) {
+        if (interactionPending || !targetId) return;
+        interactionPending = true;
+        try {
+          const result = await post(roomPath('action'), {
+            token,
+            action: 'interact',
+            interaction: 'tomato',
+            targetId,
+          });
+          if (result && result.code === roomCode && result.players) receive(result);
+        } catch (error) { showError(error.message, true); }
+        finally { interactionPending = false; }
       }
       async function sendAction(action, extra = {}) {
         if (pending) return;

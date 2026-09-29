@@ -9,6 +9,8 @@ const MAX_ROOMS = 100;
 const CREATE_WINDOW_MS = 10 * 60_000;
 const MAX_CREATES_PER_ADDRESS = 12;
 const MAX_SSE_PER_PLAYER = 2;
+const INTERACTION_COOLDOWN_MS = 1_200;
+const INTERACTION_TTL_MS = 2_500;
 const RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 const SUITS = ['♠', '♥', '♣', '♦'];
 const DECK = Object.freeze([
@@ -82,6 +84,7 @@ function newPlayer(name, isAi = false) {
     hand: [],
     score: 0,
     roundResult: null,
+    lastInteractionAt: 0,
     left: false,
   };
 }
@@ -111,6 +114,8 @@ function createRoom(name, mode = 'online') {
     deadlineAt: null,
     turnTimer: null,
     aiTimer: null,
+    interaction: null,
+    interactionTimer: null,
     presenceTimer: null,
     nextReadyIds: new Set(),
     message: mode === 'solo' ? '两名电脑玩家已就位，可以开始。' : '邀请另外两名玩家加入后开始。',
@@ -218,6 +223,10 @@ function touch(room, player) {
   schedulePresenceUpdate(room);
 }
 
+function currentInteraction(room, now = Date.now()) {
+  return room.interaction && room.interaction.expiresAt > now ? room.interaction : null;
+}
+
 function sorted(cards) {
   return [...cards].sort((a, b) => a.value - b.value || a.id - b.id);
 }
@@ -241,6 +250,7 @@ function state(room, viewer) {
       isAi: player.isAi,
       connected: isOnline(player),
       cardCount: player.hand.length,
+      ...(room.phase === 'finished' ? { hand: sorted(player.hand) } : {}),
       score: player.score,
       roundResult: player.roundResult,
       left: player.left,
@@ -256,6 +266,7 @@ function state(room, viewer) {
     baseScore: room.baseScore,
     multiplier: room.multiplier,
     deadlineAt: room.deadlineAt,
+    interaction: currentInteraction(room),
     canStart,
     nextReadyIds,
     readyCount: nextReadyIds.length,
@@ -279,6 +290,38 @@ function broadcast(room, skipClient = null) {
       try { client.write(data); } catch { player.clients.delete(client); }
     }
   }
+}
+
+function applyInteraction(room, player, interaction, targetId) {
+  if (interaction !== 'tomato') return { status: 409, error: '不支持的互动类型' };
+  const target = room.players.find((seat) => !seat.left && seat.id === targetId);
+  if (!target) return { status: 409, error: '互动目标不存在' };
+  if (target.id === player.id) return { status: 409, error: '不能对自己发送互动' };
+  const now = Date.now();
+  if (now - player.lastInteractionAt < INTERACTION_COOLDOWN_MS) {
+    return { status: 429, error: '互动太频繁，请稍后再试' };
+  }
+
+  player.lastInteractionAt = now;
+  const event = {
+    id: crypto.randomUUID(),
+    type: interaction,
+    fromPlayerId: player.id,
+    targetPlayerId: target.id,
+    createdAt: now,
+    expiresAt: now + INTERACTION_TTL_MS,
+  };
+  room.interaction = event;
+  if (room.interactionTimer) clearTimeout(room.interactionTimer);
+  room.interactionTimer = setTimeout(() => {
+    room.interactionTimer = null;
+    if (room.interaction?.id !== event.id) return;
+    room.interaction = null;
+    broadcast(room);
+  }, INTERACTION_TTL_MS);
+  room.interactionTimer.unref();
+  broadcast(room);
+  return null;
 }
 
 function clearTurn(room) {
@@ -330,9 +373,6 @@ function classifyCards(input) {
     if (values.length === 1) return result('bomb', values[0]);
     if (byAmount(3).length === 1) return result('triple-single', byAmount(3)[0]);
   }
-  if (count === 5 && byAmount(3).length === 1 && byAmount(2).length === 1) {
-    return result('triple-pair', byAmount(3)[0]);
-  }
   if (count >= 5 && values.length === count && values.at(-1) <= 14 && consecutive(values)) {
     return result('straight', values.at(-1), count);
   }
@@ -350,7 +390,8 @@ function classifyCards(input) {
       if (!core.every((value) => groups.get(value) === 3)) continue;
       const remainder = values.filter((value) => !core.includes(value));
       if (unit === 3 && remainder.length === 0) return result(type, core.at(-1), length);
-      if (unit === 4 && remainder.reduce((sum, value) => sum + groups.get(value), 0) === length) {
+      if (unit === 4 && remainder.length === length
+          && remainder.every((value) => groups.get(value) === 1)) {
         return result(type, core.at(-1), length);
       }
       if (unit === 5 && remainder.length === length && remainder.every((value) => groups.get(value) === 2)) {
@@ -576,24 +617,35 @@ function legalAiMoves(hand, previous = null) {
     const pattern = classifyCards(ids);
     if (pattern && beats(pattern, previous)) moves.push({ ids: [...ids], pattern });
   }
-  function attachments(entries, total, pairsOnly, callback, index = 0, selected = []) {
+  function attachments(entries, total, callback, index = 0, selected = []) {
     if (total === 0) {
       callback(selected);
       return;
     }
     if (index >= entries.length) return;
-    const available = entries.slice(index).reduce((sum, [, ids]) => (
-      sum + (pairsOnly ? (ids.length >= 2 ? 2 : 0) : ids.length)
-    ), 0);
+    const available = entries.slice(index).reduce((sum, [, ids]) => sum + ids.length, 0);
     if (available < total) return;
     const [, ids] = entries[index];
-    const amounts = pairsOnly ? [0, 2] : Array.from({ length: Math.min(ids.length, total) + 1 }, (_, amount) => amount);
+    const amounts = Array.from({ length: Math.min(ids.length, total) + 1 }, (_, amount) => amount);
     for (const amount of amounts) {
       if (amount > total || amount > ids.length) continue;
       selected.push(...ids.slice(0, amount));
-      attachments(entries, total - amount, pairsOnly, callback, index + 1, selected);
+      attachments(entries, total - amount, callback, index + 1, selected);
       selected.length -= amount;
     }
+  }
+  function groupedAttachments(entries, groupsNeeded, cardsPerGroup, callback, index = 0, selected = []) {
+    if (groupsNeeded === 0) {
+      callback(selected);
+      return;
+    }
+    if (entries.length - index < groupsNeeded) return;
+    const [, ids] = entries[index];
+    groupedAttachments(entries, groupsNeeded, cardsPerGroup, callback, index + 1, selected);
+    if (ids.length < cardsPerGroup) return;
+    selected.push(...ids.slice(0, cardsPerGroup));
+    groupedAttachments(entries, groupsNeeded - 1, cardsPerGroup, callback, index + 1, selected);
+    selected.length -= cardsPerGroup;
   }
 
   const entries = [...groups.entries()];
@@ -610,7 +662,6 @@ function legalAiMoves(hand, previous = null) {
     for (const [otherValue, otherIds] of entries) {
       if (otherValue === value) continue;
       add([...ids.slice(0, 3), otherIds[0]]);
-      if (otherIds.length >= 2) add([...ids.slice(0, 3), ...otherIds.slice(0, 2)]);
     }
   }
 
@@ -634,16 +685,16 @@ function legalAiMoves(hand, previous = null) {
       if (length < 2) continue;
       add(core);
       const outside = entries.filter(([rank]) => !coreValues.has(rank));
-      attachments(outside, length, false, (wings) => add([...core, ...wings]));
-      attachments(outside, length * 2, true, (wings) => add([...core, ...wings]));
+      groupedAttachments(outside, length, 1, (wings) => add([...core, ...wings]));
+      groupedAttachments(outside, length, 2, (wings) => add([...core, ...wings]));
     }
   }
 
   for (const [value, ids] of entries) {
     if (ids.length !== 4) continue;
     const outside = entries.filter(([rank]) => rank !== value);
-    attachments(outside, 2, false, (wings) => add([...ids, ...wings]));
-    attachments(outside, 4, true, (wings) => add([...ids, ...wings]));
+    attachments(outside, 2, (wings) => add([...ids, ...wings]));
+    groupedAttachments(outside, 2, 2, (wings) => add([...ids, ...wings]));
   }
   return moves;
 }
@@ -675,7 +726,7 @@ function estimateHandTurns(hand) {
   }
   const remaining = [...counts.entries()].filter(([, count]) => count > 0);
   const triples = remaining.filter(([, count]) => count === 3).length;
-  const attachments = Math.min(triples, remaining.length - triples);
+  const attachments = Math.min(triples, remaining.filter(([, count]) => count === 1).length);
   turns += remaining.length - attachments;
   if ((counts.get(16) || 0) && (counts.get(17) || 0)) turns -= 1;
   return Math.max(1, turns);
@@ -896,6 +947,7 @@ function leaveRoom(room, player) {
   }
   if (!room.players.some((seat) => !seat.isAi && !seat.left)) {
     clearTurn(room);
+    if (room.interactionTimer) clearTimeout(room.interactionTimer);
     if (room.presenceTimer) clearTimeout(room.presenceTimer);
     rooms.delete(room.code);
   }
@@ -1011,6 +1063,10 @@ async function handleRequest(req, res, pathname, url) {
         } else if (body.action === 'bid') error = applyBid(room, player, body.score);
         else if (body.action === 'play') error = applyPlay(room, player, body.cards);
         else if (body.action === 'pass') error = applyPass(room, player);
+        else if (body.action === 'interact') {
+          const interactionError = applyInteraction(room, player, body.interaction, body.targetId);
+          if (interactionError) return fail(res, interactionError.status, interactionError.error);
+        }
         else if (body.action === 'hint') {
           if (room.phase !== 'playing' || room.currentTurnId !== player.id) error = '只有轮到你出牌时才能提示';
           else return sendJson(res, 200, { ...state(room, player), ...playHint(room, player) });
@@ -1034,6 +1090,7 @@ setInterval(() => {
   for (const [code, room] of rooms) {
     if (room.lastActivity >= cutoff || room.players.some((player) => player.clients.size)) continue;
     clearTurn(room);
+    if (room.interactionTimer) clearTimeout(room.interactionTimer);
     if (room.presenceTimer) clearTimeout(room.presenceTimer);
     rooms.delete(code);
   }
@@ -1048,5 +1105,5 @@ setInterval(() => {
 module.exports = {
   handleRequest,
   liveRoomCount: () => rooms.size,
-  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, chooseAiPlay, playHint, rankedLegalPlays, finishRound, scheduleTurn, schedulePresenceUpdate },
+  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER, INTERACTION_COOLDOWN_MS, INTERACTION_TTL_MS }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, applyInteraction, legalAiMoves, chooseAiPlay, playHint, rankedLegalPlays, finishRound, scheduleTurn, schedulePresenceUpdate },
 };

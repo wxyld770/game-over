@@ -9,7 +9,9 @@ process.env.DOUDIZHU_PLAY_MS = '30000';
 const repoRoot = process.env.GAME_OVER_ROOT || path.resolve(__dirname, '..');
 const { server } = require(path.join(repoRoot, 'server.js'));
 const { testing } = require(path.join(repoRoot, 'doudizhu-server.js'));
-const { DECK, classifyCards, beats, chooseAiPlay, playHint, rooms, createAttempts, limits } = testing;
+const {
+  DECK, classifyCards, beats, legalAiMoves, chooseAiPlay, playHint, rooms, createAttempts, limits,
+} = testing;
 const doudizhuHtml = fs.readFileSync(path.join(repoRoot, 'public', 'games', 'doudizhu.html'), 'utf8');
 const hintScript = [...doudizhuHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
   .map((match) => match[1]).find((source) => source.includes('root.DoudizhuHints'));
@@ -37,7 +39,6 @@ test('斗地主常见牌型、非法牌型与大小比较', () => {
     ['pair', [[3, 2]]],
     ['triple', [[3, 3]]],
     ['triple-single', [[3, 3], [4, 1]]],
-    ['triple-pair', [[3, 3], [4, 2]]],
     ['straight', [[3, 1], [4, 1], [5, 1], [6, 1], [7, 1]]],
     ['pair-straight', [[3, 2], [4, 2], [5, 2]]],
     ['plane', [[3, 3], [4, 3]]],
@@ -49,6 +50,7 @@ test('斗地主常见牌型、非法牌型与大小比较', () => {
     ['rocket', [[16, 1], [17, 1]]],
   ];
   for (const [type, groups] of cases) assert.equal(classifyCards(cards(groups))?.type, type, type);
+  assert.equal(classifyCards(cards([[3, 3], [4, 2]])), null, '三张只能带一张，不能带一对');
   assert.equal(classifyCards(cards([[3, 1], [4, 1], [5, 1], [6, 1], [15, 1]])), null, '顺子不能含 2');
   assert.equal(classifyCards(cards([[3, 1], [4, 1], [5, 1], [6, 1], [16, 1]])), null, '顺子不能含王');
   assert.equal(classifyCards([0, 0]), null, '同一张牌不能重复');
@@ -58,6 +60,79 @@ test('斗地主常见牌型、非法牌型与大小比较', () => {
   assert.equal(beats(classifyCards(cards([[3, 4]])), classifyCards(cards([[14, 1]]))), true);
   assert.equal(beats(classifyCards(cards([[16, 1], [17, 1]])), classifyCards(cards([[15, 4]]))), true);
   assert.equal(beats(classifyCards(cards([[3, 4]])), classifyCards(cards([[16, 1], [17, 1]]))), false);
+});
+
+test('斗地主飞机可按长度带单张或对子，并严格匹配翅膀数量', () => {
+  const threeCoreSingles = classifyCards(cards([
+    [3, 3], [4, 3], [5, 3], [6, 1], [7, 1], [8, 1],
+  ]));
+  assert.deepEqual(threeCoreSingles, {
+    type: 'plane-single', mainValue: 5, count: 12, chainLength: 3,
+  });
+  const threeCorePairs = classifyCards(cards([
+    [4, 3], [5, 3], [6, 3], [8, 2], [9, 2], [10, 2],
+  ]));
+  assert.deepEqual(threeCorePairs, {
+    type: 'plane-pair', mainValue: 6, count: 15, chainLength: 3,
+  });
+
+  assert.equal(classifyCards(cards([[3, 3], [4, 3], [5, 2]])), null,
+    '飞机带单要求两个不同牌值的单张，不能把一个对子当作两张单牌');
+  assert.equal(classifyCards(cards([[3, 3], [4, 3], [5, 2], [6, 1], [7, 1]])), null,
+    '飞机不能混带一对和两个单张');
+  assert.equal(classifyCards(cards([[3, 3], [4, 3], [5, 2], [6, 1]])), null,
+    '两组三张带对子时必须带满两对');
+  assert.equal(classifyCards(cards([[13, 3], [14, 3], [15, 3]])), null, '飞机不能包含 2');
+
+  const lower = classifyCards(cards([[3, 3], [4, 3], [6, 1], [7, 1]]));
+  const higher = classifyCards(cards([[4, 3], [5, 3], [8, 1], [9, 1]]));
+  const longer = classifyCards(cards([[3, 3], [4, 3], [5, 3], [8, 1], [9, 1], [10, 1]]));
+  assert.equal(beats(higher, lower), true, '相同长度、相同翅膀类型的更大飞机可以压过');
+  assert.equal(beats(longer, lower), false, '不同长度的飞机不能互相压制');
+  assert.equal(beats(threeCorePairs, threeCoreSingles), false, '单翅和对翅飞机不能互相压制');
+});
+
+test('斗地主 AI 候选遵循三带一和飞机带牌规则', () => {
+  const hand = held([
+    [3, 3], [4, 3], [5, 3], [7, 2], [8, 2], [9, 2], [10, 1],
+  ]);
+  const moves = legalAiMoves(hand);
+  assert.ok(moves.length > 0);
+  assert.ok(moves.every((move) => classifyCards(move.ids)), '每个 AI 候选都必须通过同一套牌型校验');
+  assert.ok(moves.every((move) => move.pattern.type !== 'triple-pair'), 'AI 不得生成三带一对');
+  assert.ok(moves.some((move) => move.pattern.type === 'triple-single'), 'AI 仍应生成三带一');
+  assert.ok(moves.some((move) => move.pattern.type === 'plane-single'
+    && move.pattern.chainLength === 3), 'AI 应生成三组三张带三个单张');
+  assert.ok(moves.some((move) => move.pattern.type === 'plane-pair'
+    && move.pattern.chainLength === 3), 'AI 应生成三组三张带三对');
+
+  const oneWingRank = held([[3, 3], [4, 3], [5, 2]]);
+  assert.equal(legalAiMoves(oneWingRank).some((move) => move.pattern.type === 'plane-single'), false,
+    'AI 不得把同一牌值的一对拆作飞机的两个单翅');
+
+  const previous = classifyCards(cards([[3, 3], [4, 3], [8, 2], [9, 2]]));
+  const responses = legalAiMoves(hand, previous);
+  assert.ok(responses.some((move) => move.pattern.type === 'plane-pair'
+    && move.pattern.chainLength === 2 && move.pattern.mainValue > previous.mainValue),
+  'AI 应能用更大的同长度对翅飞机跟牌');
+  assert.ok(responses.every((move) => beats(move.pattern, previous)));
+});
+
+test('斗地主 AI 不会把三带对误判为一手余牌', () => {
+  const player = { id: 'landlord-ai', hand: held([[6, 2], [7, 2], [8, 3]]) };
+  const room = {
+    landlordId: player.id,
+    players: [player, { id: 'farmer-a', hand: Array(17) }, { id: 'farmer-b', hand: Array(17) }],
+    lastPlay: null,
+    playHistory: [],
+  };
+  const move = chooseAiPlay(room, player);
+  const played = new Set(move);
+  const remaining = player.hand.filter((card) => !played.has(card.id));
+  assert.ok(classifyCards(remaining), 'AI 领出后应留下能一次出完的合法牌型');
+  assert.notDeepEqual(classifyCards(move), {
+    type: 'pair', mainValue: 7, count: 2, chainLength: 1,
+  }, 'AI 不应留下会被误判为三带对的余牌');
 });
 
 test('斗地主 AI 会压制对手，并在地主即将出完时接管农民队友的牌权', () => {
@@ -176,6 +251,7 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
     for (const room of rooms.values()) {
       clearTimeout(room.turnTimer);
       clearTimeout(room.aiTimer);
+      clearTimeout(room.interactionTimer);
       clearTimeout(room.presenceTimer);
       for (const player of room.players) for (const client of player.clients) client.end();
     }
@@ -254,6 +330,11 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   assert.equal(bid.body.bottomCards.length, 3);
   assert.equal((await state(code, users[turnIndex].token)).hand.length, 20);
   assert.deepEqual((await state(code, users[turnIndex].token)).players.map((player) => player.cardCount).sort((a, b) => a - b), [17, 17, 20]);
+  for (const user of users) {
+    const playing = await state(code, user.token);
+    assert.ok(playing.players.every((player) => !Object.hasOwn(player, 'hand')),
+      '出牌阶段也不可泄露其他玩家手牌');
+  }
 
   const room = rooms.get(code);
   const landlord = room.players[turnIndex];
@@ -269,6 +350,89 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   assert.ok(classifyCards(hint.body.hintCards), '提示结果必须是合法牌型');
   assert.deepEqual(landlord.hand.map((card) => card.id), handBeforeHint, '查看提示不能替玩家出牌');
   assert.equal(room.deadlineAt, deadlineBeforeHint, '查看提示不能重置回合倒计时');
+
+  const senderIndex = (turnIndex + 1) % 3;
+  const targetIndex = (turnIndex + 2) % 3;
+  const sender = room.players[senderIndex];
+  const target = room.players[targetIndex];
+  const broadcastChunks = [];
+  const fakeClient = {
+    write(chunk) { broadcastChunks.push(chunk); },
+    end() {},
+  };
+  target.clients.add(fakeClient);
+  const beforeInteraction = {
+    currentTurnId: room.currentTurnId,
+    deadlineAt: room.deadlineAt,
+    lastPlay: room.lastPlay,
+    hands: room.players.map((seat) => seat.hand.map((card) => card.id)),
+    multiplier: room.multiplier,
+  };
+  const tomato = await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'tomato',
+    targetId: target.id,
+    fromPlayerId: target.id,
+    playerId: target.id,
+    id: 'forged-event',
+    createdAt: 0,
+    expiresAt: Number.MAX_SAFE_INTEGER,
+  });
+  assert.equal(tomato.status, 200, JSON.stringify(tomato.body));
+  assert.equal(tomato.body.interaction.type, 'tomato');
+  assert.equal(tomato.body.interaction.fromPlayerId, sender.id,
+    '互动发送者必须从鉴权 token 推导，忽略客户端伪造字段');
+  assert.equal(tomato.body.interaction.targetPlayerId, target.id);
+  assert.equal(typeof tomato.body.interaction.id, 'string');
+  assert.notEqual(tomato.body.interaction.id, 'forged-event');
+  assert.ok(tomato.body.interaction.createdAt > 0 && tomato.body.interaction.createdAt <= Date.now());
+  assert.equal(tomato.body.interaction.expiresAt - tomato.body.interaction.createdAt,
+    limits.INTERACTION_TTL_MS);
+  assert.deepEqual({
+    currentTurnId: room.currentTurnId,
+    deadlineAt: room.deadlineAt,
+    lastPlay: room.lastPlay,
+    hands: room.players.map((seat) => seat.hand.map((card) => card.id)),
+    multiplier: room.multiplier,
+  }, beforeInteraction, '互动不得改变回合、倒计时、出牌、手牌或倍率');
+  const broadcastState = JSON.parse(broadcastChunks.at(-1).replace(/^data: /, '').trim());
+  assert.deepEqual(broadcastState.interaction, tomato.body.interaction,
+    '互动应通过房间广播同步给其他玩家');
+  target.clients.delete(fakeClient);
+
+  const independentSender = await action(code, users[targetIndex].token, 'interact', {
+    interaction: 'tomato', targetId: sender.id,
+  });
+  assert.equal(independentSender.status, 200, '互动冷却应按发送者分别计算');
+
+  assert.equal((await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'tomato', targetId: sender.id,
+  })).status, 409, '不能给自己扔番茄');
+  assert.equal((await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'tomato', targetId: 'not-in-room',
+  })).status, 409, '不能给未知玩家扔番茄');
+  assert.equal((await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'unknown', targetId: target.id,
+  })).status, 409, '不接受未知互动类型');
+  assert.equal((await action(code, 'invalid-token', 'interact', {
+    interaction: 'tomato', targetId: target.id,
+  })).status, 403, '互动必须通过房间身份鉴权');
+  const limited = await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'tomato', targetId: target.id,
+  });
+  assert.equal(limited.status, 429, '每位发送者应有独立互动限流');
+  assert.deepEqual(limited.body, { error: '互动太频繁，请稍后再试' });
+
+  sender.lastInteractionAt -= limits.INTERACTION_COOLDOWN_MS;
+  const secondTomato = await action(code, users[senderIndex].token, 'interact', {
+    interaction: 'tomato', targetId: target.id,
+  });
+  assert.equal(secondTomato.status, 200, '冷却结束后可以再次互动');
+  const expiryTimer = room.interactionTimer;
+  room.interaction.expiresAt = Date.now() - 1;
+  assert.equal((await state(code, users[targetIndex].token)).interaction, null,
+    '状态接口不得返回已过期互动');
+  assert.equal(room.interactionTimer, expiryTimer, '读取过期互动不能取消等待广播的清理定时器');
+  assert.ok(room.interaction, '过期互动只由清理定时器移除，避免其他 SSE 客户端错过清理广播');
 
   const otherIndex = (turnIndex + 1) % 3;
   assert.equal((await action(code, users[otherIndex].token, 'play', { cards: [0] })).status, 409, '非本人回合不能出牌');
@@ -305,6 +469,9 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   assert.equal(win.body.winningTeam, 'landlord');
   assert.equal(win.body.players.find((player) => player.id === landlord.id).roundResult.delta, 6);
   assert.equal(win.body.players.filter((player) => player.id !== landlord.id).every((player) => player.roundResult.delta === -3), true);
+  assert.ok(win.body.players.every((player) => Array.isArray(player.hand)), '结算后应公开三家的剩余手牌');
+  assert.ok(win.body.players.every((player) => player.hand.length === player.cardCount),
+    '结算明牌数量应与公开余牌数一致');
 
   const firstReady = await action(code, users[turnIndex].token, 'start');
   assert.equal(firstReady.status, 200);
