@@ -1,12 +1,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 process.env.DOUDIZHU_AI_MS = '25';
+process.env.DOUDIZHU_PLAY_MS = '30000';
 const repoRoot = process.env.GAME_OVER_ROOT || path.resolve(__dirname, '..');
 const { server } = require(path.join(repoRoot, 'server.js'));
 const { testing } = require(path.join(repoRoot, 'doudizhu-server.js'));
-const { DECK, classifyCards, beats, chooseAiPlay, rooms, createAttempts, limits } = testing;
+const { DECK, classifyCards, beats, chooseAiPlay, playHint, rooms, createAttempts, limits } = testing;
+const doudizhuHtml = fs.readFileSync(path.join(repoRoot, 'public', 'games', 'doudizhu.html'), 'utf8');
+const hintScript = [...doudizhuHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .map((match) => match[1]).find((source) => source.includes('root.DoudizhuHints'));
+const hintSandbox = { module: { exports: {} } };
+vm.runInNewContext(hintScript, hintSandbox, { filename: 'doudizhu-hints.js' });
+const DoudizhuHints = hintSandbox.module.exports;
 
 function cards(groups) {
   return groups.flatMap(([value, count]) => DECK.filter((card) => card.value === value).slice(0, count).map((card) => card.id));
@@ -98,6 +107,63 @@ test('斗地主 AI 决策不读取对手暗牌', () => {
     chooseAiPlay(room(highHiddenCards), farmer),
     '对手暗牌内容变化但公开余牌数相同时，电脑决策必须一致',
   );
+  assert.deepEqual(
+    playHint(room(lowHiddenCards), farmer).hintCandidates,
+    playHint(room(highHiddenCards), farmer).hintCandidates,
+    '对手暗牌内容变化但公开余牌数相同时，提示候选及顺序必须一致',
+  );
+});
+
+test('斗地主出牌提示返回排序、去重且合法的候选，并优先保留炸弹', () => {
+  const player = { id: 'farmer', hand: held([[5, 2], [6, 2], [7, 4], [16, 1], [17, 1]]) };
+  const landlord = { id: 'landlord', hand: Array(5) };
+  const teammate = { id: 'teammate', hand: Array(6) };
+  const previous = publicPlay(landlord.id, [[4, 2]]);
+  const room = {
+    landlordId: landlord.id,
+    players: [landlord, player, teammate],
+    lastPlay: previous,
+    playHistory: [previous],
+  };
+
+  const hint = playHint(room, player);
+  assert.equal(hint.hintAction, 'play');
+  assert.deepEqual(hint.hintCards, hint.hintCandidates[0]);
+  const signatures = hint.hintCandidates.map((candidate) => [...candidate].sort((a, b) => a - b).join(','));
+  assert.equal(new Set(signatures).size, signatures.length, '提示候选不得重复');
+  const patterns = hint.hintCandidates.map((candidate) => classifyCards(candidate));
+  assert.ok(patterns.every((pattern) => beats(pattern, previous.pattern)), '每个提示候选都必须合法压过上家');
+  assert.equal(patterns[0].type, 'pair');
+  assert.notEqual(patterns[0].mainValue, 7, '有完整对子可用时不应先拆炸弹跟牌');
+  const firstExplosive = patterns.findIndex((pattern) => ['bomb', 'rocket'].includes(pattern.type));
+  assert.ok(firstExplosive > 0, '普通同型牌应排在炸弹之前');
+  assert.ok(patterns.slice(firstExplosive).every((pattern) => ['bomb', 'rocket'].includes(pattern.type)));
+  assert.equal(patterns.at(-1).type, 'rocket', '王炸应放在候选最后');
+
+  room.lastPlay = publicPlay(teammate.id, [[4, 1]]);
+  room.playHistory.push(room.lastPlay);
+  const teammateHint = playHint(room, player);
+  assert.equal(teammateHint.hintAction, 'pass', '队友掌握牌权且地主未临近出完时应先建议不出');
+  assert.ok(teammateHint.hintCandidates.length > 0, '建议不出时仍应返回可轮换的合法候选');
+
+  room.lastPlay = publicPlay(landlord.id, [[16, 1], [17, 1]]);
+  room.playHistory.push(room.lastPlay);
+  const noBeat = playHint(room, player);
+  assert.equal(noBeat.hintCandidates.length, 0);
+  assert.match(noBeat.hintMessage, /没有大过上家的牌/);
+});
+
+test('斗地主客户端提示候选去重、轮换，并支持队友控权时首次不出', () => {
+  const cycle = DoudizhuHints.createCycle('turn-1', [[8, 4], [4, 8], [12]], true, '建议不出');
+  const first = DoudizhuHints.next(cycle);
+  const second = DoudizhuHints.next(cycle);
+  const third = DoudizhuHints.next(cycle);
+  const fourth = DoudizhuHints.next(cycle);
+  assert.equal(first.action, 'pass');
+  assert.deepEqual(Array.from(second.cards), [4, 8]);
+  assert.deepEqual(Array.from(third.cards), [12]);
+  assert.deepEqual(Array.from(fourth.cards), [4, 8], '到达末尾后应从第一个候选继续轮换');
+  assert.equal(second.total, 2, '相同牌组不同顺序只能保留一个候选');
 });
 
 test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算', { timeout: 10_000 }, async (t) => {
@@ -189,24 +255,47 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   assert.equal((await state(code, users[turnIndex].token)).hand.length, 20);
   assert.deepEqual((await state(code, users[turnIndex].token)).players.map((player) => player.cardCount).sort((a, b) => a - b), [17, 17, 20]);
 
-  const otherIndex = (turnIndex + 1) % 3;
-  assert.equal((await action(code, users[otherIndex].token, 'play', { cards: [0] })).status, 409, '非本人回合不能出牌');
-  assert.equal((await action(code, users[turnIndex].token, 'pass')).status, 409, '领出不能过牌');
   const room = rooms.get(code);
   const landlord = room.players[turnIndex];
+  const deadlineBeforeHint = room.deadlineAt;
+  const handBeforeHint = landlord.hand.map((card) => card.id);
+  assert.ok(deadlineBeforeHint - Date.now() > 28_000 && deadlineBeforeHint - Date.now() <= 30_000,
+    '每个出牌回合应从 30 秒开始倒计时');
+  const hint = await action(code, users[turnIndex].token, 'hint');
+  assert.equal(hint.status, 200, JSON.stringify(hint.body));
+  assert.equal(hint.body.hintAction, 'play');
+  assert.ok(hint.body.hintCards.length > 0, '领出时提示应选择一组牌');
+  assert.ok(hint.body.hintCards.every((id) => handBeforeHint.includes(id)), '提示只能包含自己的手牌');
+  assert.ok(classifyCards(hint.body.hintCards), '提示结果必须是合法牌型');
+  assert.deepEqual(landlord.hand.map((card) => card.id), handBeforeHint, '查看提示不能替玩家出牌');
+  assert.equal(room.deadlineAt, deadlineBeforeHint, '查看提示不能重置回合倒计时');
+
+  const otherIndex = (turnIndex + 1) % 3;
+  assert.equal((await action(code, users[otherIndex].token, 'play', { cards: [0] })).status, 409, '非本人回合不能出牌');
+  assert.equal((await action(code, users[otherIndex].token, 'hint')).status, 409, '非本人回合不能查看出牌提示');
+  assert.equal((await action(code, users[turnIndex].token, 'pass')).status, 409, '领出不能过牌');
   const notOwned = DECK.find((card) => !landlord.hand.some((held) => held.id === card.id));
   assert.equal((await action(code, users[turnIndex].token, 'play', { cards: [notOwned.id] })).status, 409);
 
+  room.deadlineAt = Date.now() + 1_000;
   const lead = await action(code, users[turnIndex].token, 'play', { cards: [landlord.hand[0].id] });
   assert.equal(lead.status, 200);
   assert.equal(lead.body.lastPlay.cards.length, 1);
+  const afterLeadDeadline = room.deadlineAt;
+  assert.ok(afterLeadDeadline - Date.now() > 28_000, '出牌后应给下一位玩家重新计满 30 秒');
   assert.equal(room.playHistory.length, 1, '服务端应记录公开出牌，供电脑按已知牌面推算');
+  const forcedPassDeadline = Date.now() + 1_000;
+  room.deadlineAt = forcedPassDeadline;
   assert.equal((await action(code, users[(turnIndex + 1) % 3].token, 'pass')).status, 200);
+  assert.ok(room.deadlineAt - Date.now() > 28_000, '不出后应给下一位玩家重新计满 30 秒');
+  assert.ok(room.deadlineAt > forcedPassDeadline + 27_000, '新回合应替换原有截止时间');
+  room.deadlineAt = Date.now() + 1_000;
   const renewed = await action(code, users[(turnIndex + 2) % 3].token, 'pass');
   assert.equal(renewed.status, 200);
   assert.equal(renewed.body.currentTurnId, landlord.id);
   assert.equal(renewed.body.lastPlay, null, '两人过牌后由上手重新领出');
   assert.equal(renewed.body.canPass, false);
+  assert.ok(room.deadlineAt - Date.now() > 28_000, '重新获得牌权时也应重新计满 30 秒');
 
   landlord.hand = [DECK[0]];
   const win = await action(code, users[turnIndex].token, 'play', { cards: [0] });

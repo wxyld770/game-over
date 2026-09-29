@@ -55,6 +55,35 @@ test('dynamic planner ranks several continuations without mutating the board', (
   assert.equal(JSON.stringify(state), before, 'planning must be side-effect free');
 });
 
+test('dynamic fallback excludes moves that immediately return to recent positions', () => {
+  const previous = {
+    cols: [
+      [up(7), up(6)], [up(8)], [up(5)], [up(6)], [up(9)],
+      [up(10)], [up(4)], [up(3)], [up(2)], [up(1)]
+    ],
+    stock: [],
+    completed: 0
+  };
+  const forward = planner.legalMoves(previous).find(move =>
+    move.fromCol === 0 && move.fromIndex === 0 && move.toCol === 1);
+  assert.ok(forward);
+  const current = planner.applyMove(previous, forward);
+  const reverse = planner.legalMoves(current).find(move =>
+    move.fromCol === 1 && move.fromIndex === 1 && move.toCol === 0);
+  assert.ok(reverse, 'the immediate reversal should be legal before history filtering');
+
+  const candidates = Array.from(planner.nonRepeatingMoves(current, [previous], {
+    depth: 3,
+    breadth: 24,
+    nodeLimit: 1400
+  }));
+
+  assert.ok(candidates.length > 0, 'the fallback should retain other playable moves');
+  assert.equal(candidates.some(move => move.fromCol === reverse.fromCol &&
+    move.fromIndex === reverse.fromIndex && move.toCol === reverse.toCol), false);
+  assert.equal(planner.stateKey(planner.applyMove(current, reverse)), planner.stateKey(previous));
+});
+
 test('moving the ace onto a complete descending run collects the sequence', () => {
   const descendingToTwo = Array.from({ length: 12 }, (_, index) => up(13 - index));
   const state = {
@@ -193,7 +222,7 @@ test('page keeps fixed cards and wires hints through the completion certificate'
   assert.match(html, /SpiderPlanner\.advanceCertificate\(game, game\.certificate,/);
   assert.doesNotMatch(html, /target\.r =/);
   assert.doesNotMatch(html, /lastIndexOf\(plannedRank\)/);
-  assert.match(html, /多条可完整收完的路线/);
+  assert.match(html, /偏离初始解法后，提示仍会按当前牌面给出不重复的下一步/);
 });
 
 test('pointer dragging keeps an origin placeholder and renders the complete moving run', () => {
@@ -206,4 +235,12 @@ test('pointer dragging keeps an origin placeholder and renders the complete movi
   assert.doesNotMatch(html, /event\.pointerType === "touch" \|\|/);
   assert.doesNotMatch(html, /addEventListener\("dragstart"/);
   assert.doesNotMatch(html, /element\.draggable = pickable/);
+});
+
+test('the complete visible column is a drop target and free play keeps useful hints', () => {
+  assert.match(html, /\.column \{[^}]*min-height: var\(--board-min-h\)/);
+  assert.match(html, /const boardRect = board\.getBoundingClientRect\(\)/);
+  assert.match(html, /if \(x >= rect\.left && x <= rect\.right\) return Number\(candidate\.dataset\.col\)/);
+  assert.match(html, /SpiderPlanner\.nonRepeatingMoves\(game, history\.slice\(-8\)/);
+  assert.doesNotMatch(html, /建议撤销最近的自由移动，回到可以完整收完的路线/);
 });

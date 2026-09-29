@@ -14,7 +14,7 @@
     .shell{width:min(1180px,100%);margin:auto;padding:22px 22px 48px} header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:22px}.back{color:var(--gold);font-weight:800;text-decoration:none}.back:hover{text-decoration:underline}.brand{color:#c3d8da;font-size:.76rem;letter-spacing:.2em}
     .intro{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:18px}.intro h1{margin:0;font-size:clamp(2rem,5vw,3.35rem);letter-spacing:0}.intro p{max-width:560px;margin:8px 0 0;color:#d0ddde;line-height:1.55}.run-state{min-height:20px;margin:0;color:#bcd0d1;font-size:.78rem;text-align:right}
     .layout{display:grid;grid-template-columns:minmax(0,760px) minmax(260px,330px);gap:24px;align-items:start}.game-panel{min-width:0}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:12px}.stat{min-height:72px;padding:11px 13px;border:1px solid var(--line);border-radius:8px;background:rgba(6,31,37,.48)}.stat span{display:block;color:var(--muted);font-size:.75rem}.stat strong{display:block;margin-top:5px;color:#fff1c9;font-size:1.42rem;font-variant-numeric:tabular-nums}.stat.combo strong{color:#a7efd6}
-    .board-frame{position:relative;width:100%;max-width:720px}.grid{--grid-gap:clamp(3px,.65vw,6px);--grid-pad:clamp(7px,1.2vw,12px);position:relative;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:var(--grid-gap);width:100%;aspect-ratio:9/8;padding:var(--grid-pad);border:1px solid #4e777b;border-radius:8px;background:#0a2c33;box-shadow:0 24px 55px rgba(0,0,0,.25);touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}.slot-layer{position:absolute;inset:var(--grid-pad);z-index:0;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:var(--grid-gap);pointer-events:none}.slot{min-width:0;min-height:0;border:1px solid rgba(148,195,199,.16);border-radius:8px;background:rgba(2,24,29,.58);box-shadow:inset 0 2px 8px rgba(0,0,0,.22)}.gem{position:relative;z-index:1;display:grid;place-items:center;min-width:0;min-height:0;padding:0;border:1px solid rgba(255,255,255,.2);border-radius:8px;box-shadow:inset 0 -5px 0 rgba(0,0,0,.17),0 3px 8px rgba(0,0,0,.2);font-size:clamp(17px,3.6vw,36px);line-height:1;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease,opacity .2s ease}.gem:disabled{opacity:1}.gem:hover:not(:disabled){filter:brightness(1.15);transform:scale(1.04)}.gem.selected{z-index:3;transform:scale(1.08);box-shadow:0 0 0 3px #fff3c9,0 0 20px #ffde91}.gem.hinted{z-index:3;animation:hint .78s ease-in-out infinite alternate;box-shadow:0 0 0 3px #fff2c0,0 0 22px #f9d985}.gem.dragging,.gem.drag-peer{transform:translate(var(--drag-x,0),var(--drag-y,0));will-change:transform}.gem.dragging{z-index:6;cursor:grabbing;filter:brightness(1.18);box-shadow:inset 0 -5px 0 rgba(0,0,0,.12),0 10px 22px rgba(0,0,0,.36),0 0 0 2px rgba(255,243,201,.72);transition:none}.gem.drag-peer{z-index:5;filter:brightness(1.08);transition:transform .06s linear,filter .12s ease}.gem.drag-committing,.gem.drag-returning{transform:translate(var(--drag-x,0),var(--drag-y,0));will-change:transform}.gem.drag-committing{z-index:6;filter:brightness(1.12);transition:transform .18s cubic-bezier(.22,.72,.25,1),filter .18s ease}.gem.drag-returning{z-index:6;transition:transform .16s cubic-bezier(.22,.72,.25,1)}.gem.falling{z-index:2;animation:fall var(--fall-ms,280ms) cubic-bezier(.18,.78,.3,1) both;will-change:transform}.gem.clearing{z-index:5;animation:clear .24s ease-in both;will-change:transform,opacity}.gem.shaking{animation:shake .28s ease}.gem[data-kind="0"]{color:#ffe0e3;background:#d84e69}.gem[data-kind="1"]{color:#d8f8ff;background:#2b9bc1}.gem[data-kind="2"]{color:#fff0b8;background:#d6a933}.gem[data-kind="3"]{color:#eee1ff;background:#8b66c8}.gem[data-kind="4"]{color:#e4ffd5;background:#57a665}.gem[data-kind="5"]{color:#fff0df;background:#d7774f}
+    .board-frame{position:relative;width:100%;max-width:720px}.grid{--grid-gap:clamp(3px,.65vw,6px);--grid-pad:clamp(7px,1.2vw,12px);position:relative;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:var(--grid-gap);width:100%;aspect-ratio:9/8;padding:var(--grid-pad);border:1px solid #4e777b;border-radius:8px;background:#0a2c33;box-shadow:0 24px 55px rgba(0,0,0,.25);touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}.slot-layer{position:absolute;inset:var(--grid-pad);z-index:0;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));gap:var(--grid-gap);pointer-events:none}.slot{min-width:0;min-height:0;border:1px solid rgba(148,195,199,.16);border-radius:8px;background:rgba(2,24,29,.58);box-shadow:inset 0 2px 8px rgba(0,0,0,.22)}.gem{position:relative;z-index:1;display:grid;place-items:center;min-width:0;min-height:0;padding:0;border:1px solid rgba(255,255,255,.2);border-radius:8px;box-shadow:inset 0 -5px 0 rgba(0,0,0,.17),0 3px 8px rgba(0,0,0,.2);font-size:clamp(17px,3.6vw,36px);line-height:1;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease,opacity .2s ease}.gem:disabled{opacity:1}.gem:hover:not(:disabled){filter:brightness(1.15);transform:scale(1.04)}.gem.selected{z-index:3;transform:scale(1.08);box-shadow:0 0 0 3px #fff3c9,0 0 20px #ffde91}.gem.hinted{z-index:3;animation:hint .78s ease-in-out infinite alternate;box-shadow:0 0 0 3px #fff2c0,0 0 22px #f9d985}.grid .gem.dragging,.grid .gem.drag-peer{transform:translate(var(--drag-x,0),var(--drag-y,0));will-change:transform}.gem.dragging{z-index:6;cursor:grabbing;filter:brightness(1.18);box-shadow:inset 0 -5px 0 rgba(0,0,0,.12),0 10px 22px rgba(0,0,0,.36),0 0 0 2px rgba(255,243,201,.72);transition:none}.gem.drag-peer{z-index:5;filter:brightness(1.08);transition:transform .06s linear,filter .12s ease}.grid .gem.drag-committing,.grid .gem.drag-returning{z-index:6;transform:translate(var(--drag-x,0),var(--drag-y,0));transition:none;will-change:transform}.gem.drag-committing{filter:brightness(1.12)}.gem.falling{z-index:2;animation:fall var(--fall-ms,280ms) cubic-bezier(.18,.78,.3,1) both;will-change:transform}.gem.clearing{z-index:5;animation:clear .24s ease-in both;will-change:transform,opacity}.gem.shaking{animation:shake .28s ease}.gem[data-kind="0"]{color:#ffe0e3;background:#d84e69}.gem[data-kind="1"]{color:#d8f8ff;background:#2b9bc1}.gem[data-kind="2"]{color:#fff0b8;background:#d6a933}.gem[data-kind="3"]{color:#eee1ff;background:#8b66c8}.gem[data-kind="4"]{color:#e4ffd5;background:#57a665}.gem[data-kind="5"]{color:#fff0df;background:#d7774f}
     .message{min-height:48px;margin:13px 2px 0;color:#d7e3e4;font-size:.88rem;line-height:1.55}.message.success{color:#b8efd6}.message.error{color:#ffc2aa}.tools{display:flex;flex-wrap:wrap;gap:9px}.tool{min-height:42px;padding:0 15px;border:1px solid rgba(241,203,131,.62);border-radius:8px;background:rgba(241,203,131,.08);color:#f7d99d;font-weight:800}.tool:hover:not(:disabled){background:rgba(241,203,131,.17)}.tool.primary{color:#202b2b;background:#f1cb83}.tool.danger{margin-left:auto;border-color:rgba(255,174,145,.55);color:#ffc2aa}
     .score-guide{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:18px}.score-rule{padding:9px 8px;border-top:1px solid var(--line);color:var(--muted);font-size:.74rem}.score-rule strong{display:block;margin-bottom:3px;color:#fff1c9;font-size:.92rem}
     .leaderboard{min-width:0;padding-left:22px;border-left:1px solid var(--line)}.leaderboard-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.leaderboard h2{margin:0;font-size:1.25rem}.leaderboard small{display:block;margin-top:4px;color:var(--muted)}.icon-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid rgba(241,203,131,.55);border-radius:8px;background:transparent;color:var(--gold);font-size:1.3rem}.mine{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:17px 0;padding-bottom:15px;border-bottom:1px solid var(--line);color:var(--muted);font-size:.76rem}.mine strong{display:block;margin-top:6px;color:#f8d995;font-size:1.1rem}.ranking{margin:0;padding:0;list-style:none}.ranking li{display:grid;grid-template-columns:28px minmax(0,1fr) 6ch;align-items:center;gap:7px;min-height:40px;border-bottom:1px solid rgba(255,255,255,.08);font-size:.84rem}.ranking .place{color:#95b1b4}.ranking li:nth-child(-n+3) .place{color:var(--gold);font-weight:900}.ranking .name{overflow-wrap:anywhere}.ranking .points{text-align:right;font-weight:850;font-variant-numeric:tabular-nums}.ranking-status{min-height:22px;margin:12px 0;color:var(--muted);font-size:.8rem}.ranking-status.error{color:#ffc2aa}
@@ -225,6 +225,31 @@
       tile.style.setProperty('--drag-y', `${y}px`);
     }
 
+    function setSwapProgress(a, b, progress, vector = motionVector(a, b)) {
+      const path = rules.swapPath(vector, progress, b);
+      setMotion(tiles[a], path.source.x, path.source.y);
+      setMotion(tiles[b], path.peer.x, path.peer.y);
+    }
+
+    function animateProgress(from, to, duration, update) {
+      if (from === to || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        update(to);
+        return Promise.resolve();
+      }
+      return new Promise(resolve => {
+        let startedAt;
+        function step(timestamp) {
+          if (startedAt === undefined) startedAt = timestamp;
+          const elapsed = Math.min(1, (timestamp - startedAt) / duration);
+          const eased = 1 - ((1 - elapsed) ** 3);
+          update(from + (to - from) * eased);
+          if (elapsed < 1) requestAnimationFrame(step);
+          else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
     function clearMotion(index) {
       const tile = tiles[index];
       if (!tile) return;
@@ -236,11 +261,12 @@
 
     function restoreDragMotion(motion, className) {
       if (!motion) return;
-      setMotion(tiles[motion.from], motion.x, motion.y);
+      const paired = motion.target >= 0 && Number.isFinite(motion.progress);
+      if (paired) setSwapProgress(motion.from, motion.target, motion.progress);
+      else setMotion(tiles[motion.from], motion.x, motion.y);
       tiles[motion.from].classList.add(className);
       tiles[motion.from].setAttribute('aria-grabbed', 'true');
       if (motion.target >= 0) {
-        setMotion(tiles[motion.target], -motion.x, -motion.y);
         tiles[motion.target].classList.add(className);
       }
     }
@@ -251,9 +277,16 @@
       render();
       restoreDragMotion(motion, 'drag-returning');
       await nextFrame();
-      setMotion(tiles[motion.from], 0, 0);
-      if (motion.target >= 0) setMotion(tiles[motion.target], 0, 0);
-      await wait(170);
+      if (motion.target >= 0 && Number.isFinite(motion.progress)) {
+        const vector = motionVector(motion.from, motion.target);
+        await animateProgress(motion.progress, 0, 160, progress => {
+          setSwapProgress(motion.from, motion.target, progress, vector);
+        });
+      } else {
+        await animateProgress(0, 1, 160, progress => {
+          setMotion(tiles[motion.from], motion.x * (1 - progress), motion.y * (1 - progress));
+        });
+      }
       clearMotion(motion.from);
       clearMotion(motion.target);
       busy = false;
@@ -266,13 +299,13 @@
 
     async function animateSwap(a, b, motion) {
       const vector = motionVector(a, b);
-      const start = motion?.target === b ? motion : { from: a, target: b, x: 0, y: 0 };
+      const start = motion?.target === b ? motion : { from: a, target: b, x: 0, y: 0, progress: 0 };
       render();
       restoreDragMotion(start, 'drag-committing');
       await nextFrame();
-      setMotion(tiles[a], vector.x, vector.y);
-      setMotion(tiles[b], -vector.x, -vector.y);
-      await wait(190);
+      await animateProgress(start.progress, 1, Math.max(80, 190 * (1 - start.progress)), progress => {
+        setSwapProgress(a, b, progress, vector);
+      });
       clearMotion(a);
       clearMotion(b);
     }
@@ -428,6 +461,7 @@
         dragX: 0,
         dragY: 0,
         distance: 0,
+        progress: 0,
         dragged: false,
       } : null;
       if (pointerStart) {
@@ -463,6 +497,7 @@
         drag.dragX = horizontal ? resistance : 0;
         drag.dragY = horizontal ? 0 : resistance;
         drag.distance = Math.abs(resistance);
+        drag.progress = 0;
         setMotion(source, drag.dragX, drag.dragY);
         return;
       }
@@ -474,9 +509,9 @@
       drag.dragX = vector.x * progress;
       drag.dragY = vector.y * progress;
       drag.distance = distance;
-      setMotion(source, drag.dragX, drag.dragY);
+      drag.progress = progress;
+      setSwapProgress(drag.index, target, progress, vector);
       const peer = tiles[target];
-      setMotion(peer, -drag.dragX, -drag.dragY);
       peer.classList.add('drag-peer');
     });
     grid.addEventListener('pointerup', event => {
@@ -489,7 +524,7 @@
       }
       event.preventDefault();
       lastSwipe = { at: performance.now(), from: drag.index };
-      const motion = { from: drag.index, target: drag.target, x: drag.dragX, y: drag.dragY };
+      const motion = { from: drag.index, target: drag.target, x: drag.dragX, y: drag.dragY, progress: drag.progress };
       const travelled = Math.hypot(drag.dragX, drag.dragY);
       const threshold = Math.max(12, Math.min(24, drag.distance * .28));
       if (drag.target >= 0 && travelled >= threshold) trySwap(drag.index, drag.target, motion);
@@ -506,7 +541,7 @@
       if (!drag.dragged) { clearMotion(drag.index); return; }
       selected = -1;
       hinted = [];
-      returnDrag({ from: drag.index, target: drag.target, x: drag.dragX, y: drag.dragY });
+      returnDrag({ from: drag.index, target: drag.target, x: drag.dragX, y: drag.dragY, progress: drag.progress });
     }
     grid.addEventListener('pointercancel', cancelActiveDrag);
     grid.addEventListener('lostpointercapture', cancelActiveDrag);

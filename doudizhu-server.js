@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const net = require('node:net');
 
 const BID_MS = Number(process.env.DOUDIZHU_BID_MS || 15_000);
-const PLAY_MS = Number(process.env.DOUDIZHU_PLAY_MS || 20_000);
+const PLAY_MS = Number(process.env.DOUDIZHU_PLAY_MS || 30_000);
 const AI_MS = Number(process.env.DOUDIZHU_AI_MS || 650);
 const PRESENCE_MS = 10_000;
 const MAX_ROOMS = 100;
@@ -796,22 +796,70 @@ function scoreAiMove(room, player, move, context) {
   return score;
 }
 
-function chooseAiPlay(room, player) {
+function rankedLegalPlays(room, player) {
   const previous = room.lastPlay?.pattern || null;
   const moves = legalAiMoves(player.hand, previous);
-  if (!moves.length) return null;
+  if (!moves.length) return [];
   const context = aiPublicContext(room, player);
-  if (previous && context.previousIsTeammate) {
-    // Keep a farmer teammate's initiative unless the landlord is about to go out.
-    if (context.opponentMin > 2) return null;
-  }
-  const ranked = moves.map((move) => ({ move, score: scoreAiMove(room, player, move, context) }));
+  const seen = new Set();
+  const ranked = moves
+    .filter((move) => {
+      const signature = [...move.ids].sort((a, b) => a - b).join(',');
+      if (seen.has(signature)) return false;
+      seen.add(signature);
+      return true;
+    })
+    .map((move) => ({ move, score: scoreAiMove(room, player, move, context) }));
+  const explosiveOrder = (move) => move.pattern.type === 'rocket' ? 2 : move.pattern.type === 'bomb' ? 1 : 0;
   ranked.sort((first, second) => (
-    first.score - second.score
+    explosiveOrder(first.move) - explosiveOrder(second.move)
+    || first.score - second.score
     || first.move.pattern.mainValue - second.move.pattern.mainValue
     || second.move.ids.length - first.move.ids.length
+    || first.move.ids.join(',').localeCompare(second.move.ids.join(','))
   ));
-  return ranked[0].move.ids;
+  return ranked.map(({ move }) => move);
+}
+
+function chooseAiPlay(room, player) {
+  const context = aiPublicContext(room, player);
+  if (room.lastPlay && context.previousIsTeammate && context.opponentMin > 2) {
+    // Keep a farmer teammate's initiative unless the landlord is about to go out.
+    return null;
+  }
+  return rankedLegalPlays(room, player)[0]?.ids || null;
+}
+
+function playHint(room, player) {
+  const candidates = rankedLegalPlays(room, player).map((move) => move.ids);
+  const context = aiPublicContext(room, player);
+  const teammateHasInitiative = !!room.lastPlay && context.previousIsTeammate && context.opponentMin > 2;
+  if (!candidates.length) {
+    return {
+      hintAction: 'pass',
+      hintCards: [],
+      hintCandidates: [],
+      hintMessage: room.lastPlay ? '没有大过上家的牌，建议不出。' : '当前没有可出的合法牌。',
+    };
+  }
+  if (teammateHasInitiative) {
+    return {
+      hintAction: 'pass',
+      hintCards: [],
+      hintCandidates: candidates,
+      hintMessage: '队友掌握牌权，建议不出并保留大牌；再次点击提示可查看能压住的牌。',
+    };
+  }
+
+  const cards = candidates[0];
+  const pattern = classifyCards(cards);
+  const explosive = pattern?.type === 'bomb' || pattern?.type === 'rocket';
+  let hintMessage = room.lastPlay
+    ? '已选中一组代价较小的压制牌。'
+    : '已选中一组有利于减少剩余手数的牌。';
+  if (context.opponentMin <= 2) hintMessage = '对手即将出完，已选中更有控制力的拦截牌。';
+  else if (explosive) hintMessage = '普通牌无法完成合适的压制，建议使用炸弹牌型。';
+  return { hintAction: 'play', hintCards: cards, hintCandidates: candidates, hintMessage };
 }
 
 function aiTakeTurn(room, player) {
@@ -963,6 +1011,10 @@ async function handleRequest(req, res, pathname, url) {
         } else if (body.action === 'bid') error = applyBid(room, player, body.score);
         else if (body.action === 'play') error = applyPlay(room, player, body.cards);
         else if (body.action === 'pass') error = applyPass(room, player);
+        else if (body.action === 'hint') {
+          if (room.phase !== 'playing' || room.currentTurnId !== player.id) error = '只有轮到你出牌时才能提示';
+          else return sendJson(res, 200, { ...state(room, player), ...playHint(room, player) });
+        }
         else error = '未知操作';
         if (error) return fail(res, 409, error);
         return sendJson(res, 200, state(room, player));
@@ -996,5 +1048,5 @@ setInterval(() => {
 module.exports = {
   handleRequest,
   liveRoomCount: () => rooms.size,
-  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, chooseAiPlay, finishRound, scheduleTurn, schedulePresenceUpdate },
+  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, chooseAiPlay, playHint, rankedLegalPlays, finishRound, scheduleTurn, schedulePresenceUpdate },
 };

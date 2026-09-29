@@ -2,6 +2,23 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Rules = require('../public/match3-rules.js');
 
+test('交换轨迹让两颗宝石同时移动且在中点保持可见', () => {
+  const vector = { x: 100, y: 0 };
+  const halfway = Rules.swapPath(vector, 0.5, 1);
+  const peerPosition = {
+    x: vector.x + halfway.peer.x,
+    y: vector.y + halfway.peer.y,
+  };
+  assert.deepEqual(halfway.source, { x: 50, y: 0 });
+  assert.equal(peerPosition.x, 50);
+  assert.ok(Math.abs(peerPosition.y - halfway.source.y) > 40, 'peer takes a separate curved lane');
+
+  const finished = Rules.swapPath(vector, 1, 1);
+  assert.deepEqual(finished.source, vector);
+  assert.ok(Math.abs(finished.peer.x + vector.x) < 1e-9);
+  assert.ok(Math.abs(finished.peer.y) < 1e-9);
+});
+
 test('随机棋盘没有预消除、颜色不分栏，并且始终至少有一步可走', () => {
   const colorsByColumn = Array.from({ length: Rules.COLS }, () => new Set());
   for (let seed = 0; seed < 300; seed += 1) {

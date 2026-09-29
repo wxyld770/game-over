@@ -138,13 +138,16 @@
     .table-indicators { display:flex; align-items:center; justify-content:flex-end; gap:9px; flex-wrap:wrap; }
     .role-summary,.timer { display:inline-flex; align-items:center; min-height:29px; padding:4px 10px; border:1px solid rgba(255,223,161,.34); border-radius:999px; background:rgba(5,37,30,.5); color:#ffe4ae; font-size:.74rem; font-weight:800; }
     .timer:empty { display:none; }
+    .timer.urgent { border-color:#ffad8f; color:#fff4e0; background:#8c3b31; animation:timerUrgent .8s ease-in-out infinite alternate; }
     .players { z-index:2; gap:14px; margin:26px 0 14px; }
     .player { position:relative; min-height:93px; padding:13px 15px; border-color:rgba(214,235,214,.19); border-radius:16px; background:linear-gradient(135deg,rgba(3,33,30,.74),rgba(7,51,41,.54)); box-shadow:inset 0 1px rgba(255,255,255,.07); transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease; }
     .player.landlord { border-color:rgba(255,211,126,.53); background:linear-gradient(135deg,rgba(91,61,20,.61),rgba(40,47,31,.69)); }
     .player.farmer { border-color:rgba(124,225,197,.3); }
     .player.me { box-shadow:inset 0 0 0 1px rgba(190,246,213,.18),inset 0 1px rgba(255,255,255,.1); }
     .player.active { transform:translateY(-4px); border-color:#ffdf9e; box-shadow:0 0 0 2px rgba(253,219,153,.24),0 0 28px rgba(252,199,97,.22),inset 0 1px rgba(255,255,255,.13); }
-    .player.active::after { content:"当前回合"; position:absolute; top:-11px; right:11px; padding:3px 7px; border-radius:999px; background:#f3ca80; color:#204035; font-size:.6rem; font-weight:900; box-shadow:0 3px 9px rgba(0,0,0,.2); }
+    .player.active::after { content:"当前回合"; position:absolute; top:-11px; left:11px; padding:3px 7px; border-radius:999px; background:#f3ca80; color:#204035; font-size:.6rem; font-weight:900; box-shadow:0 3px 9px rgba(0,0,0,.2); }
+    .seat-turn-timer { position:absolute; top:-12px; right:11px; min-width:48px; padding:3px 8px; border:1px solid rgba(255,224,164,.65); border-radius:999px; color:#ffebbd; background:#315e4d; box-shadow:0 3px 9px rgba(0,0,0,.23); font-size:.65rem; font-weight:950; font-variant-numeric:tabular-nums; text-align:center; }
+    .seat-turn-timer.urgent { border-color:#ffc0aa; color:#fff8e9; background:#943f33; animation:timerUrgent .8s ease-in-out infinite alternate; }
     .player-name { font-size:.95rem; }
     .badge { border-radius:999px; padding:3px 7px; font-weight:800; }
     .badge.role-landlord { color:#2a382e; background:#f2c572; border-color:#f2c572; }
@@ -217,8 +220,9 @@
     @keyframes dealCard { from { opacity:0; transform:translateY(40px) rotate(-10deg) scale(.89); } to { opacity:1; transform:translateY(var(--arc,0px)) rotate(var(--tilt,0deg)) scale(1); } }
     @keyframes playedIn { from { opacity:0; transform:translateY(30px) scale(.86); } to { opacity:1; transform:translateY(0) scale(1); } }
     @keyframes resultIn { from { opacity:0; transform:translateY(18px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes timerUrgent { to { filter:brightness(1.2); } }
     @media (max-width:960px) { .hero-visual { right:30px; opacity:.43; } .table { padding:22px 20px 17px; } .card { width:70px; height:104px; } .card + .card { margin-left:-31px; } .card-center { font-size:2.4rem; } .hand { height:143px; } }
-    @media (max-width:720px) { .shell { padding:14px 13px 45px; } .hero { min-height:150px; padding:24px 0 22px; } .hero-visual { right:5px; top:13px; transform:scale(.72); transform-origin:top right; opacity:.27; } .hero p { font-size:.86rem; } .setup .panel { min-height:0; } .table { min-height:405px; padding:19px 14px 16px; } .table::before { inset:8px; } .players { gap:6px; margin:24px 0 14px; } .player { min-height:86px; padding:10px 8px; } .player-name { font-size:.77rem; } .player-meta { margin-top:10px; font-size:.67rem; line-height:1.4; } .player.active::after { top:-10px; right:1px; font-size:.53rem; } .center { min-height:151px; } .my-hand-panel { padding:17px 14px 20px; } .card { width:66px; height:99px; } .card + .card { margin-left:-34px; } .card-index { font-size:1.12rem; } .card-center { font-size:2.2rem; } .hand { height:139px; justify-content:flex-start; } .hand-viewport { min-height:146px; } .actions .btn { min-width:87px; } }
+    @media (max-width:720px) { .shell { padding:14px 13px 45px; } .hero { min-height:150px; padding:24px 0 22px; } .hero-visual { right:5px; top:13px; transform:scale(.72); transform-origin:top right; opacity:.27; } .hero p { font-size:.86rem; } .setup .panel { min-height:0; } .table { min-height:405px; padding:19px 14px 16px; } .table::before { inset:8px; } .players { gap:6px; margin:24px 0 14px; } .player { min-height:86px; padding:10px 8px; } .player-name { font-size:.77rem; } .player-meta { margin-top:10px; font-size:.67rem; line-height:1.4; } .player.active::after { top:-10px; left:3px; font-size:.53rem; } .seat-turn-timer { top:-11px; right:3px; min-width:43px; padding:3px 6px; font-size:.58rem; } .center { min-height:151px; } .my-hand-panel { padding:17px 14px 20px; } .card { width:66px; height:99px; } .card + .card { margin-left:-34px; } .card-index { font-size:1.12rem; } .card-center { font-size:2.2rem; } .hand { height:139px; justify-content:flex-start; } .hand-viewport { min-height:146px; } .actions .btn { min-width:87px; } }
     @media (max-width:430px) { .shell { padding:11px 9px 36px; } .brand { font-size:.61rem; } .hero { min-height:139px; } h1 { font-size:3.1rem; } .table { padding:18px 11px 15px; } .table-kicker { display:none; } .table-head h2 { font-size:1.1rem; } .role-summary,.timer { min-height:25px; padding:3px 7px; font-size:.64rem; } .players { gap:5px; } .player { min-height:83px; padding:9px 5px; } .player-name { gap:3px; font-size:.72rem; } .badge { padding:2px 5px; font-size:.58rem; } .player-meta { font-size:.62rem; } .center-message { font-size:.79rem; } .hand-head { gap:4px; } .hand-head h2 { font-size:1rem; } .hand-meta { gap:4px; } .hand-meta span { display:none; } .hand-meta strong { font-size:.67rem; } .card { width:63px; height:94px; padding:5px 6px; } .card + .card { margin-left:-35px; } .card-center { font-size:2.03rem; } .hand { height:132px; padding-left:13px; padding-right:13px; } .hand-viewport { min-height:137px; } .hand-rail { font-size:.66rem; } .actions .btn { min-width:76px; padding:0 11px; } }
     /* Each player's seat belongs to a corner of the table from this viewer's perspective. */
     .table { min-height:0; }
@@ -313,9 +317,52 @@
     </main>
   </div>
   <script>
+    (function (root, factory) {
+      'use strict';
+      if (typeof module === 'object' && module.exports) module.exports = factory();
+      else root.DoudizhuHints = factory();
+    }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+      'use strict';
+      function createCycle(key, candidates, passFirst, message) {
+        const seen = new Set();
+        const unique = [];
+        for (const cards of candidates || []) {
+          if (!Array.isArray(cards) || !cards.length) continue;
+          const normalized = [...cards].sort((a, b) => a - b);
+          const signature = normalized.join(',');
+          if (seen.has(signature)) continue;
+          seen.add(signature);
+          unique.push(normalized);
+        }
+        return { key, candidates: unique, index: 0, passPending: !!passFirst, message: String(message || '') };
+      }
+      function next(cycle) {
+        if (!cycle) return null;
+        if (cycle.passPending) {
+          cycle.passPending = false;
+          return { action: 'pass', cards: [], message: cycle.message, position: 0, total: cycle.candidates.length };
+        }
+        if (!cycle.candidates.length) {
+          return { action: 'none', cards: [], message: cycle.message, position: 0, total: 0 };
+        }
+        const index = cycle.index % cycle.candidates.length;
+        cycle.index = (index + 1) % cycle.candidates.length;
+        return {
+          action: 'play',
+          cards: [...cycle.candidates[index]],
+          message: cycle.message,
+          position: index + 1,
+          total: cycle.candidates.length,
+        };
+      }
+      return Object.freeze({ createCycle, next });
+    }));
+  </script>
+  <script>
     (() => {
       'use strict';
       const $ = (id) => document.getElementById(id);
+      const hintRules = globalThis.DoudizhuHints;
       const apiRoot = '/api/doudizhu/rooms';
       const sessionsKey = 'doudizhu:sessions';
       const chosen = new Set();
@@ -335,6 +382,7 @@
       let dragFrame = 0;
       let lastPointerActivation = { id: '', time: 0 };
       let effectTimer = null;
+      let hintCycle = null;
 
       function storeSession(code, value) {
         try {
@@ -368,6 +416,14 @@
       const post = (path, data) => request(path, { method: 'POST', body: JSON.stringify(data) });
       const roomPath = (suffix) => `${apiRoot}/${roomCode}/${suffix}`;
       const turnName = (id) => state?.players.find((player) => player.id === id)?.name || '玩家';
+      function hintStateKey(snapshot = state) {
+        if (!snapshot) return '';
+        const hand = (snapshot.hand || []).map((card) => card.id).sort((a, b) => a - b).join(',');
+        const last = snapshot.lastPlay
+          ? `${snapshot.lastPlay.playerId}:${(snapshot.lastPlay.cards || []).map((card) => card.id).sort((a, b) => a - b).join(',')}`
+          : '-';
+        return `${snapshot.phase}|${snapshot.currentTurnId || '-'}|${snapshot.deadlineAt || '-'}|${hand}|${last}`;
+      }
       const cardText = (card) => {
         if (!card) return '';
         if (typeof card !== 'object') return '?';
@@ -635,13 +691,14 @@
           }
         }
         if (state.canPlay) {
+          if (state.canPass) actions.push(actionButton('不出', () => sendAction('pass'), 'secondary'));
+          actions.push(actionButton('✦ 提示', requestPlayHint, 'secondary'));
           actions.push(actionButton('出牌', () => {
             if (!chosen.size) { showError('请先点选要出的牌。', true); return; }
             sendAction('play', { cards: [...chosen] });
           }));
           actions.push(actionButton('清空选择', () => { chosen.clear(); renderHand(); renderActions(); }, 'secondary', !chosen.size));
         }
-        if (state.canPass) actions.push(actionButton('过牌', () => sendAction('pass'), 'secondary'));
         $('actions').replaceChildren(...actions);
       }
       function renderPlayers() {
@@ -702,6 +759,13 @@
           countLabel.textContent = cardCount ? '剩余张数' : '已出完';
           count.append(countNumber, countLabel);
           item.append(avatar, name, meta, count);
+          if (player.id === state.currentTurnId && state.phase === 'playing') {
+            const turnTimer = document.createElement('span');
+            turnTimer.className = 'seat-turn-timer';
+            turnTimer.dataset.turnTimer = '';
+            turnTimer.setAttribute('aria-label', `${player.name} 的出牌倒计时`);
+            item.append(turnTimer);
+          }
           return item;
         });
         for (const seat of ['left', 'right']) {
@@ -802,16 +866,27 @@
         $('again').hidden = !state.canStart;
       }
       function renderTimer() {
+        const seatTimers = document.querySelectorAll('[data-turn-timer]');
         if (!state || !state.deadlineAt || !['bidding', 'playing'].includes(state.phase)) {
           $('timer').textContent = '';
           $('mobileTimer').textContent = '';
+          $('timer').classList.remove('urgent');
+          $('mobileTimer').classList.remove('urgent');
+          for (const timer of seatTimers) timer.textContent = '';
           return;
         }
         let deadline = typeof state.deadlineAt === 'number' ? state.deadlineAt : Date.parse(state.deadlineAt);
         if (deadline < 1e12) deadline *= 1000;
         const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-        $('timer').textContent = `剩余 ${seconds} 秒`;
+        $('timer').textContent = `${turnName(state.currentTurnId)} · ${seconds} 秒`;
         $('mobileTimer').textContent = $('timer').textContent;
+        const urgent = seconds <= 5;
+        $('timer').classList.toggle('urgent', urgent);
+        $('mobileTimer').classList.toggle('urgent', urgent);
+        for (const timer of seatTimers) {
+          timer.textContent = `${seconds} 秒`;
+          timer.classList.toggle('urgent', urgent);
+        }
       }
       function render() {
         if (!state) return;
@@ -841,8 +916,10 @@
         if (signature === lastRenderedSignature) return;
         lastRenderedSignature = signature;
         const previousPhase = state?.phase;
+        const previousHintKey = hintStateKey(state);
         const wasMyTurn = state && ['bidding', 'playing'].includes(state.phase) && state.currentTurnId === state.selfId;
         state = nextState;
+        if (previousHintKey !== hintStateKey(nextState)) hintCycle = null;
         if (previousPhase !== nextState.phase) {
           chosen.clear();
           showError('', true);
@@ -908,6 +985,7 @@
         chosen.clear();
         previousHandIds.clear();
         lastPlaySignature = '';
+        hintCycle = null;
         if (effectTimer) clearTimeout(effectTimer);
         effectTimer = null;
         $('playEffect').hidden = true;
@@ -932,6 +1010,55 @@
           if (action === 'play') chosen.clear();
         } catch (error) { showError(error.message, true); }
         finally { pending = false; if (state) { renderHand(); renderActions(); } }
+      }
+      function showNextPlayHint() {
+        if (!hintCycle || hintCycle.key !== hintStateKey()) return;
+        const step = hintRules.next(hintCycle);
+        if (!step) return;
+        chosen.clear();
+        if (step.action === 'pass') {
+          syncSelection();
+          showError(step.message, true);
+          return;
+        }
+        if (step.action === 'none') {
+          syncSelection();
+          showError(step.message || '没有大过上家的牌，建议不出。', true);
+          return;
+        }
+        const held = new Set((state.hand || []).map((card) => card.id));
+        for (const id of step.cards) if (held.has(id)) chosen.add(id);
+        syncSelection();
+        showError(`${step.message}（方案 ${step.position}/${step.total}，再次点击可切换）`, true);
+      }
+      async function requestPlayHint() {
+        if (pending || !state?.canPlay) return;
+        const key = hintStateKey();
+        if (hintCycle?.key === key) {
+          showNextPlayHint();
+          return;
+        }
+        pending = true;
+        showError('正在分析当前牌面…', true);
+        renderActions();
+        try {
+          const result = await post(roomPath('action'), { token, action: 'hint' });
+          const serverState = { ...result };
+          delete serverState.hintAction;
+          delete serverState.hintCards;
+          delete serverState.hintCandidates;
+          delete serverState.hintMessage;
+          if (serverState.code === roomCode && serverState.players) receive(serverState);
+          const held = new Set((state?.hand || []).map((card) => card.id));
+          const candidates = (result.hintCandidates || []).filter((cards) => {
+            return Array.isArray(cards) && cards.length && cards.every((id) => held.has(id));
+          });
+          const message = result.hintMessage
+            || (candidates.length ? '已选中建议牌。' : '没有大过上家的牌，建议不出。');
+          hintCycle = hintRules.createCycle(hintStateKey(), candidates, result.hintAction === 'pass', message);
+          showNextPlayHint();
+        } catch (error) { showError(error.message, true); }
+        finally { pending = false; if (state) renderActions(); }
       }
       async function create(mode) {
         $('setupError').textContent = '';

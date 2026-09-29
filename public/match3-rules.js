@@ -34,6 +34,25 @@
       && Math.abs(row(a) - row(b)) + Math.abs(col(a) - col(b)) === 1;
   }
 
+  function swapPath(vector, progress, target) {
+    const x = Number(vector?.x) || 0;
+    const y = Number(vector?.y) || 0;
+    const amount = Math.max(0, Math.min(1, Number(progress) || 0));
+    const distance = Math.hypot(x, y);
+    const bend = distance * 0.46 * Math.sin(Math.PI * amount);
+    let bendX = 0;
+    let bendY = 0;
+    if (Math.abs(x) >= Math.abs(y)) {
+      bendY = (row(target) < ROWS / 2 ? 1 : -1) * bend;
+    } else {
+      bendX = (col(target) < COLS / 2 ? 1 : -1) * bend;
+    }
+    return {
+      source: { x: x * amount, y: y * amount },
+      peer: { x: -x * amount + bendX, y: -y * amount + bendY },
+    };
+  }
+
   function matchRuns(board) {
     const runs = [];
     for (let r = 0; r < ROWS; r += 1) {
@@ -302,6 +321,7 @@
     MAX_SCORE,
     MIN_MOVE_MS,
     adjacent,
+    swapPath,
     matchRuns,
     matchGroups,
     findMoves,

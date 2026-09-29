@@ -21,6 +21,7 @@
       --card-h: 102px;
       --up-step: 31px;
       --down-step: 13px;
+      --board-min-h: 440px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     * { box-sizing: border-box; }
@@ -95,10 +96,10 @@
       grid-template-columns: repeat(10,minmax(0,1fr));
       gap: clamp(7px, .8vw, 15px);
       min-width: 790px;
-      min-height: 440px;
-      align-items: start;
+      min-height: var(--board-min-h);
+      align-items: stretch;
     }
-    .column { position: relative; min-width: 0; border-radius: 8px; cursor: pointer; }
+    .column { position: relative; min-width: 0; min-height: var(--board-min-h); border-radius: 8px; cursor: pointer; }
     .column::before { content: ""; position: absolute; inset: 24px 0 auto; height: var(--card-h); border: 1px dashed rgba(230,220,167,.28); border-radius: 8px; }
     .column.is-valid-target::before { border: 2px solid #f3d585; background: rgba(245,211,130,.08); }
     .column.is-drag-target::before { background: rgba(245,211,130,.22); }
@@ -195,7 +196,7 @@
       .side-panel:last-child { grid-column: 1 / -1; }
     }
     @media (max-width: 650px) {
-      :root { --card-h: 86px; --up-step: 28px; --down-step: 11px; }
+      :root { --card-h: 86px; --up-step: 28px; --down-step: 11px; --board-min-h: 365px; }
       .topbar { min-height: 68px; }
       .brand { font-size: .9rem; }
       .intro { display: block; padding-top: 20px; }
@@ -208,7 +209,7 @@
       .stat strong { font-size: 1.13rem; }
       .table { min-height: 495px; padding: 12px 9px; }
       .table-head { padding-bottom: 10px; }
-      .board { min-width: 680px; min-height: 365px; }
+      .board { min-width: 680px; }
       .card-corner { font-size: 15px; }
       .card-center { font-size: 25px; }
       .side { grid-template-columns: 1fr; }
@@ -261,7 +262,7 @@
             </section>
           </div>
           <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
-          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示会从多条可完整收完的路线中给出下一步。</p>
+          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；偏离初始解法后，提示仍会按当前牌面给出不重复的下一步。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
@@ -615,7 +616,12 @@
       function stateKey(state) {
         const columns = state.cols.map(col => col.map(card => (card.up ? "u" : "d") + card.r.toString(36)).join(","));
         columns.sort();
-        return state.completed + ":" + columns.join("|");
+        return state.completed + ":" + (state.stock || []).join(",") + ":" + columns.join("|");
+      }
+
+      function nonRepeatingMoves(state, recentStates, options) {
+        const recent = new Set((recentStates || []).map(stateKey));
+        return analyze(state, options).moves.filter(move => !recent.has(stateKey(applyMove(state, move))));
       }
 
       function transitionBonus(before, after) {
@@ -729,6 +735,8 @@
         readyCertificateActions,
         advanceCertificate,
         analyze,
+        stateKey,
+        nonRepeatingMoves,
         openingQuality,
         planDeal
       });
@@ -853,15 +861,27 @@
         clearHint();
         renderBoard();
       }
+
+      function presentMoveHint(move, suffix) {
+        selected = { col: move.fromCol, index: move.fromIndex };
+        hint = move;
+        renderBoard();
+        const viewport = board.parentElement;
+        const column = board.querySelector('.column[data-col="' + move.fromCol + '"]');
+        if (column && viewport.scrollTo) {
+          viewport.scrollTo({
+            left: Math.max(0, column.offsetLeft - viewport.clientWidth / 2 + column.clientWidth / 2),
+            behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+          });
+        }
+        announce("提示：第 " + (move.fromCol + 1) + " 列的 " + move.count +
+          " 张牌 → 第 " + (move.toCol + 1) + " 列。" + (suffix || ""));
+        hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
+      }
+
       function showHint() {
         if (game.completed === TARGET_RUNS) return;
         clearHint();
-        if (!game.certificate.valid) {
-          selected = null;
-          renderBoard();
-          announce("建议撤销最近的自由移动，回到可以完整收完的路线。");
-          return;
-        }
         const actions = SpiderPlanner.readyCertificateActions(game, game.certificate);
         if (actions.length) {
           const action = actions[hintCursor % actions.length];
@@ -874,25 +894,30 @@
             hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
             return;
           }
-          const move = action;
-          selected = { col: move.fromCol, index: move.fromIndex };
-          hint = move;
-          renderBoard();
-          const viewport = board.parentElement;
-          const column = board.querySelector('.column[data-col="' + move.fromCol + '"]');
-          if (column && viewport.scrollTo) {
-            viewport.scrollTo({
-              left: Math.max(0, column.offsetLeft - viewport.clientWidth / 2 + column.clientWidth / 2),
-              behavior: window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
-            });
-          }
-          announce("提示：第 " + (move.fromCol + 1) + " 列的 " + move.count +
-            " 张牌 → 第 " + (move.toCol + 1) + " 列。" +
-            (actions.length > 1 ? "还有其他顺序也可以完整收完。" : ""));
-          hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
-        } else {
-          announce("当前路线无法继续，请撤销最近一步。");
+          presentMoveHint(action, actions.length > 1 ? "还有其他顺序也可以完整收完。" : "");
+          return;
         }
+
+        const candidates = SpiderPlanner.nonRepeatingMoves(game, history.slice(-8), {
+          depth: 4,
+          breadth: 28,
+          nodeLimit: 3600
+        });
+        if (candidates.length) {
+          presentMoveHint(candidates[0], "已避开最近走过的牌面。");
+          return;
+        }
+        if (game.stock.length && game.cols.every(col => col.length)) {
+          selected = null;
+          renderBoard();
+          dealButton.classList.add("hint-deal");
+          announce("当前没有不重复的整理步骤，建议从底牌发下一轮。");
+          hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
+          return;
+        }
+        selected = null;
+        renderBoard();
+        announce("当前没有不重复的安全移动，建议撤销最近一步。");
       }
       function clearCelebration() {
         clearTimeout(celebrationTimer);
@@ -1102,7 +1127,15 @@
       function columnAtPoint(x, y) {
         const element = document.elementFromPoint(x, y);
         const column = element && element.closest(".column");
-        return column && board.contains(column) ? Number(column.dataset.col) : -1;
+        if (column && board.contains(column)) return Number(column.dataset.col);
+        const boardRect = board.getBoundingClientRect();
+        if (x < boardRect.left || x > boardRect.right || y < boardRect.top || y > boardRect.bottom) return -1;
+        const columns = [...board.querySelectorAll(".column")];
+        for (const candidate of columns) {
+          const rect = candidate.getBoundingClientRect();
+          if (x >= rect.left && x <= rect.right) return Number(candidate.dataset.col);
+        }
+        return -1;
       }
 
       function positionDragPreview() {
