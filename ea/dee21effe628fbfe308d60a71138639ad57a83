@@ -1,0 +1,47 @@
+test/pages.test.js
+  s_168e1bfdeccdef::t_859ffff1001929 74,82-85
+  s_168e1bfdeccdef::t_925f2ea4a4aba0 43-49,54-61,89
+  s_168e1bfdeccdef::t_0732247729cea4 52-53,62-63,70-72,76-77
+  s_168e1bfdeccdef::t_f093917d62b879 64-69,73,75,78-81,86-88
+  s_168e1bfdeccdef::t_2a53f40f585f4d 50-51
+doudizhu-server.js
+  s_168e1bfdeccdef::t_0607075f9f186f 729
+  s_168e1bfdeccdef::t_686953d56013c0 12-13,87,117-118,226,228-229,269,295-324,950,1066-1069,1093,1108
+  s_168e1bfdeccdef::t_0732247729cea4 227
+  s_168e1bfdeccdef::t_f9de55c5c56e03 253,393-394,620,626,629,633,637-649,688-689,696-697
+public/games/doudizhu.html
+  s_168e1bfdeccdef::t_aeebaed539fec5 247,249-252,284-287,289-301,303-309,318-322,326,328,340,366,373
+  s_168e1bfdeccdef::t_c8e41dc90aa307 888,895-896
+  s_168e1bfdeccdef::t_d4cffbbf034f00 149,220-226,239,243-245,270,272,276-277,362-363,369
+  s_168e1bfdeccdef::t_898fb94e809a6e 427-436,451,455
+  s_168e1bfdeccdef::t_a00ea24d7ef48f 454,1112,1115-1117,1122,1197
+  s_168e1bfdeccdef::t_fc7d2b5fe9de69 780,858,862-863,981-992,1027-1029,1040-1045,1055-1058,1064-1066,1072
+  s_168e1bfdeccdef::t_29c698c102e6d1 1108,1110-1111,1113,1137,1194,1201-1202,1205-1206
+  s_168e1bfdeccdef::t_29ea895ae7a9c8 264-268,271,273-275,278,330,370
+  s_168e1bfdeccdef::t_2a53f40f585f4d 236,240-241,269,279,331
+  s_168e1bfdeccdef::t_1832865e52c0ca 788-789,792-796,798-800,886,890-894,897-902,904,906-907,910-911,915,917-920,924,926-974,976,1001
+  s_168e1bfdeccdef::t_22bc8b783ab6d8 452-453,797,843-857,980,1103-1107,1109,1114,1118-1121,1195-1196,1214-1226
+  s_168e1bfdeccdef::t_9cd4839b8db741 248,327
+test/doudizhu.test.js
+  s_168e1bfdeccdef::t_0732247729cea4 430,434-435
+  s_168e1bfdeccdef::t_0607075f9f186f 121-137,333-337
+  s_168e1bfdeccdef::t_f9de55c5c56e03 53,65-120,472-474
+  s_168e1bfdeccdef::t_da5e2b514e14d9 376-378,386-387,401-405
+  s_168e1bfdeccdef::t_686953d56013c0 12-14,254,354-375,379-385,388-400,406-429,431-433
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "eadee21effe628fbfe308d60a71138639ad57a83",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
