@@ -30,6 +30,27 @@ function nextPerfectHold(game) {
   return null;
 }
 
+function nextLandingHold(game) {
+  const target = game.platforms[1];
+  for (let hold = 0; hold <= Rules.MAX_HOLD_MS; hold += 10) {
+    const trial = Rules.createGame(game.seed, game.groundY);
+    const event = play(trial, hold);
+    if (event?.advanced && event.platform.x === target.x) return hold;
+  }
+  return null;
+}
+
+function cameraScene(game, displayWidth) {
+  return {
+    player: game.player,
+    platforms: game.platforms,
+    previewPlatform: game.previewPlatform,
+    displayWidth,
+    displayHeight: 350,
+    baseViewScale: Math.max(0.74, Math.min(1, displayWidth / 760)),
+  };
+}
+
 test('跳一跳首帧：浏览器帧时间早于初始化时间时仍从零时长开始', () => {
   assert.equal(Rules.frameDeltaSeconds(100, 100.5), 0);
   assert.equal(Rules.frameDeltaSeconds(100, 100), 0);
@@ -89,6 +110,9 @@ test('跳一跳规则：只在成功落地后展示并生成一个新平台', ()
   assert.equal(Rules.PLATFORM_WINDOW_SIZE, 2);
   assert.deepEqual(game.platforms, [current, target]);
   assert.equal(game.spawned, 1);
+  const preview = game.previewPlatform;
+  assert.ok(preview);
+  assert.ok(!game.platforms.includes(preview));
 
   const hold = nextPerfectHold(game);
   const event = play(game, hold);
@@ -96,6 +120,8 @@ test('跳一跳规则：只在成功落地后展示并生成一个新平台', ()
   assert.equal(game.platforms.length, Rules.PLATFORM_WINDOW_SIZE);
   assert.equal(game.platforms[0], target);
   assert.notEqual(game.platforms[1], target);
+  assert.deepEqual(game.platforms[1], preview);
+  assert.ok(!game.platforms.includes(game.previewPlatform));
   assert.equal(game.spawned, 2);
 });
 
@@ -163,41 +189,51 @@ test('跳一跳规则：停留原平台不加分，普通落点重置连击', ()
   assert.equal(edge.earned, 1);
 });
 
-test('跳一跳镜头：落地换出下一平台后仍按屏幕像素匀速移动', () => {
-  const game = Rules.createGame(0);
-  const scene = () => ({
-    player: game.player,
-    platforms: game.platforms,
-    displayWidth: 334,
-    displayHeight: 350,
-    baseViewScale: 0.74,
-  });
-  let view = Rules.updateCameraView({}, scene(), 0, true);
-  Rules.jump(game, 410);
+test('跳一跳镜头：起跳时跟随并在落地帧到位，落地后不再拖动', () => {
+  for (const fps of [30, 60, 120]) {
+    for (const displayWidth of [334, 760]) {
+      for (const seed of [0, 111, 199, 869]) {
+        const game = Rules.createGame(seed);
+        const hold = nextLandingHold(game);
+        assert.notEqual(hold, null);
+        let view = Rules.updateCameraView({}, cameraScene(game, displayWidth), 0, true);
+        const initialCameraX = view.cameraX;
+        const frameSeconds = 1 / fps;
+        let physicsDebt = 0;
+        let landingShiftPx = 0;
+        let maximumAirborneShiftPx = 0;
+        Rules.jump(game, hold);
 
-  let landingView;
-  while (game.state === 'jumping') {
-    Rules.step(game);
-    const previous = view;
-    view = Rules.updateCameraView(view, scene(), Rules.STEP_SECONDS);
-    const centerTravelPx = Math.abs(view.centerX - previous.centerX) * view.scale;
-    assert.ok(centerTravelPx <= Rules.CAMERA_SPEED_PX * Rules.STEP_SECONDS + 1e-9);
-    if (game.state === 'ready') landingView = view;
+        while (game.state === 'jumping') {
+          physicsDebt += frameSeconds;
+          while (physicsDebt >= Rules.STEP_SECONDS && game.state === 'jumping') {
+            physicsDebt -= Rules.STEP_SECONDS;
+            Rules.step(game);
+          }
+          const previous = view;
+          view = Rules.updateCameraView(view, cameraScene(game, displayWidth), frameSeconds);
+          const previousScreenX = (game.player.x - previous.cameraX) * previous.scale;
+          const screenX = (game.player.x - view.cameraX) * view.scale;
+          const shiftPx = Math.abs(screenX - previousScreenX);
+          if (game.state === 'ready') landingShiftPx = shiftPx;
+          else maximumAirborneShiftPx = Math.max(maximumAirborneShiftPx, shiftPx);
+        }
+
+        assert.ok(view.cameraX > initialCameraX + 40, `seed ${seed}, ${displayWidth}px, ${fps}fps: camera did not follow during flight`);
+        assert.ok(landingShiftPx <= maximumAirborneShiftPx + 0.5,
+          `seed ${seed}, ${displayWidth}px, ${fps}fps: landing frame jumped ${landingShiftPx}px`);
+        assert.ok(Math.abs(view.centerX - view.targetCenterX) < 1e-9);
+        assert.ok(Math.abs(view.scale - view.targetScale) < 1e-9);
+
+        for (let frame = 0; frame < 30; frame += 1) {
+          const previous = view;
+          view = Rules.updateCameraView(view, cameraScene(game, displayWidth), frameSeconds);
+          assert.ok(Math.abs(view.cameraX - previous.cameraX) * view.scale < 1e-9,
+            `seed ${seed}, ${displayWidth}px, ${fps}fps: camera kept moving after landing`);
+        }
+      }
+    }
   }
-
-  assert.ok(landingView);
-  const frameSeconds = 1 / 60;
-  const shifts = [];
-  for (let frame = 0; frame < 24; frame += 1) {
-    const previousScreenX = (game.player.x - view.cameraX) * view.scale;
-    view = Rules.updateCameraView(view, scene(), frameSeconds);
-    const screenX = (game.player.x - view.cameraX) * view.scale;
-    shifts.push(screenX - previousScreenX);
-  }
-
-  const maximumFrameShift = Rules.CAMERA_SPEED_PX * frameSeconds;
-  assert.ok(shifts.every((shift) => shift <= 0 && Math.abs(shift) <= maximumFrameShift + 1e-9));
-  assert.ok(shifts.slice(0, 12).every((shift) => Math.abs(Math.abs(shift) - maximumFrameShift) < 1e-9));
 });
 
 test('跳一跳镜头：缩放围绕视口中心渐进，不因平台替换瞬移', () => {

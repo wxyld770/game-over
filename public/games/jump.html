@@ -140,6 +140,7 @@
       let player;
       let cameraX = 0;
       let cameraCenterX = 0;
+      let cameraView = {};
       let score = 0;
       let best = 0;
       let perfectStreak = 0;
@@ -178,9 +179,10 @@
       }
 
       function updateView(dt, snap = false) {
-        const view = rules.updateCameraView({ scale: viewScale, centerX: cameraCenterX }, {
-          player, platforms, displayWidth, displayHeight, baseViewScale,
+        const view = rules.updateCameraView({ ...cameraView, scale: viewScale, centerX: cameraCenterX }, {
+          player, platforms, previewPlatform: game?.previewPlatform, displayWidth, displayHeight, baseViewScale,
         }, dt, snap);
+        cameraView = view;
         viewScale = view.scale;
         width = view.width;
         height = view.height;
@@ -255,6 +257,7 @@
         syncGame();
         cameraX = 0;
         cameraCenterX = 0;
+        cameraView = {};
         scoreText.textContent = '0';
         comboText.textContent = '0';
         charging = false;

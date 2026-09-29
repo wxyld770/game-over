@@ -12,8 +12,8 @@
   const PLAYER_RADIUS = 19;
   const PLATFORM_Y_LIMIT = 55;
   const PLATFORM_WINDOW_SIZE = 2;
-  const CAMERA_SPEED_PX = 96;
-  const VIEW_SCALE_SPEED = 0.18;
+  const CAMERA_SPEED_PX = 128;
+  const VIEW_SCALE_SPEED = 0.24;
 
   function frameDeltaSeconds(now, previous) {
     if (!Number.isFinite(now) || !Number.isFinite(previous)) return 0;
@@ -25,9 +25,33 @@
     return value + Math.sign(target - value) * maximumChange;
   }
 
+  function predictedLanding(player, platforms) {
+    if (!player || player.standing) return null;
+    // Mirror step() so edge landings do not make the camera switch targets mid-flight.
+    let x = player.x;
+    let y = player.y;
+    let vy = player.vy;
+    for (let stepIndex = 1; stepIndex <= 300; stepIndex += 1) {
+      const previousBottom = y + player.r;
+      vy += GRAVITY * STEP_SECONDS;
+      x += player.vx * STEP_SECONDS;
+      y += vy * STEP_SECONDS;
+      if (vy < 0) continue;
+      for (const platform of platforms) {
+        if (previousBottom <= platform.y + 4
+          && y + player.r >= platform.y
+          && x + player.r * 0.55 >= platform.x
+          && x - player.r * 0.55 <= platform.x + platform.w) {
+          return { platform, seconds: stepIndex * STEP_SECONDS };
+        }
+      }
+    }
+    return null;
+  }
+
   function updateCameraView(view, scene, dt, snap = false) {
     if (!view || !scene || !Number.isFinite(dt) || dt < 0) throw new Error('Invalid camera state');
-    const { player, platforms, displayWidth, displayHeight, baseViewScale } = scene;
+    const { player, platforms, previewPlatform, displayWidth, displayHeight, baseViewScale } = scene;
     if (!Array.isArray(platforms)
       || !Number.isFinite(displayWidth) || displayWidth <= 0
       || !Number.isFinite(displayHeight) || displayHeight <= 0
@@ -35,24 +59,44 @@
       throw new Error('Invalid camera scene');
     }
 
-    const current = player && (player.standing || platforms[0]);
-    const next = player && platforms.find((platform) => platform !== current
+    const landing = predictedLanding(player, platforms);
+    const tracksAdvance = !player?.standing && previewPlatform
+      && view.focusPlatformX === platforms[1]?.x
+      && view.nextPlatformX === previewPlatform.x
+      && view.nextPlatformWidth === previewPlatform.w;
+    const anticipatesAdvance = previewPlatform
+      && (tracksAdvance || landing && landing.platform === platforms[1]);
+    const current = anticipatesAdvance ? platforms[1] : player && (player.standing || platforms[0]);
+    const next = anticipatesAdvance ? previewPlatform : player && platforms.find((platform) => platform !== current
       && platform.x + platform.w > player.x - player.r);
-    const left = player
-      ? Math.min(player.x - player.r * 1.7, player.standing && platforms[0] ? platforms[0].x : player.x)
-      : 0;
-    const right = player
-      ? Math.max(player.x + player.r * 1.7, next ? next.x + next.w : player.x + 110)
-      : displayWidth / baseViewScale;
+    const left = current ? current.x : player ? player.x - player.r * 1.7 : 0;
+    const right = next ? next.x + next.w : player ? player.x + player.r * 1.7 + 110 : displayWidth / baseViewScale;
     const targetScale = Math.min(baseViewScale, displayWidth / Math.max(1, right - left + 44));
     const previousScale = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : baseViewScale;
-    const scale = snap ? targetScale : moveToward(previousScale, targetScale, VIEW_SCALE_SPEED * dt);
+    const sameFocus = view.focusPlatformX === current?.x
+      && view.nextPlatformX === next?.x
+      && view.nextPlatformWidth === next?.w;
+    const settleOnLanding = Boolean(player?.standing && sameFocus);
+    const remainingSeconds = landing && landing.platform === current ? landing.seconds : null;
+    const arrivalFraction = remainingSeconds === null
+      ? 0
+      : Math.min(1, dt / Math.max(dt, remainingSeconds + dt));
+    const maximumScaleChange = Math.max(
+      VIEW_SCALE_SPEED * dt,
+      Math.abs(targetScale - previousScale) * arrivalFraction,
+    );
+    const scale = snap || settleOnLanding
+      ? targetScale
+      : moveToward(previousScale, targetScale, maximumScaleChange);
     const width = displayWidth / scale;
     const height = displayHeight / scale;
     const targetCenterX = Math.max(width / 2, (left + right) / 2);
     const previousCenterX = Number.isFinite(view.centerX) ? view.centerX : targetCenterX;
-    const maximumWorldChange = CAMERA_SPEED_PX * dt / scale;
-    const movedCenterX = snap
+    const maximumWorldChange = Math.max(
+      CAMERA_SPEED_PX * dt / scale,
+      Math.abs(targetCenterX - previousCenterX) * arrivalFraction,
+    );
+    const movedCenterX = snap || settleOnLanding
       ? targetCenterX
       : moveToward(previousCenterX, targetCenterX, maximumWorldChange);
     const centerX = Math.max(width / 2, movedCenterX);
@@ -65,17 +109,22 @@
       cameraX: centerX - width / 2,
       targetScale,
       targetCenterX,
+      focusPlatformX: current?.x,
+      nextPlatformX: next?.x,
+      nextPlatformWidth: next?.w,
     };
   }
 
   function randomGenerator(seed) {
     let value = seed >>> 0;
-    return function () {
+    const random = function () {
       value = (value + 0x6D2B79F5) >>> 0;
       let mixed = Math.imul(value ^ (value >>> 15), 1 | value);
       mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed);
       return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
     };
+    random.clone = () => randomGenerator(value);
+    return random;
   }
 
   function nextPlatform(game, previous) {
@@ -94,6 +143,12 @@
     };
   }
 
+  function previewNextPlatform(game, previous) {
+    if (typeof game.random.clone !== 'function') return null;
+    // Peek without advancing the replay RNG or adding a third collision platform.
+    return nextPlatform({ random: game.random.clone(), spawned: game.spawned, groundY: game.groundY }, previous);
+  }
+
   function createGame(seed, groundY = 0) {
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xFFFFFFFF) throw new Error('Invalid game seed');
     if (!Number.isFinite(groundY)) throw new Error('Invalid ground position');
@@ -109,6 +164,7 @@
       state: 'ready',
     };
     game.platforms.push(nextPlatform(game, game.platforms[0]));
+    game.previewPlatform = previewNextPlatform(game, game.platforms[1]);
     const first = game.platforms[0];
     game.player = { x: first.x + first.w / 2, y: first.y - PLAYER_RADIUS, vx: 0, vy: 0, r: PLAYER_RADIUS, standing: first };
     return game;
@@ -143,6 +199,7 @@
       game.score += earned;
       game.platforms.shift();
       game.platforms.push(nextPlatform(game, platform));
+      game.previewPlatform = previewNextPlatform(game, game.platforms[1]);
     } else {
       game.perfectStreak = 0;
     }
