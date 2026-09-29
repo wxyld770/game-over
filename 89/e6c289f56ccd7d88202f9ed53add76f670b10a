@@ -1,0 +1,23 @@
+public/jump-rules.js
+  s_168e1bfdeccdef::t_8d037307bdcd69 18-22,212
+test/jump-rules.test.js
+  s_168e1bfdeccdef::t_8d037307bdcd69 33-40
+public/games/jump.html
+  s_168e1bfdeccdef::t_8d037307bdcd69 584
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "89e6c289f56ccd7d88202f9ed53add76f670b10a",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
