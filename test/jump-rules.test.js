@@ -155,6 +155,70 @@ test('跳一跳规则：停留原平台不加分，普通落点重置连击', ()
   assert.equal(edge.earned, 1);
 });
 
+test('跳一跳镜头：落地换出下一平台后仍按屏幕像素匀速移动', () => {
+  const game = Rules.createGame(0);
+  const scene = () => ({
+    player: game.player,
+    platforms: game.platforms,
+    displayWidth: 334,
+    displayHeight: 350,
+    baseViewScale: 0.74,
+  });
+  let view = Rules.updateCameraView({}, scene(), 0, true);
+  Rules.jump(game, 410);
+
+  let landingView;
+  while (game.state === 'jumping') {
+    Rules.step(game);
+    const previous = view;
+    view = Rules.updateCameraView(view, scene(), Rules.STEP_SECONDS);
+    const centerTravelPx = Math.abs(view.centerX - previous.centerX) * view.scale;
+    assert.ok(centerTravelPx <= Rules.CAMERA_SPEED_PX * Rules.STEP_SECONDS + 1e-9);
+    if (game.state === 'ready') landingView = view;
+  }
+
+  assert.ok(landingView);
+  const frameSeconds = 1 / 60;
+  const shifts = [];
+  for (let frame = 0; frame < 24; frame += 1) {
+    const previousScreenX = (game.player.x - view.cameraX) * view.scale;
+    view = Rules.updateCameraView(view, scene(), frameSeconds);
+    const screenX = (game.player.x - view.cameraX) * view.scale;
+    shifts.push(screenX - previousScreenX);
+  }
+
+  const maximumFrameShift = Rules.CAMERA_SPEED_PX * frameSeconds;
+  assert.ok(shifts.every((shift) => shift <= 0 && Math.abs(shift) <= maximumFrameShift + 1e-9));
+  assert.ok(shifts.slice(0, 12).every((shift) => Math.abs(Math.abs(shift) - maximumFrameShift) < 1e-9));
+});
+
+test('跳一跳镜头：缩放围绕视口中心渐进，不因平台替换瞬移', () => {
+  const current = { x: 820, y: 0, w: 118, h: 25 };
+  const player = { x: 879, y: -19, r: 19, standing: current };
+  const baseScene = {
+    player,
+    displayWidth: 334,
+    displayHeight: 350,
+    baseViewScale: 0.74,
+  };
+  const before = Rules.updateCameraView({}, {
+    ...baseScene,
+    platforms: [current, { x: 1010, y: 4, w: 112, h: 25 }],
+  }, 0, true);
+  const frameSeconds = 1 / 60;
+  const after = Rules.updateCameraView(before, {
+    ...baseScene,
+    platforms: [current, { x: 1225, y: 4, w: 130, h: 25 }],
+  }, frameSeconds);
+
+  assert.ok(Math.abs(after.scale - before.scale) <= Rules.VIEW_SCALE_SPEED * frameSeconds + 1e-9);
+  assert.ok(Math.abs(after.centerX - before.centerX) * after.scale
+    <= Rules.CAMERA_SPEED_PX * frameSeconds + 1e-9);
+  const beforePlayerX = (player.x - before.cameraX) * before.scale;
+  const afterPlayerX = (player.x - after.cameraX) * after.scale;
+  assert.ok(Math.abs(afterPlayerX - beforePlayerX) < 2.5);
+});
+
 test('跳一跳规则：拒绝未完局、结束后的额外输入与异常蓄力记录', () => {
   assert.throws(() => Rules.replay(0, []));
   assert.throws(() => Rules.replay(0, [410]), /not finished/);

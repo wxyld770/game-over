@@ -28,3 +28,11 @@ test('all game pages have parseable inline JavaScript and a return path', () => 
     }
   }
 });
+
+test('match-3 releases an interrupted pointer drag through every browser cancellation path', () => {
+  const html = fs.readFileSync(path.join(root, 'games/match3.html'), 'utf8');
+  assert.match(html, /function cancelActiveDrag\(event\)[\s\S]*pointerStart = null;[\s\S]*returnDrag\(/);
+  assert.match(html, /grid\.addEventListener\('pointercancel', cancelActiveDrag\)/);
+  assert.match(html, /grid\.addEventListener\('lostpointercapture', cancelActiveDrag\)/);
+  assert.match(html, /window\.addEventListener\('blur', cancelActiveDrag\)/);
+});

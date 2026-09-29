@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a211c">
-  <meta name="description" content="单花色蜘蛛纸牌：移动同花色降序牌列，凑齐 K 到 A 的八组完整序列。支持手机点选、电脑拖拽、撤销和自动续局。">
+  <meta name="description" content="单花色蜘蛛纸牌：整理固定四组 K 到 A，共 52 张牌。支持点选、拖拽、提示、撤销和自动续局。">
   <title>蜘蛛纸牌 · Game Over</title>
   <style>
     :root {
@@ -121,10 +121,22 @@
       user-select: none;
       touch-action: manipulation;
     }
-    .card.face-up { cursor: grab; background: linear-gradient(145deg,#fffaf0,#eee5d4); border-color: #cbbd9f; }
+    .card.face-up { cursor: grab; touch-action: none; background: linear-gradient(145deg,#fffaf0,#eee5d4); border-color: #cbbd9f; }
     .card.face-up:active { cursor: grabbing; }
     .card.is-selected { border: 3px solid #f8cb65; background: #fff9e9; box-shadow: 0 0 0 2px #346849, 0 7px 15px rgba(0,0,0,.38); }
     .card.is-picked-run { box-shadow: 0 0 0 2px #f4d488, 0 7px 15px rgba(0,0,0,.38); }
+    .card.is-drag-origin { opacity: .42; filter: saturate(.6) brightness(.82); }
+    .drag-preview {
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+      filter: drop-shadow(0 15px 13px rgba(0,0,0,.42));
+      will-change: transform;
+    }
+    .drag-preview .card { left: 0; width: 100%; box-shadow: 0 5px 10px rgba(0,0,0,.3); }
+    body.is-card-dragging, body.is-card-dragging * { cursor: grabbing !important; }
     .card.is-hint-source { box-shadow: 0 0 0 3px #ffe393, 0 0 18px rgba(255,226,145,.8); animation: hint-pulse 1s ease-in-out 3; }
     .column.is-hint-target::before { border: 3px solid #fff0ac; background: rgba(255,225,135,.18); box-shadow: 0 0 18px rgba(255,225,135,.7); animation: hint-pulse 1s ease-in-out 3; }
     .card-corner { display: flex; align-items: center; gap: 2px; padding: 3px 5px; color: #102a20; font-weight: 950; font-size: clamp(15px,1.45vw,20px); line-height: 1; text-shadow: 0 1px 0 #fff; }
@@ -220,7 +232,7 @@
         <div>
           <p class="eyebrow">SOLO CLASSIC · ONE SUIT</p>
           <h1>蜘蛛纸牌</h1>
-          <p>八副黑桃，十列牌阵。理清每一步，把八组 K 到 A 全部收走。</p>
+          <p>四组黑桃，十列牌阵。理清每一步，把四组 K 到 A 全部收走。</p>
         </div>
         <div class="toolbar">
           <button class="action" id="hintButton" type="button">✦ 提示</button>
@@ -229,8 +241,8 @@
         </div>
       </section>
       <div class="stats" aria-label="牌局数据">
-        <div class="stat"><span>已完成</span><strong id="completeStat">0 / 8</strong></div>
-        <div class="stat"><span>剩余发牌</span><strong id="dealsStat">5 次</strong></div>
+        <div class="stat"><span>已完成</span><strong id="completeStat">0 / 4</strong></div>
+        <div class="stat"><span>剩余发牌</span><strong id="dealsStat">2 次</strong></div>
         <div class="stat"><span>移动步数</span><strong id="movesStat">0</strong></div>
         <div class="stat"><span>用时</span><strong id="timeStat">00:00</strong></div>
       </div>
@@ -238,7 +250,7 @@
         <div>
           <div class="table-frame">
             <section class="table" aria-label="蜘蛛纸牌牌桌">
-              <div class="table-head"><strong>♠ · SPIDER TABLE</strong><span>手机点选 · 电脑拖拽</span></div>
+              <div class="table-head"><strong>♠ · SPIDER TABLE</strong><span>点选或拖拽</span></div>
               <div class="sequence-celebration" id="sequenceCelebration" hidden aria-hidden="true">
                 <div class="sequence-cards"><i>K</i><i>Q</i><i>J</i><i>10</i><i>A</i></div>
                 <strong id="sequenceLabel">K → A · 收齐一组！</strong>
@@ -249,13 +261,13 @@
             </section>
           </div>
           <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
-          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示会从当前牌面向后推演，优先保留多条可继续路线。</p>
+          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示会从多条可完整收完的路线中给出下一步。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
             <h2>底牌</h2>
             <button class="stock-button" id="dealButton" type="button" aria-label="从底牌向十列各发一张牌">
-              <span><strong>发一轮牌</strong><small id="dealHint">还可发 5 轮</small></span>
+              <span><strong>发一轮牌</strong><small id="dealHint">还可发 2 轮</small></span>
               <span class="stock-cards" aria-hidden="true"><i class="stock-card"></i><i class="stock-card"></i><i class="stock-card"></i></span>
             </button>
             <p style="margin-top: 10px">每次给十列各发一张。<strong>有空列时不能发牌。</strong></p>
@@ -263,15 +275,15 @@
           <section class="side-panel">
             <h2>完成的牌组</h2>
             <p>从 K 到 A 排成完整的 13 张，就会自动收走。</p>
-            <div class="complete-track" id="completeTrack" aria-label="八组完成进度"></div>
+            <div class="complete-track" id="completeTrack" aria-label="四组完成进度"></div>
           </section>
           <section class="side-panel">
             <h2>玩法规则</h2>
             <ol class="rules">
-              <li>牌面共 <strong>104 张</strong>：十列起始牌 <strong>54 张</strong>，底牌 <strong>50 张</strong>。</li>
+              <li>牌面固定为 <strong>52 张</strong>：每个点数各 4 张；十列起始牌 <strong>32 张</strong>，底牌 <strong>20 张</strong>。</li>
               <li>可移动一张明牌，或一整段连续的 <strong>降序明牌</strong>；目标列顶牌须比移动牌的第一张大 1，空列可放任意可移动牌段。</li>
-              <li>移走盖在暗牌上的牌后，暗牌自动翻开；翻牌和发牌会结合当前牌面重新规划，尽量保留多条路线。</li>
-              <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完八组即获胜。</li>
+              <li>移走盖在暗牌上的牌后，暗牌自动翻开；所有牌的点数在开局时已经固定。</li>
+              <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完四组即获胜。</li>
               <li>只要有空列，就必须先放牌，不能从底牌发下一轮。撤销可恢复上一步移动或发牌。</li>
             </ol>
           </section>
@@ -283,7 +295,7 @@
   <div class="win-cover" id="winCover" hidden role="dialog" aria-modal="true" aria-labelledby="winTitle">
     <div class="win-panel">
       <div class="win-icon" aria-hidden="true">✦ ♠ ✦</div>
-      <h2 id="winTitle">八组全部收齐！</h2>
+      <h2 id="winTitle">四组全部收齐！</h2>
       <p id="winSummary"></p>
       <div class="win-actions">
         <button class="action primary" id="winNewButton" type="button">再来一局</button>
@@ -295,6 +307,13 @@
     "use strict";
     (() => {
       const ROUTE_CAP = 99;
+      const TARGET_RUNS = 4;
+      const COLUMN_COUNT = 10;
+      const DEAL_SIZE = 10;
+      const DEAL_ROUNDS = 2;
+      const TOTAL_CARDS = 52;
+      const INITIAL_CARDS = 32;
+      const SEGMENT_PARTITIONS = [[3, 3, 7], [3, 3, 7], [6, 7], [6, 7]];
 
       function cloneState(state) {
         return {
@@ -356,6 +375,204 @@
         next.cols[move.toCol].push(...moved);
         if (source.length && !source[source.length - 1].up) source[source.length - 1].up = true;
         collectRuns(next);
+        return next;
+      }
+
+      function dealNextRound(state) {
+        if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE || state.cols.some(col => !col.length)) return null;
+        const next = cloneState(state);
+        for (let colIndex = 0; colIndex < COLUMN_COUNT; colIndex++) {
+          next.cols[colIndex].push({ r: next.stock.pop(), up: true });
+        }
+        collectRuns(next);
+        return next;
+      }
+
+      function isValidState(state) {
+        if (!state || !Array.isArray(state.cols) || state.cols.length !== COLUMN_COUNT ||
+            !Array.isArray(state.stock) || state.stock.length > DEAL_SIZE * DEAL_ROUNDS || state.stock.length % DEAL_SIZE !== 0 ||
+            !Number.isInteger(state.completed) || state.completed < 0 || state.completed > TARGET_RUNS) return false;
+        const counts = Array(14).fill(state.completed);
+        for (const rank of state.stock) {
+          if (!Number.isInteger(rank) || rank < 1 || rank > 13) return false;
+          counts[rank]++;
+        }
+        for (const col of state.cols) {
+          if (!Array.isArray(col) || col.length > TOTAL_CARDS) return false;
+          let seenUp = false;
+          for (const card of col) {
+            if (!card || !Number.isInteger(card.r) || card.r < 1 || card.r > 13 || typeof card.up !== "boolean") return false;
+            if (seenUp && !card.up) return false;
+            if (card.up) seenUp = true;
+            counts[card.r]++;
+          }
+        }
+        return counts.slice(1).every(count => count === TARGET_RUNS);
+      }
+
+      function randomSlot(randomIndex, max) {
+        const value = typeof randomIndex === "function" ? randomIndex(max) : Math.floor(Math.random() * max);
+        return Number.isInteger(value) && value >= 0 && value < max ? value : 0;
+      }
+
+      function shuffle(items, randomIndex) {
+        for (let index = items.length - 1; index > 0; index--) {
+          const swapIndex = randomSlot(randomIndex, index + 1);
+          [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+        }
+        return items;
+      }
+
+      function createSolvableDeal(randomIndex) {
+        const segments = [];
+        SEGMENT_PARTITIONS.forEach((parts, group) => {
+          let rank = 13;
+          parts.forEach((length, order) => {
+            const ranks = [];
+            for (let index = 0; index < length; index++) ranks.push(rank--);
+            segments.push({ group, order, ranks });
+          });
+        });
+        shuffle(segments, randomIndex);
+
+        const locations = new Map();
+        const cols = [];
+        const firstRound = [];
+        const secondRound = [];
+        segments.forEach((segment, colIndex) => {
+          locations.set(segment.group + ":" + segment.order, colIndex);
+          cols.push(segment.ranks.slice(0, -2).map(rank => ({ r: rank, up: true })));
+          firstRound.push(segment.ranks[segment.ranks.length - 2]);
+          secondRound.push(segment.ranks[segment.ranks.length - 1]);
+        });
+
+        const sourceCols = segments.map((segment, index) => segment.ranks.length === 3 ? index : -1).filter(index => index >= 0);
+        const donorCols = segments.map((segment, index) => segment.ranks.length >= 6 ? index : -1).filter(index => index >= 0);
+        shuffle(donorCols, randomIndex);
+        const recovery = [];
+        const certificateNodes = [];
+        sourceCols.forEach((sourceCol, index) => {
+          const donorCol = donorCols[index];
+          const donor = cols[donorCol];
+          const takeLimit = Math.min(2, donor.length - 1);
+          const takeCount = 1 + randomSlot(randomIndex, takeLimit);
+          const moved = donor.splice(donor.length - takeCount, takeCount);
+          cols[sourceCol][0].up = false;
+          const fromIndex = cols[sourceCol].length;
+          cols[sourceCol].push(...moved);
+          const action = { type: "move", fromCol: sourceCol, fromIndex, toCol: donorCol };
+          recovery.push(action);
+          certificateNodes.push({ ...action, id: "recover-" + index, requires: [] });
+        });
+
+        const stock = secondRound.slice().reverse().concat(firstRound.slice().reverse());
+        const plan = recovery.slice();
+        const recoveryIds = certificateNodes.map(node => node.id);
+        for (let round = 0; round < DEAL_ROUNDS; round++) {
+          const action = { type: "deal" };
+          const id = "deal-" + (round + 1);
+          const requires = round === 0 ? recoveryIds : ["deal-" + round];
+          plan.push(action);
+          certificateNodes.push({ ...action, id, requires });
+        }
+        SEGMENT_PARTITIONS.forEach((parts, group) => {
+          let requires = ["deal-" + DEAL_ROUNDS];
+          for (let order = parts.length - 1; order > 0; order--) {
+            const action = {
+              type: "move",
+              fromCol: locations.get(group + ":" + order),
+              fromIndex: 0,
+              toCol: locations.get(group + ":" + (order - 1))
+            };
+            const id = "assemble-" + group + "-" + order;
+            plan.push(action);
+            certificateNodes.push({ ...action, id, requires });
+            requires = [id];
+          }
+        });
+        return {
+          state: { cols, stock, completed: 0 },
+          plan,
+          certificate: { version: 1, valid: true, done: [], nodes: certificateNodes }
+        };
+      }
+
+      function replayPlan(state, plan) {
+        let current = cloneState(state);
+        for (const action of plan) {
+          if (action.type === "deal") {
+            current = dealNextRound(current);
+            if (!current) return null;
+            continue;
+          }
+          const move = legalMoves(current).find(candidate => candidate.fromCol === action.fromCol &&
+            candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
+          if (!move) return null;
+          current = applyMove(current, move);
+        }
+        return current;
+      }
+
+      function cloneCertificate(certificate) {
+        if (!certificate) return null;
+        return {
+          version: certificate.version,
+          valid: certificate.valid,
+          done: Array.isArray(certificate.done) ? certificate.done.slice() : [],
+          nodes: Array.isArray(certificate.nodes) ? certificate.nodes.map(node => ({
+            ...node,
+            requires: Array.isArray(node.requires) ? node.requires.slice() : []
+          })) : []
+        };
+      }
+
+      function isValidCertificate(certificate) {
+        if (!certificate || certificate.version !== 1 || typeof certificate.valid !== "boolean" ||
+            !Array.isArray(certificate.done) || !Array.isArray(certificate.nodes) ||
+            certificate.nodes.length < 1 || certificate.nodes.length > 32) return false;
+        const seen = new Set();
+        for (const node of certificate.nodes) {
+          if (!node || typeof node.id !== "string" || !node.id || seen.has(node.id) ||
+              !Array.isArray(node.requires) || node.requires.some(id => !seen.has(id))) return false;
+          if (node.type === "move") {
+            if (![node.fromCol, node.toCol].every(value => Number.isInteger(value) && value >= 0 && value < COLUMN_COUNT) ||
+                node.fromCol === node.toCol || !Number.isInteger(node.fromIndex) || node.fromIndex < 0 || node.fromIndex >= TOTAL_CARDS) return false;
+          } else if (node.type !== "deal") return false;
+          seen.add(node.id);
+        }
+        const done = new Set(certificate.done);
+        return done.size === certificate.done.length && certificate.done.every(id => seen.has(id));
+      }
+
+      function actionMatches(left, right) {
+        return left && right && left.type === right.type && (left.type === "deal" ||
+          (left.fromCol === right.fromCol && left.fromIndex === right.fromIndex && left.toCol === right.toCol));
+      }
+
+      function readyCertificateActions(state, certificate) {
+        if (!isValidCertificate(certificate) || !certificate.valid) return [];
+        const done = new Set(certificate.done);
+        const moves = legalMoves(state);
+        const ready = [];
+        for (const node of certificate.nodes) {
+          if (done.has(node.id) || !node.requires.every(id => done.has(id))) continue;
+          if (node.type === "deal") {
+            if (state.stock.length >= DEAL_SIZE && state.cols.every(col => col.length)) ready.push({ ...node });
+            continue;
+          }
+          const move = moves.find(candidate => node.fromCol === candidate.fromCol &&
+            node.fromIndex === candidate.fromIndex && node.toCol === candidate.toCol);
+          if (move) ready.push({ ...node, count: move.count });
+        }
+        return ready;
+      }
+
+      function advanceCertificate(state, certificate, action) {
+        const next = cloneCertificate(certificate);
+        if (!isValidCertificate(next) || !next.valid) return next;
+        const matched = readyCertificateActions(state, next).find(node => actionMatches(node, action));
+        if (matched) next.done.push(matched.id);
+        else next.valid = false;
         return next;
       }
 
@@ -494,91 +711,25 @@
         return sources.size * 45 + targets.size * 28 + ranks.size * 18 + moves.length * 6;
       }
 
-      function rankRevealChoices(state, colIndex) {
-        const target = state.cols[colIndex] && state.cols[colIndex][state.cols[colIndex].length - 1];
-        if (!target || target.up) return [];
-        const available = new Set(state.stock || []);
-        for (const col of state.cols) {
-          for (const card of col) if (!card.up) available.add(card.r);
-        }
-        const choices = [];
-        for (const rank of available) {
-          const next = cloneState(state);
-          const nextTarget = next.cols[colIndex][next.cols[colIndex].length - 1];
-          nextTarget.r = rank;
-          nextTarget.up = true;
-          collectRuns(next);
-          const result = analyze(next, { depth: 3, breadth: 18, nodeLimit: 850 });
-          const distinctSources = new Set(result.moves.slice(0, 12).map(move => move.fromCol)).size;
-          choices.push({
-            rank,
-            score: result.score + result.routeCount * 150 + distinctSources * 65,
-            routeCount: result.routeCount,
-            moveCount: result.moves.length
-          });
-        }
-        return choices.sort((a, b) => b.routeCount - a.routeCount || b.score - a.score || a.rank - b.rank);
-      }
-
       function planDeal(state) {
-        if (!Array.isArray(state.stock) || state.stock.length < 10) return [];
-        const counts = Array(14).fill(0);
-        for (const rank of state.stock) counts[rank]++;
-        let beam = [{ ranks: [], counts, heuristic: 0 }];
-        for (let colIndex = 0; colIndex < state.cols.length; colIndex++) {
-          const nextBeam = [];
-          const underneath = state.cols[colIndex][state.cols[colIndex].length - 1];
-          for (const candidate of beam) {
-            for (let rank = 1; rank <= 13; rank++) {
-              if (!candidate.counts[rank]) continue;
-              const nextCounts = candidate.counts.slice();
-              nextCounts[rank]--;
-              let gain = underneath && underneath.r === rank + 1 ? 85 : 0;
-              for (const prior of candidate.ranks) {
-                if (Math.abs(prior - rank) === 1) gain += 17;
-                if (prior === rank) gain -= 4;
-              }
-              nextBeam.push({
-                ranks: candidate.ranks.concat(rank),
-                counts: nextCounts,
-                heuristic: candidate.heuristic + gain
-              });
-            }
-          }
-          nextBeam.sort((a, b) => b.heuristic - a.heuristic || a.ranks.join(",").localeCompare(b.ranks.join(",")));
-          const seen = new Set();
-          beam = [];
-          for (const candidate of nextBeam) {
-            const signature = candidate.ranks.join(",") + ":" + candidate.counts.join(",");
-            if (seen.has(signature)) continue;
-            seen.add(signature);
-            beam.push(candidate);
-            if (beam.length === 120) break;
-          }
-        }
-        const finalists = [];
-        for (const candidate of beam.slice(0, 28)) {
-          const next = cloneState(state);
-          candidate.ranks.forEach((rank, colIndex) => next.cols[colIndex].push({ r: rank, up: true }));
-          collectRuns(next);
-          const result = analyze(next, { depth: 2, breadth: 18, nodeLimit: 520 });
-          finalists.push({
-            ranks: candidate.ranks,
-            routeCount: result.routeCount,
-            score: result.score + result.routeCount * 130 + openingQuality(next) * 3 + candidate.heuristic
-          });
-        }
-        finalists.sort((a, b) => b.routeCount - a.routeCount || b.score - a.score ||
-          a.ranks.join(",").localeCompare(b.ranks.join(",")));
-        return finalists.length ? finalists[0].ranks : state.stock.slice(-10);
+        if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE) return [];
+        return state.stock.slice(-DEAL_SIZE).reverse();
       }
 
       globalThis.SpiderPlanner = Object.freeze({
+        config: Object.freeze({ TARGET_RUNS, COLUMN_COUNT, DEAL_SIZE, DEAL_ROUNDS, TOTAL_CARDS, INITIAL_CARDS }),
         legalMoves,
         applyMove,
+        dealNextRound,
+        isValidState,
+        createSolvableDeal,
+        replayPlan,
+        cloneCertificate,
+        isValidCertificate,
+        readyCertificateActions,
+        advanceCertificate,
         analyze,
         openingQuality,
-        rankRevealChoices,
         planDeal
       });
     })();
@@ -586,7 +737,9 @@
   <script>
     "use strict";
     (() => {
-      const STORE_KEY = "game-over-spider-one-suit-v1";
+      const STORE_KEY = "game-over-spider-one-suit-v2";
+      const LEGACY_STORE_KEY = "game-over-spider-one-suit-v1";
+      const { TARGET_RUNS } = SpiderPlanner.config;
       const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const board = document.getElementById("board");
       const status = document.getElementById("status");
@@ -600,11 +753,12 @@
       let selected = null;
       let hint = null;
       let hintCursor = 0;
-      let hintRouteCount = 0;
       let hintTimer = null;
       let celebrating = false;
       let celebrationTimer = null;
-      let dragging = false;
+      let dragState = null;
+      let dragFrame = 0;
+      let ignoreClickUntil = 0;
 
       function randomIndex(max) {
         if (window.crypto && window.crypto.getRandomValues) {
@@ -617,56 +771,22 @@
       }
 
       function freshGame() {
-        let best = null;
-        let bestQuality = -1;
-        for (let attempt = 0; attempt < 20; attempt++) {
-          const deck = [];
-          for (let copy = 0; copy < 8; copy++) {
-            for (let rank = 1; rank <= 13; rank++) deck.push(rank);
-          }
-          for (let i = deck.length - 1; i > 0; i--) {
-            const j = randomIndex(i + 1);
-            [deck[i], deck[j]] = [deck[j], deck[i]];
-          }
-          const cols = Array.from({ length: 10 }, () => []);
-          for (let col = 0; col < 10; col++) {
-            const count = col < 4 ? 6 : 5;
-            for (let i = 0; i < count; i++) cols[col].push({ r: deck.pop(), up: i === count - 1 });
-          }
-          const candidate = { cols, stock: deck, completed: 0, moves: 0 };
-          const quality = SpiderPlanner.openingQuality(candidate);
-          if (quality > bestQuality) {
-            best = candidate;
-            bestQuality = quality;
-          }
-          if (quality >= 430) break;
+        const generated = SpiderPlanner.createSolvableDeal(randomIndex);
+        const proof = SpiderPlanner.replayPlan(generated.state, generated.plan);
+        if (!SpiderPlanner.isValidState(generated.state) || !proof || proof.completed !== TARGET_RUNS ||
+            proof.stock.length || proof.cols.some(col => col.length)) {
+          throw new Error("无法生成可验证的蜘蛛纸牌牌局");
         }
-        best.startedAt = Date.now();
-        best.finishedAt = null;
-        return best;
+        generated.state.moves = 0;
+        generated.state.startedAt = Date.now();
+        generated.state.finishedAt = null;
+        generated.state.certificate = SpiderPlanner.cloneCertificate(generated.certificate);
+        return generated.state;
       }
 
       function cardCountsAreValid(state) {
-        if (!state || !Array.isArray(state.cols) || state.cols.length !== 10 ||
-            !Array.isArray(state.stock) || state.stock.length > 50 || state.stock.length % 10 !== 0 ||
-            !Number.isInteger(state.completed) || state.completed < 0 || state.completed > 8 ||
-            !Number.isInteger(state.moves) || state.moves < 0 || state.moves > 1000000) return false;
-        const counts = Array(14).fill(state.completed);
-        for (const rank of state.stock) {
-          if (!Number.isInteger(rank) || rank < 1 || rank > 13) return false;
-          counts[rank]++;
-        }
-        for (const col of state.cols) {
-          if (!Array.isArray(col) || col.length > 104) return false;
-          let seenUp = false;
-          for (const card of col) {
-            if (!card || !Number.isInteger(card.r) || card.r < 1 || card.r > 13 || typeof card.up !== "boolean") return false;
-            if (seenUp && !card.up) return false;
-            if (card.up) seenUp = true;
-            counts[card.r]++;
-          }
-        }
-        return counts.slice(1).every(count => count === 8);
+        return SpiderPlanner.isValidState(state) && Number.isInteger(state.moves) &&
+          state.moves >= 0 && state.moves <= 1000000 && SpiderPlanner.isValidCertificate(state.certificate);
       }
 
       function readSaved() {
@@ -690,7 +810,8 @@
           cols: game.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
           stock: game.stock.slice(),
           completed: game.completed,
-          moves: game.moves
+          moves: game.moves,
+          certificate: SpiderPlanner.cloneCertificate(game.certificate)
         });
         if (history.length > 100) history.shift();
       }
@@ -732,18 +853,28 @@
         clearHint();
         renderBoard();
       }
-      function findHints() {
-        const result = SpiderPlanner.analyze(game, { depth: 4, breadth: 24, nodeLimit: 3200 });
-        hintRouteCount = result.routeCount;
-        return result.moves;
-      }
       function showHint() {
-        if (game.completed === 8) return;
+        if (game.completed === TARGET_RUNS) return;
         clearHint();
-        const moves = findHints();
-        if (moves.length) {
-          const move = moves[hintCursor % moves.length];
-          hintCursor = (hintCursor + 1) % moves.length;
+        if (!game.certificate.valid) {
+          selected = null;
+          renderBoard();
+          announce("建议撤销最近的自由移动，回到可以完整收完的路线。");
+          return;
+        }
+        const actions = SpiderPlanner.readyCertificateActions(game, game.certificate);
+        if (actions.length) {
+          const action = actions[hintCursor % actions.length];
+          hintCursor = (hintCursor + 1) % actions.length;
+          if (action.type === "deal") {
+            selected = null;
+            renderBoard();
+            dealButton.classList.add("hint-deal");
+            announce("提示：从底牌发下一轮。");
+            hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
+            return;
+          }
+          const move = action;
           selected = { col: move.fromCol, index: move.fromIndex };
           hint = move;
           renderBoard();
@@ -757,18 +888,10 @@
           }
           announce("提示：第 " + (move.fromCol + 1) + " 列的 " + move.count +
             " 张牌 → 第 " + (move.toCol + 1) + " 列。" +
-            (hintRouteCount > 1 ? "这一步会继续保留多条后续路线。" : "这是当前推演最稳妥的一步。"));
+            (actions.length > 1 ? "还有其他顺序也可以完整收完。" : ""));
           hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
-        } else if (game.stock.length && game.cols.every(col => col.length)) {
-          selected = null;
-          renderBoard();
-          dealButton.classList.add("hint-deal");
-          announce("当前没有合法移牌，可以从底牌发下一轮。");
-          hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
-        } else if (game.stock.length) {
-          announce("当前没有合法移牌；先填满空列才能发牌，可尝试撤销。");
         } else {
-          announce("当前没有合法移牌，底牌也已用尽；可尝试撤销或新游戏。");
+          announce("当前路线无法继续，请撤销最近一步。");
         }
       }
       function clearCelebration() {
@@ -789,35 +912,13 @@
         sequenceCelebration.classList.add("active");
         celebrationTimer = setTimeout(() => {
           clearCelebration();
-          if (game.completed === 8) render();
+          if (game.completed === TARGET_RUNS) render();
         }, 920);
       }
       function revealTopCard(colIndex) {
         const col = game.cols[colIndex];
         const target = col && col[col.length - 1];
         if (!target || target.up) return;
-        const originalRank = target.r;
-        const choices = SpiderPlanner.rankRevealChoices(game, colIndex);
-        const desiredRank = choices.length ? choices[0].rank : originalRank;
-        if (desiredRank !== originalRank) {
-          const stockIndex = game.stock.lastIndexOf(desiredRank);
-          if (stockIndex >= 0) {
-            game.stock[stockIndex] = originalRank;
-            target.r = desiredRank;
-          } else {
-            let exchanged = false;
-            for (let sourceCol = 0; sourceCol < game.cols.length && !exchanged; sourceCol++) {
-              for (let index = 0; index < game.cols[sourceCol].length; index++) {
-                const candidate = game.cols[sourceCol][index];
-                if (candidate === target || candidate.up || candidate.r !== desiredRank) continue;
-                candidate.r = originalRank;
-                target.r = desiredRank;
-                exchanged = true;
-                break;
-              }
-            }
-          }
-        }
         target.up = true;
       }
       function collectCompleteRuns() {
@@ -836,9 +937,9 @@
         return collected;
       }
       function afterAction(message, collected) {
-        if (game.completed === 8) {
+        if (game.completed === TARGET_RUNS) {
           game.finishedAt = Date.now();
-          announce("恭喜，八组牌全部收齐！");
+          announce("恭喜，四组牌全部收齐！");
         } else if (collected) {
           announce("收齐 " + collected + " 组 K 到 A！继续加油。");
         } else {
@@ -846,14 +947,16 @@
         }
         selected = null;
         clearHint();
-        hintCursor = 0;
         if (collected) showCelebration(collected);
         save();
         render();
       }
       function moveCards(fromCol, fromIndex, toCol) {
-        if (game.completed === 8 || !canMove(fromCol, fromIndex, toCol)) return false;
+        if (game.completed === TARGET_RUNS || !canMove(fromCol, fromIndex, toCol)) return false;
         snapshot();
+        game.certificate = SpiderPlanner.advanceCertificate(game, game.certificate, {
+          type: "move", fromCol, fromIndex, toCol
+        });
         const source = game.cols[fromCol];
         const moved = source.splice(fromIndex);
         game.cols[toCol].push(...moved);
@@ -864,7 +967,7 @@
         return true;
       }
       function deal() {
-        if (game.completed === 8) return;
+        if (game.completed === TARGET_RUNS) return;
         if (!game.stock.length) { announce("底牌已发完，试着整理明牌。"); return; }
         if (game.cols.some(col => !col.length)) {
           announce("先填满所有空列，才能从底牌发下一轮。");
@@ -872,11 +975,11 @@
         }
         clearHint();
         snapshot();
+        game.certificate = SpiderPlanner.advanceCertificate(game, game.certificate, { type: "deal" });
         const plannedRanks = SpiderPlanner.planDeal(game);
         for (let colIndex = 0; colIndex < game.cols.length; colIndex++) {
-          const plannedRank = plannedRanks[colIndex];
-          const stockIndex = game.stock.lastIndexOf(plannedRank);
-          const rank = stockIndex >= 0 ? game.stock.splice(stockIndex, 1)[0] : game.stock.pop();
+          const rank = game.stock.pop();
+          if (rank !== plannedRanks[colIndex]) throw new Error("底牌顺序校验失败");
           game.cols[colIndex].push({ r: rank, up: true });
         }
         game.moves++;
@@ -893,6 +996,7 @@
         game.stock = previous.stock;
         game.completed = previous.completed;
         game.moves = previous.moves;
+        game.certificate = previous.certificate;
         game.finishedAt = null;
         selected = null;
         save();
@@ -900,7 +1004,7 @@
         announce("已撤销上一步。");
       }
       function startNew(force) {
-        if (!force && game && game.moves > 0 && game.completed < 8 &&
+        if (!force && game && game.moves > 0 && game.completed < TARGET_RUNS &&
             !window.confirm("开始新游戏会清除当前进度，确定吗？")) return;
         clearHint();
         clearCelebration();
@@ -954,7 +1058,7 @@
               element.setAttribute("role", "button");
               element.setAttribute("aria-label", "第 " + (colIndex + 1) + " 列，" + rank + "，点击选牌或作为落点");
               element.tabIndex = 0;
-              element.draggable = pickable(colIndex, index);
+              element.draggable = false;
               if (hint && hint.fromCol === colIndex && index >= hint.fromIndex) element.classList.add("is-hint-source");
               if (selected && selected.col === colIndex) {
                 if (selected.index === index) element.classList.add("is-selected");
@@ -975,18 +1079,18 @@
       }
       function render() {
         renderBoard();
-        document.getElementById("completeStat").textContent = game.completed + " / 8";
+        document.getElementById("completeStat").textContent = game.completed + " / " + TARGET_RUNS;
         document.getElementById("dealsStat").textContent = (game.stock.length / 10) + " 次";
         document.getElementById("movesStat").textContent = String(game.moves);
         document.getElementById("dealHint").textContent = game.stock.length ? "还可发 " + (game.stock.length / 10) + " 轮" : "底牌已发完";
-        dealButton.disabled = !game.stock.length || game.completed === 8;
+        dealButton.disabled = !game.stock.length || game.completed === TARGET_RUNS;
         undoButton.disabled = !history.length;
-        hintButton.disabled = game.completed === 8;
-        document.getElementById("completeTrack").innerHTML = Array.from({ length: 8 }, (_, i) =>
+        hintButton.disabled = game.completed === TARGET_RUNS;
+        document.getElementById("completeTrack").innerHTML = Array.from({ length: TARGET_RUNS }, (_, i) =>
           '<span class="complete-slot' + (i < game.completed ? ' done' : '') + '" aria-label="第 ' + (i + 1) + ' 组' + (i < game.completed ? '已完成' : '未完成') + '">♠</span>'
         ).join("");
         updateTime();
-        if (game.completed === 8 && !celebrating) {
+        if (game.completed === TARGET_RUNS && !celebrating) {
           document.getElementById("winSummary").textContent = "用时 " + formatTime(game.finishedAt - game.startedAt) + " · 共 " + game.moves + " 步";
           winCover.hidden = false;
           document.getElementById("winNewButton").focus();
@@ -995,9 +1099,104 @@
         }
       }
 
+      function columnAtPoint(x, y) {
+        const element = document.elementFromPoint(x, y);
+        const column = element && element.closest(".column");
+        return column && board.contains(column) ? Number(column.dataset.col) : -1;
+      }
+
+      function positionDragPreview() {
+        dragFrame = 0;
+        if (!dragState || !dragState.active || !dragState.preview) return;
+        dragState.preview.style.transform = "translate3d(" +
+          (dragState.x - dragState.offsetX) + "px," +
+          (dragState.y - dragState.offsetY) + "px,0)";
+      }
+
+      function updateDragTarget() {
+        if (!dragState || !dragState.active) return;
+        const targetCol = columnAtPoint(dragState.x, dragState.y);
+        board.querySelectorAll(".is-drag-target").forEach(element => element.classList.remove("is-drag-target"));
+        if (canMove(dragState.col, dragState.index, targetCol)) {
+          const target = board.querySelector('.column[data-col="' + targetCol + '"]');
+          if (target) target.classList.add("is-drag-target");
+        }
+      }
+
+      function beginPointerDrag() {
+        if (!dragState || dragState.active) return;
+        clearHint();
+        dragState.active = true;
+        selected = { col: dragState.col, index: dragState.index };
+        const sourceCards = [...dragState.column.querySelectorAll(".card")]
+          .filter(card => Number(card.dataset.index) >= dragState.index);
+        const firstRect = sourceCards[0].getBoundingClientRect();
+        const preview = document.createElement("div");
+        preview.className = "drag-preview";
+        preview.setAttribute("aria-hidden", "true");
+        preview.style.width = firstRect.width + "px";
+        let bottom = firstRect.height;
+        sourceCards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          const clone = card.cloneNode(true);
+          clone.classList.remove("is-selected", "is-picked-run", "is-hint-source", "is-drag-origin");
+          clone.removeAttribute("role");
+          clone.removeAttribute("aria-label");
+          clone.removeAttribute("tabindex");
+          clone.draggable = false;
+          clone.style.setProperty("--top", (rect.top - firstRect.top) + "px");
+          preview.appendChild(clone);
+          card.classList.add("is-drag-origin");
+          bottom = Math.max(bottom, rect.top - firstRect.top + rect.height);
+        });
+        preview.style.height = bottom + "px";
+        document.body.appendChild(preview);
+        document.body.classList.add("is-card-dragging");
+        dragState.preview = preview;
+        dragState.offsetX = dragState.startX - firstRect.left;
+        dragState.offsetY = dragState.startY - firstRect.top;
+        board.querySelectorAll(".column").forEach(column => {
+          if (canMove(dragState.col, dragState.index, Number(column.dataset.col))) {
+            column.classList.add("is-valid-target");
+          }
+        });
+        positionDragPreview();
+        updateDragTarget();
+      }
+
+      function resetPointerDrag() {
+        const previous = dragState;
+        dragState = null;
+        if (dragFrame) cancelAnimationFrame(dragFrame);
+        dragFrame = 0;
+        document.body.classList.remove("is-card-dragging");
+        if (previous && previous.preview) previous.preview.remove();
+        board.querySelectorAll(".is-drag-origin, .is-valid-target, .is-drag-target").forEach(element => {
+          element.classList.remove("is-drag-origin", "is-valid-target", "is-drag-target");
+        });
+        if (previous && previous.captureTarget && previous.captureTarget.hasPointerCapture &&
+            previous.captureTarget.hasPointerCapture(previous.pointerId)) {
+          previous.captureTarget.releasePointerCapture(previous.pointerId);
+        }
+        return previous;
+      }
+
+      function cancelPointerDrag() {
+        const previous = resetPointerDrag();
+        if (!previous || !previous.active) return;
+        selected = null;
+        ignoreClickUntil = performance.now() + 350;
+        announce("已取消拖动，牌组保持在原位。");
+      }
+
       board.addEventListener("click", event => {
+        if (performance.now() < ignoreClickUntil) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         const column = event.target.closest(".column");
-        if (!column || game.completed === 8) return;
+        if (!column || game.completed === TARGET_RUNS) return;
         const colIndex = Number(column.dataset.col);
         const card = event.target.closest(".card");
         const index = card ? Number(card.dataset.index) : -1;
@@ -1030,44 +1229,65 @@
           event.target.click();
         }
       });
-      board.addEventListener("dragstart", event => {
+      board.addEventListener("pointerdown", event => {
+        if ((event.pointerType === "mouse" && event.button !== 0) || dragState) return;
         const card = event.target.closest(".card.face-up");
         const column = card && card.closest(".column");
-        if (!card || !column || game.completed === 8) { event.preventDefault(); return; }
+        if (!card || !column || game.completed === TARGET_RUNS) return;
         const col = Number(column.dataset.col);
         const index = Number(card.dataset.index);
-        if (!pickable(col, index)) { event.preventDefault(); return; }
-        clearHint();
-        selected = { col, index };
-        dragging = true;
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", col + ":" + index);
-        requestAnimationFrame(() => {
-          if (dragging) board.querySelectorAll(".column").forEach(element => {
-            if (canMove(col, index, Number(element.dataset.col))) element.classList.add("is-valid-target");
-          });
-        });
+        if (!pickable(col, index)) return;
+        dragState = {
+          pointerId: event.pointerId,
+          pointerType: event.pointerType,
+          captureTarget: card,
+          column,
+          col,
+          index,
+          startX: event.clientX,
+          startY: event.clientY,
+          x: event.clientX,
+          y: event.clientY,
+          active: false,
+          preview: null,
+          offsetX: 0,
+          offsetY: 0
+        };
+        try { card.setPointerCapture(event.pointerId); } catch (_) {}
       });
-      board.addEventListener("dragover", event => {
-        const column = event.target.closest(".column");
-        if (!column || !selected || !canMove(selected.col, selected.index, Number(column.dataset.col))) return;
+      board.addEventListener("pointermove", event => {
+        if (!dragState || dragState.pointerId !== event.pointerId) return;
+        dragState.x = event.clientX;
+        dragState.y = event.clientY;
+        const threshold = dragState.pointerType === "touch" ? 9 : 6;
+        if (!dragState.active && Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) < threshold) return;
+        if (!dragState.active) beginPointerDrag();
         event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        board.querySelectorAll(".is-drag-target").forEach(element => element.classList.remove("is-drag-target"));
-        column.classList.add("is-drag-target");
+        if (!dragFrame) dragFrame = requestAnimationFrame(positionDragPreview);
+        updateDragTarget();
       });
-      board.addEventListener("drop", event => {
-        const column = event.target.closest(".column");
-        if (!column || !selected) return;
+      board.addEventListener("pointerup", event => {
+        if (!dragState || dragState.pointerId !== event.pointerId) return;
+        if (!dragState.active) {
+          resetPointerDrag();
+          return;
+        }
         event.preventDefault();
-        dragging = false;
-        if (!moveCards(selected.col, selected.index, Number(column.dataset.col))) clearSelection();
+        const targetCol = columnAtPoint(event.clientX, event.clientY);
+        const previous = resetPointerDrag();
+        ignoreClickUntil = performance.now() + 350;
+        if (!canMove(previous.col, previous.index, targetCol) ||
+            !moveCards(previous.col, previous.index, targetCol)) {
+          selected = null;
+          announce("不能放到这里，牌组已回到原位。");
+        }
       });
-      board.addEventListener("dragend", () => {
-        dragging = false;
-        board.querySelectorAll(".is-drag-target").forEach(element => element.classList.remove("is-drag-target"));
-        if (selected) clearSelection();
+      board.addEventListener("pointercancel", cancelPointerDrag);
+      board.addEventListener("lostpointercapture", () => {
+        if (dragState && dragState.active) cancelPointerDrag();
+        else if (dragState) resetPointerDrag();
       });
+      window.addEventListener("blur", cancelPointerDrag);
       dealButton.addEventListener("click", deal);
       hintButton.addEventListener("click", showHint);
       undoButton.addEventListener("click", undo);
@@ -1077,6 +1297,7 @@
       document.addEventListener("keydown", event => {
         if (event.key === "Escape" && !winCover.hidden) winCover.hidden = true;
       });
+      try { localStorage.removeItem(LEGACY_STORE_KEY); } catch (_) {}
       if (!readSaved()) {
         game = freshGame();
         save();

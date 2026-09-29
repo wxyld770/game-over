@@ -139,13 +139,12 @@
       let platforms = [];
       let player;
       let cameraX = 0;
+      let cameraCenterX = 0;
       let score = 0;
       let best = 0;
       let perfectStreak = 0;
       let particles = [];
       let impactAt = -1000;
-      const CAMERA_SPEED = 320;
-      const VIEW_SCALE_SPEED = .6;
       const reducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       let charging = false;
       let chargeSource = null;
@@ -178,25 +177,16 @@
         state = game.state;
       }
 
-      function moveToward(value, target, maximumChange) {
-        if (Math.abs(target - value) <= maximumChange) return target;
-        return value + Math.sign(target - value) * maximumChange;
-      }
-
       function updateView(dt, snap = false) {
-        const current = player && (player.standing || platforms[0]);
-        const next = player && platforms.find((platform) => platform !== current && platform.x + platform.w > player.x - player.r);
-        const left = player ? Math.min(player.x - player.r * 1.7, player.standing ? platforms[0].x : player.x) : 0;
-        const right = player ? Math.max(player.x + player.r * 1.7, next ? next.x + next.w : player.x + 110) : displayWidth;
-        const targetScale = Math.min(baseViewScale, displayWidth / Math.max(1, right - left + 44));
-        viewScale = snap ? targetScale : moveToward(viewScale, targetScale, VIEW_SCALE_SPEED * dt);
-        width = displayWidth / viewScale;
-        height = displayHeight / viewScale;
+        const view = rules.updateCameraView({ scale: viewScale, centerX: cameraCenterX }, {
+          player, platforms, displayWidth, displayHeight, baseViewScale,
+        }, dt, snap);
+        viewScale = view.scale;
+        width = view.width;
+        height = view.height;
+        cameraCenterX = view.centerX;
+        cameraX = view.cameraX;
         ctx.setTransform(pixelRatio * viewScale, 0, 0, pixelRatio * viewScale, 0, 0);
-        if (player) {
-          const desired = Math.max(0, (left + right - width) / 2);
-          cameraX = snap ? desired : moveToward(cameraX, desired, CAMERA_SPEED * dt);
-        }
       }
 
       async function request(path, options = {}) {
@@ -264,6 +254,7 @@
         game = rules.createGame(randomSeed[0]);
         syncGame();
         cameraX = 0;
+        cameraCenterX = 0;
         scoreText.textContent = '0';
         comboText.textContent = '0';
         charging = false;

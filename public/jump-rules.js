@@ -12,6 +12,56 @@
   const PLAYER_RADIUS = 19;
   const PLATFORM_Y_LIMIT = 55;
   const PLATFORM_WINDOW_SIZE = 2;
+  const CAMERA_SPEED_PX = 96;
+  const VIEW_SCALE_SPEED = 0.18;
+
+  function moveToward(value, target, maximumChange) {
+    if (Math.abs(target - value) <= maximumChange) return target;
+    return value + Math.sign(target - value) * maximumChange;
+  }
+
+  function updateCameraView(view, scene, dt, snap = false) {
+    if (!view || !scene || !Number.isFinite(dt) || dt < 0) throw new Error('Invalid camera state');
+    const { player, platforms, displayWidth, displayHeight, baseViewScale } = scene;
+    if (!Array.isArray(platforms)
+      || !Number.isFinite(displayWidth) || displayWidth <= 0
+      || !Number.isFinite(displayHeight) || displayHeight <= 0
+      || !Number.isFinite(baseViewScale) || baseViewScale <= 0) {
+      throw new Error('Invalid camera scene');
+    }
+
+    const current = player && (player.standing || platforms[0]);
+    const next = player && platforms.find((platform) => platform !== current
+      && platform.x + platform.w > player.x - player.r);
+    const left = player
+      ? Math.min(player.x - player.r * 1.7, player.standing && platforms[0] ? platforms[0].x : player.x)
+      : 0;
+    const right = player
+      ? Math.max(player.x + player.r * 1.7, next ? next.x + next.w : player.x + 110)
+      : displayWidth / baseViewScale;
+    const targetScale = Math.min(baseViewScale, displayWidth / Math.max(1, right - left + 44));
+    const previousScale = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : baseViewScale;
+    const scale = snap ? targetScale : moveToward(previousScale, targetScale, VIEW_SCALE_SPEED * dt);
+    const width = displayWidth / scale;
+    const height = displayHeight / scale;
+    const targetCenterX = Math.max(width / 2, (left + right) / 2);
+    const previousCenterX = Number.isFinite(view.centerX) ? view.centerX : targetCenterX;
+    const maximumWorldChange = CAMERA_SPEED_PX * dt / scale;
+    const movedCenterX = snap
+      ? targetCenterX
+      : moveToward(previousCenterX, targetCenterX, maximumWorldChange);
+    const centerX = Math.max(width / 2, movedCenterX);
+
+    return {
+      scale,
+      width,
+      height,
+      centerX,
+      cameraX: centerX - width / 2,
+      targetScale,
+      targetCenterX,
+    };
+  }
 
   function randomGenerator(seed) {
     let value = seed >>> 0;
@@ -152,5 +202,8 @@
     PLAYER_RADIUS,
     PLATFORM_Y_LIMIT,
     PLATFORM_WINDOW_SIZE,
+    CAMERA_SPEED_PX,
+    VIEW_SCALE_SPEED,
+    updateCameraView,
   });
 }));
