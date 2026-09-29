@@ -1,0 +1,78 @@
+test/match3.test.js
+  s_168e1bfdeccdef::t_a6fa0b0dbb3dfc 3,5-15,17-22,24-29,34-37,40,42-55,57-60,64-72,75-83,93
+  s_168e1bfdeccdef::t_43de746ad5d332 30-33,38-39,84-92
+  s_168e1bfdeccdef::t_263e1655eb52ab 94-107
+public/games/jump.html
+  s_168e1bfdeccdef::t_919df5d474510f 147-148,170,181-186,189-190,192,198,283,294
+public/match3-rules.js
+  s_168e1bfdeccdef::t_906c2d0940fbd9 12,64-81,119-122,210,234-247
+  s_168e1bfdeccdef::t_263e1655eb52ab 14-16,258-269,277,281-283,286,288-293
+  s_168e1bfdeccdef::t_bb45eb44f1ef97 1-11,13,17-63,82-118,123-209,211-233,248-257,270-276,278-280,284-285,287,294-312
+test/match3-leaderboard.test.js
+  s_168e1bfdeccdef::t_626efe4f6e93be 1-21,23-31,33-103,129
+  s_168e1bfdeccdef::t_263e1655eb52ab 127-128
+  s_168e1bfdeccdef::t_083a6b4ab7dcd1 22,32,104-105,108,115-116,119,121,123-126
+  s_168e1bfdeccdef::t_0e426b005e0a13 106-107,109-114,117-118,120,122
+test/doudizhu.test.js
+  s_168e1bfdeccdef::t_6082c3296662cc 203
+  s_168e1bfdeccdef::t_f1115a36b994d3 9,15-24,54-100
+public/jump-rules.js
+  s_168e1bfdeccdef::t_919df5d474510f 14,56,89-90,143-155
+test/jump-redis-store.test.js
+  s_168e1bfdeccdef::t_b013d174ecf870 202,206,245-256
+  s_168e1bfdeccdef::t_73462accbb0c85 140
+  s_168e1bfdeccdef::t_b0e8ff732ce247 115-139,141-143
+jump-redis-store.js
+  s_168e1bfdeccdef::t_ee0494c7b72da0 1,52,57,62-69,71-73,161,173,178
+public/games/spider.html
+  s_168e1bfdeccdef::t_8aaa18e7d93551 603,620-642,644-646,736-738,795-822,825-826,833,860,875-881
+  s_168e1bfdeccdef::t_e8390cf75a997d 252,273,294-585
+  s_168e1bfdeccdef::t_d83752b86620d5 759-760
+deploy/deploy-game-over
+  s_168e1bfdeccdef::t_b13a9edc23b5ae 44,46,75,79,109,123-125
+doudizhu-server.js
+  s_168e1bfdeccdef::t_6b11a5288dd507 808-812,814
+  s_168e1bfdeccdef::t_c51860b6da0d6c 732
+  s_168e1bfdeccdef::t_17f322dd491915 564,571-581,584-594,598-613,615-646
+  s_168e1bfdeccdef::t_3bd36554bf7e47 105,431,513-514,567-568,570,614,647-648,651-731,733-746,748-794,796-807,813,999
+public/hub.html
+  s_168e1bfdeccdef::t_b13a9edc23b5ae 86
+public/games/match3.html
+  s_168e1bfdeccdef::t_947439b4334d14 6-8,10,12-23,29-46,48-51,59,65-67,70-73,76-80,82-83,85-94,96-109,112,114-119,123,125-127,131-134,137-143,145-160,162-172,174-198,200-208,210-213,215,218,227-228,236-247,249-258,260-266,268-270,273-276,278,280,282,287,289-293,295,297-304,306,308-313,321,324-330,336,344,349,361,363-365,372,376-378,381-390
+  s_168e1bfdeccdef::t_b4ff27cb0fe131 314-320,322-323,331-335,337-342
+  s_168e1bfdeccdef::t_906c2d0940fbd9 221-226,267,271-272
+.github/workflows/ci.yml
+  s_168e1bfdeccdef::t_b13a9edc23b5ae 49,53,72-73,191-193
+test/spider.test.js
+  s_168e1bfdeccdef::t_98cc6f1c7947c3 1-38,40-105
+  s_168e1bfdeccdef::t_985e429f46e206 39
+public/games/doudizhu.html
+  s_168e1bfdeccdef::t_b801654fec7b46 238-243,270-271,655-658,695-704
+  s_168e1bfdeccdef::t_c51860b6da0d6c 228
+server.js
+  s_168e1bfdeccdef::t_cc0a90f7cbd5b1 9-10,14-21,901-903,1032,1040
+test/jump-rules.test.js
+  s_168e1bfdeccdef::t_919df5d474510f 56,77-95,97-101,103-105,112,127,129
+  s_168e1bfdeccdef::t_379b3267faa12b 96,102
+match3-leaderboard.js
+  s_168e1bfdeccdef::t_906c2d0940fbd9 15
+  s_168e1bfdeccdef::t_0e426b005e0a13 230-232,234
+  s_168e1bfdeccdef::t_8537bccbd36f0c 1-9,11-14,16-228,237-239,241-302,304-330
+  s_168e1bfdeccdef::t_43de746ad5d332 10,229,233,235-236,240,303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "65a5b164448128fcc25c0e41acff3d4146173649",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
