@@ -11,6 +11,7 @@
   const GRAVITY = 850;
   const PLAYER_RADIUS = 19;
   const PLATFORM_Y_LIMIT = 55;
+  const PLATFORM_WINDOW_SIZE = 2;
 
   function randomGenerator(seed) {
     let value = seed >>> 0;
@@ -52,7 +53,7 @@
       spawned: 0,
       state: 'ready',
     };
-    for (let index = 0; index < 3; index += 1) game.platforms.push(nextPlatform(game, game.platforms.at(-1)));
+    game.platforms.push(nextPlatform(game, game.platforms[0]));
     const first = game.platforms[0];
     game.player = { x: first.x + first.w / 2, y: first.y - PLAYER_RADIUS, vx: 0, vy: 0, r: PLAYER_RADIUS, standing: first };
     return game;
@@ -85,8 +86,8 @@
       const centerBonus = perfect ? 2 + Math.min(game.perfectStreak - 1, 2) : 0;
       earned = 1 + centerBonus + (platform.special === 'star' ? 3 : 0);
       game.score += earned;
-      while (game.platforms[0] !== platform) game.platforms.shift();
-      while (game.platforms.length < 4) game.platforms.push(nextPlatform(game, game.platforms.at(-1)));
+      game.platforms.shift();
+      game.platforms.push(nextPlatform(game, platform));
     } else {
       game.perfectStreak = 0;
     }
@@ -139,5 +140,17 @@
     return { score: game.score, perfectStreak: game.perfectStreak, durationMs: chargeMs + flightDurationMs, flightDurationMs, jumpCount: holds.length };
   }
 
-  return Object.freeze({ createGame, jump, step, replay, MAX_HOLD_MS, MAX_JUMPS, STEP_SECONDS, GRAVITY, PLAYER_RADIUS, PLATFORM_Y_LIMIT });
+  return Object.freeze({
+    createGame,
+    jump,
+    step,
+    replay,
+    MAX_HOLD_MS,
+    MAX_JUMPS,
+    STEP_SECONDS,
+    GRAVITY,
+    PLAYER_RADIUS,
+    PLATFORM_Y_LIMIT,
+    PLATFORM_WINDOW_SIZE,
+  });
 }));

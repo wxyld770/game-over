@@ -41,9 +41,9 @@ import tarfile
 
 bundle, destination = sys.argv[1:]
 allowed = {
-    'server.js', 'doudizhu-server.js', 'jump-leaderboard.js',
+    'server.js', 'doudizhu-server.js', 'jump-leaderboard.js', 'match3-leaderboard.js',
     'jump-redis-store.js', 'package.json', 'package-lock.json',
-    'public/app.js', 'public/jump-rules.js', 'public/favicon.svg', 'public/index.html',
+    'public/app.js', 'public/jump-rules.js', 'public/match3-rules.js', 'public/favicon.svg', 'public/index.html',
     'public/styles.css', 'public/hub.html',
     'public/games/doudizhu.html', 'public/games/sudoku.html',
     'public/games/minesweeper.html', 'public/games/spider.html',
@@ -72,9 +72,11 @@ PY
   "${node_bin}/node" --check "${staging}/server.js"
   "${node_bin}/node" --check "${staging}/doudizhu-server.js"
   "${node_bin}/node" --check "${staging}/jump-leaderboard.js"
+  "${node_bin}/node" --check "${staging}/match3-leaderboard.js"
   "${node_bin}/node" --check "${staging}/jump-redis-store.js"
   "${node_bin}/node" --check "${staging}/public/app.js"
   "${node_bin}/node" --check "${staging}/public/jump-rules.js"
+  "${node_bin}/node" --check "${staging}/public/match3-rules.js"
 
   [[ -x "${node_bin}/npm" && -x /usr/sbin/runuser && -x /usr/bin/timeout ]] || {
     echo 'The Node/npm toolchain or restricted install runtime is missing.' >&2
@@ -104,7 +106,7 @@ PY
 fi
 
 same_contents=true
-for file in server.js doudizhu-server.js jump-leaderboard.js jump-redis-store.js package.json package-lock.json public/app.js public/jump-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
+for file in server.js doudizhu-server.js jump-leaderboard.js match3-leaderboard.js jump-redis-store.js package.json package-lock.json public/app.js public/jump-rules.js public/match3-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
   if ! cmp -s -- "${previous}/${file}" "${release}/${file}"; then
     same_contents=false
     break
@@ -118,6 +120,9 @@ application_healthy() {
     | python3 -c 'import json,sys; assert json.load(sys.stdin)["ok"] is True' 2>/dev/null || return 1
   curl --fail --silent --max-time 5 \
     http://127.0.0.1:8889/api/jump/leaderboard \
+    | python3 -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict) and isinstance(value.get("entries"),list)' 2>/dev/null || return 1
+  curl --fail --silent --max-time 5 \
+    http://127.0.0.1:8889/api/match3/leaderboard \
     | python3 -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict) and isinstance(value.get("entries"),list)' 2>/dev/null
 }
 

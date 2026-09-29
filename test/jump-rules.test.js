@@ -53,7 +53,7 @@ test('跳一跳规则：中心连击、星光平台与平台补充遵循现有�
   assert.equal(events[1].platform.special, 'star');
   assert.ok(events.every((event) => event.advanced && event.perfect));
   assert.equal(game.score, 20);
-  assert.equal(game.platforms.length, 4);
+  assert.equal(game.platforms.length, Rules.PLATFORM_WINDOW_SIZE);
   assert.equal(game.platforms[0], game.player.standing);
   assert.equal(game.state, 'ready');
   const miss = play(game, 0);
@@ -74,14 +74,42 @@ test('跳一跳规则：地面坐标平移不改变落点与分数', () => {
   }
 });
 
-test('跳一跳规则：长局始终保留四个平台，平台高度有限且下一平台可达', () => {
+test('跳一跳规则：只在成功落地后展示并生成一个新平台', () => {
+  const game = Rules.createGame(0);
+  const current = game.platforms[0];
+  const target = game.platforms[1];
+  assert.equal(Rules.PLATFORM_WINDOW_SIZE, 2);
+  assert.deepEqual(game.platforms, [current, target]);
+  assert.equal(game.spawned, 1);
+
+  const hold = nextPerfectHold(game);
+  const event = play(game, hold);
+  assert.equal(event.platform, target);
+  assert.equal(game.platforms.length, Rules.PLATFORM_WINDOW_SIZE);
+  assert.equal(game.platforms[0], target);
+  assert.notEqual(game.platforms[1], target);
+  assert.equal(game.spawned, 2);
+});
+
+test('跳一跳规则：长跳不能越过目标平台落到尚未展示的平台', () => {
+  const game = Rules.createGame(0);
+  const current = game.platforms[0];
+  const target = game.platforms[1];
+  const event = play(game, 980);
+  assert.equal(event.over, true);
+  assert.equal(game.score, 0);
+  assert.equal(game.spawned, 1);
+  assert.deepEqual(game.platforms, [current, target]);
+});
+
+test('跳一跳规则：长局始终只保留两个平台，平台高度有限且下一平台可达', () => {
   for (const [seed, groundY] of [[0, 0], [42, 275], [0xFFFFFFFF, 0]]) {
     const game = Rules.createGame(seed, groundY);
     const history = [];
     let reachedTop = false;
     let reachedBottom = false;
     for (let index = 0; index < 1100; index += 1) {
-      assert.equal(game.platforms.length, 4);
+      assert.equal(game.platforms.length, Rules.PLATFORM_WINDOW_SIZE);
       for (const platform of game.platforms) {
         assert.ok(platform.y >= groundY - 55 && platform.y <= groundY + 55, `seed ${seed}, jump ${index}: platform height escaped visible range`);
         reachedTop ||= platform.y === groundY - 55;
@@ -96,9 +124,9 @@ test('跳一跳规则：长局始终保留四个平台，平台高度有限且�
       assert.equal(event.platform, target);
       assert.equal(event.perfect, true);
       assert.equal(game.state, 'ready');
-      assert.equal(game.platforms.length, 4);
+      assert.equal(game.platforms.length, Rules.PLATFORM_WINDOW_SIZE);
     }
-    assert.equal(game.spawned, 1103);
+    assert.equal(game.spawned, 1101);
     assert.ok(reachedTop && reachedBottom, `seed ${seed}: long run must exercise both height limits`);
     assert.throws(() => Rules.replay(seed, history), /not finished/);
     history.push(0);

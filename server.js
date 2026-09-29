@@ -6,9 +6,19 @@ const os = require('node:os');
 const net = require('node:net');
 const doudizhu = require('./doudizhu-server');
 const { createJumpLeaderboard } = require('./jump-leaderboard');
+const { createMatch3Leaderboard, validateEntries: validateMatch3Entries } = require('./match3-leaderboard');
+const Match3Rules = require('./public/match3-rules.js');
 const jumpRedisUrl = process.env.JUMP_REDIS_URL || '';
 const jumpStore = jumpRedisUrl ? require('./jump-redis-store').createRedisStore({ url: jumpRedisUrl }) : undefined;
 const jump = createJumpLeaderboard({ store: jumpStore });
+const match3RedisUrl = process.env.MATCH3_REDIS_URL || jumpRedisUrl;
+const match3Store = match3RedisUrl ? require('./jump-redis-store').createRedisStore({
+  url: match3RedisUrl,
+  prefix: 'game-over:match3:v1',
+  maxScore: Match3Rules.MAX_SCORE,
+  validateEntries: validateMatch3Entries,
+}) : undefined;
+const match3 = createMatch3Leaderboard({ store: match3Store });
 
 const SITE_DIR = path.join(__dirname, 'public');
 const PORT = Number(process.env.PORT || 3000);
@@ -888,6 +898,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/jump' || pathname.startsWith('/api/jump/')) {
     return jump.handleRequest(req, res, pathname, url);
   }
+  if (pathname === '/api/match3' || pathname.startsWith('/api/match3/')) {
+    return match3.handleRequest(req, res, pathname, url);
+  }
   try {
     if (pathname === '/api/health' && req.method === 'GET') {
       return sendJson(res, 200, { ok: true, rooms: rooms.size, doudizhuRooms: doudizhu.liveRoomCount() });
@@ -1016,7 +1029,7 @@ if (require.main === module) {
       }).unref();
     }
   });
-  if (jumpStore) {
+  if (jumpStore || match3Store) {
     let stopping = false;
     const stop = () => {
       if (stopping) return;
@@ -1024,7 +1037,7 @@ if (require.main === module) {
       const deadline = setTimeout(() => process.exit(0), 5000);
       deadline.unref();
       server.close(async () => {
-        await jumpStore.close();
+        await Promise.all([jumpStore?.close(), match3Store?.close()]);
         process.exit(0);
       });
     };

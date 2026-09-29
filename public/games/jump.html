@@ -144,6 +144,8 @@
       let perfectStreak = 0;
       let particles = [];
       let impactAt = -1000;
+      const CAMERA_SPEED = 320;
+      const VIEW_SCALE_SPEED = .6;
       const reducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       let charging = false;
       let chargeSource = null;
@@ -165,7 +167,7 @@
         pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.round(displayWidth * pixelRatio);
         canvas.height = Math.round(displayHeight * pixelRatio);
-        updateView(1);
+        updateView(0, true);
       }
 
       function syncGame() {
@@ -176,23 +178,24 @@
         state = game.state;
       }
 
-      function updateView(dt) {
+      function moveToward(value, target, maximumChange) {
+        if (Math.abs(target - value) <= maximumChange) return target;
+        return value + Math.sign(target - value) * maximumChange;
+      }
+
+      function updateView(dt, snap = false) {
         const current = player && (player.standing || platforms[0]);
         const next = player && platforms.find((platform) => platform !== current && platform.x + platform.w > player.x - player.r);
-        const left = player ? Math.min(player.x - player.r * 1.7, state === 'ready' ? platforms[0].x : player.x) : 0;
-        const right = next ? next.x + next.w : player ? player.x + 110 : displayWidth;
+        const left = player ? Math.min(player.x - player.r * 1.7, player.standing ? platforms[0].x : player.x) : 0;
+        const right = player ? Math.max(player.x + player.r * 1.7, next ? next.x + next.w : player.x + 110) : displayWidth;
         const targetScale = Math.min(baseViewScale, displayWidth / Math.max(1, right - left + 44));
-        viewScale = targetScale < viewScale ? targetScale : viewScale + (targetScale - viewScale) * Math.min(1, dt * 5);
+        viewScale = snap ? targetScale : moveToward(viewScale, targetScale, VIEW_SCALE_SPEED * dt);
         width = displayWidth / viewScale;
         height = displayHeight / viewScale;
         ctx.setTransform(pixelRatio * viewScale, 0, 0, pixelRatio * viewScale, 0, 0);
         if (player) {
           const desired = Math.max(0, (left + right - width) / 2);
-          cameraX += (desired - cameraX) * Math.min(1, dt * 6);
-          // Smooth tracking must not hide the next platform while the camera settles.
-          const minimum = Math.max(0, right - width + 22);
-          const maximum = Math.max(minimum, left - 22);
-          cameraX = Math.max(minimum, Math.min(maximum, cameraX));
+          cameraX = snap ? desired : moveToward(cameraX, desired, CAMERA_SPEED * dt);
         }
       }
 
@@ -277,7 +280,7 @@
         restart.disabled = true;
         message.textContent = '正在准备本局...';
         rankedRunStatus.textContent = '';
-        updateView(1);
+        updateView(0, true);
         try {
           const createRun = () => request('/api/jump/runs', { method: 'POST', body: '{}' });
           // Serialize first visits across tabs so they share the same player Cookie.
@@ -288,7 +291,7 @@
           rankedRun = run;
           game = rules.createGame(run.seed);
           syncGame();
-          updateView(1);
+          updateView(0, true);
           loadRanking();
         } catch {
           if (version !== runVersion) return;

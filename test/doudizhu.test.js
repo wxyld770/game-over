@@ -6,10 +6,20 @@ process.env.DOUDIZHU_AI_MS = '25';
 const repoRoot = process.env.GAME_OVER_ROOT || path.resolve(__dirname, '..');
 const { server } = require(path.join(repoRoot, 'server.js'));
 const { testing } = require(path.join(repoRoot, 'doudizhu-server.js'));
-const { DECK, classifyCards, beats, rooms, createAttempts, limits } = testing;
+const { DECK, classifyCards, beats, chooseAiPlay, rooms, createAttempts, limits } = testing;
 
 function cards(groups) {
   return groups.flatMap(([value, count]) => DECK.filter((card) => card.value === value).slice(0, count).map((card) => card.id));
+}
+
+function held(groups) {
+  return cards(groups).map((id) => DECK[id]);
+}
+
+function publicPlay(playerId, groups) {
+  const ids = cards(groups);
+  const pattern = classifyCards(ids);
+  return { playerId, cards: ids.map((id) => DECK[id]), ...pattern, pattern };
 }
 
 test('斗地主常见牌型、非法牌型与大小比较', () => {
@@ -39,6 +49,55 @@ test('斗地主常见牌型、非法牌型与大小比较', () => {
   assert.equal(beats(classifyCards(cards([[3, 4]])), classifyCards(cards([[14, 1]]))), true);
   assert.equal(beats(classifyCards(cards([[16, 1], [17, 1]])), classifyCards(cards([[15, 4]]))), true);
   assert.equal(beats(classifyCards(cards([[3, 4]])), classifyCards(cards([[16, 1], [17, 1]]))), false);
+});
+
+test('斗地主 AI 会压制对手，并在地主即将出完时接管农民队友的牌权', () => {
+  const farmer = { id: 'farmer-ai', hand: held([[4, 1], [8, 2], [15, 1], [17, 1]]) };
+  const teammate = { id: 'farmer-human', hand: Array(7) };
+  const landlord = { id: 'landlord-ai', hand: Array(5) };
+  const landlordPlay = publicPlay(landlord.id, [[3, 1]]);
+  const room = {
+    landlordId: landlord.id,
+    players: [landlord, farmer, teammate],
+    lastPlay: landlordPlay,
+    playHistory: [landlordPlay],
+  };
+
+  const response = chooseAiPlay(room, farmer);
+  assert.ok(response, '农民电脑有合法牌时不能放任地主取得牌权');
+  assert.equal(beats(classifyCards(response), landlordPlay.pattern), true);
+
+  const teammatePlay = publicPlay(teammate.id, [[3, 1]]);
+  room.players = [teammate, farmer, landlord];
+  room.lastPlay = teammatePlay;
+  room.playHistory = [teammatePlay];
+  assert.equal(chooseAiPlay(room, farmer), null, '地主没有临近出完时应让农民队友继续掌握牌权');
+
+  landlord.hand = Array(1);
+  const urgentResponse = chooseAiPlay(room, farmer);
+  assert.ok(urgentResponse, '地主只剩一张时应主动压住队友的低牌，避免地主直接走完');
+  assert.equal(beats(classifyCards(urgentResponse), teammatePlay.pattern), true);
+  assert.equal(classifyCards(urgentResponse).mainValue, 17, '紧急防守应使用公开牌面下控制力最强的单张');
+});
+
+test('斗地主 AI 决策不读取对手暗牌', () => {
+  const farmer = { id: 'farmer-ai', hand: held([[4, 1], [7, 2], [10, 1], [15, 1]]) };
+  const teammate = { id: 'farmer-human', hand: Array(6) };
+  const previous = publicPlay('landlord', [[3, 1]]);
+  const room = (hiddenHand) => ({
+    landlordId: 'landlord',
+    players: [{ id: 'landlord', hand: hiddenHand }, farmer, teammate],
+    lastPlay: previous,
+    playHistory: [previous],
+  });
+
+  const lowHiddenCards = held([[5, 3], [6, 2]]);
+  const highHiddenCards = held([[13, 1], [14, 1], [16, 1], [17, 1], [9, 1]]);
+  assert.deepEqual(
+    chooseAiPlay(room(lowHiddenCards), farmer),
+    chooseAiPlay(room(highHiddenCards), farmer),
+    '对手暗牌内容变化但公开余牌数相同时，电脑决策必须一致',
+  );
 });
 
 test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算', { timeout: 10_000 }, async (t) => {
@@ -141,6 +200,7 @@ test('斗地主 HTTP：手牌隐藏、叫分、合法出牌与地主胜负结算
   const lead = await action(code, users[turnIndex].token, 'play', { cards: [landlord.hand[0].id] });
   assert.equal(lead.status, 200);
   assert.equal(lead.body.lastPlay.cards.length, 1);
+  assert.equal(room.playHistory.length, 1, '服务端应记录公开出牌，供电脑按已知牌面推算');
   assert.equal((await action(code, users[(turnIndex + 1) % 3].token, 'pass')).status, 200);
   const renewed = await action(code, users[(turnIndex + 2) % 3].token, 'pass');
   assert.equal(renewed.status, 200);

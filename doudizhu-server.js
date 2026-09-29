@@ -102,6 +102,7 @@ function createRoom(name, mode = 'online') {
     bidHistory: [],
     bidsTaken: 0,
     lastPlay: null,
+    playHistory: [],
     passCount: 0,
     baseScore: 0,
     multiplier: 1,
@@ -427,6 +428,7 @@ function startRound(room) {
   room.bidHistory = [];
   room.bidsTaken = 0;
   room.lastPlay = null;
+  room.playHistory = [];
   room.passCount = 0;
   room.baseScore = 0;
   room.multiplier = 1;
@@ -508,6 +510,8 @@ function applyPlay(room, player, ids) {
   const played = new Set(ids);
   player.hand = player.hand.filter((card) => !played.has(card.id));
   room.lastPlay = { playerId: player.id, cards: selected, ...pattern, pattern };
+  if (!Array.isArray(room.playHistory)) room.playHistory = [];
+  room.playHistory.push({ playerId: player.id, cards: selected, pattern });
   room.passCount = 0;
   if (pattern.type === 'bomb' || pattern.type === 'rocket') room.multiplier *= 2;
   if (player.hand.length === 0) {
@@ -557,57 +561,257 @@ function rankGroups(hand) {
     if (!groups.has(card.value)) groups.set(card.value, []);
     groups.get(card.value).push(card.id);
   }
-  return [...groups.values()];
+  return groups;
 }
 
-function findCombination(hand, size, previous, acceptBomb = false) {
+function legalAiMoves(hand, previous = null) {
+  if (previous?.type === 'rocket') return [];
   const groups = rankGroups(hand);
-  let best = null;
-  let bestPattern = null;
-  const selected = [];
-  function visit(index, remaining) {
-    if (remaining === 0) {
-      const pattern = classifyCards(selected);
-      if (!pattern || (!acceptBomb && ['bomb', 'rocket'].includes(pattern.type)) || !beats(pattern, previous)) return;
-      if (!best || pattern.mainValue < bestPattern.mainValue) {
-        best = [...selected];
-        bestPattern = pattern;
-      }
+  const moves = [];
+  const seen = new Set();
+  function add(ids) {
+    const signature = [...ids].sort((a, b) => a - b).join(',');
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    const pattern = classifyCards(ids);
+    if (pattern && beats(pattern, previous)) moves.push({ ids: [...ids], pattern });
+  }
+  function attachments(entries, total, pairsOnly, callback, index = 0, selected = []) {
+    if (total === 0) {
+      callback(selected);
       return;
     }
-    if (index === groups.length) return;
-    const available = groups.slice(index).reduce((sum, group) => sum + group.length, 0);
-    if (available < remaining) return;
-    const group = groups[index];
-    for (let amount = 0; amount <= Math.min(group.length, remaining); amount += 1) {
-      selected.push(...group.slice(0, amount));
-      visit(index + 1, remaining - amount);
+    if (index >= entries.length) return;
+    const available = entries.slice(index).reduce((sum, [, ids]) => (
+      sum + (pairsOnly ? (ids.length >= 2 ? 2 : 0) : ids.length)
+    ), 0);
+    if (available < total) return;
+    const [, ids] = entries[index];
+    const amounts = pairsOnly ? [0, 2] : Array.from({ length: Math.min(ids.length, total) + 1 }, (_, amount) => amount);
+    for (const amount of amounts) {
+      if (amount > total || amount > ids.length) continue;
+      selected.push(...ids.slice(0, amount));
+      attachments(entries, total - amount, pairsOnly, callback, index + 1, selected);
       selected.length -= amount;
     }
   }
-  visit(0, size);
-  return best;
+
+  const entries = [...groups.entries()];
+  for (const [, ids] of entries) {
+    add(ids.slice(0, 1));
+    if (ids.length >= 2) add(ids.slice(0, 2));
+    if (ids.length >= 3) add(ids.slice(0, 3));
+    if (ids.length === 4) add(ids);
+  }
+  if (groups.has(16) && groups.has(17)) add([groups.get(16)[0], groups.get(17)[0]]);
+
+  for (const [value, ids] of entries) {
+    if (ids.length < 3) continue;
+    for (const [otherValue, otherIds] of entries) {
+      if (otherValue === value) continue;
+      add([...ids.slice(0, 3), otherIds[0]]);
+      if (otherIds.length >= 2) add([...ids.slice(0, 3), ...otherIds.slice(0, 2)]);
+    }
+  }
+
+  for (const [unit, minimum] of [[1, 5], [2, 3]]) {
+    for (let start = 3; start <= 14; start += 1) {
+      const run = [];
+      for (let value = start; value <= 14 && (groups.get(value)?.length || 0) >= unit; value += 1) {
+        run.push(...groups.get(value).slice(0, unit));
+        if (value - start + 1 >= minimum) add(run);
+      }
+    }
+  }
+
+  for (let start = 3; start <= 14; start += 1) {
+    const core = [];
+    const coreValues = new Set();
+    for (let value = start; value <= 14 && (groups.get(value)?.length || 0) >= 3; value += 1) {
+      core.push(...groups.get(value).slice(0, 3));
+      coreValues.add(value);
+      const length = value - start + 1;
+      if (length < 2) continue;
+      add(core);
+      const outside = entries.filter(([rank]) => !coreValues.has(rank));
+      attachments(outside, length, false, (wings) => add([...core, ...wings]));
+      attachments(outside, length * 2, true, (wings) => add([...core, ...wings]));
+    }
+  }
+
+  for (const [value, ids] of entries) {
+    if (ids.length !== 4) continue;
+    const outside = entries.filter(([rank]) => rank !== value);
+    attachments(outside, 2, false, (wings) => add([...ids, ...wings]));
+    attachments(outside, 4, true, (wings) => add([...ids, ...wings]));
+  }
+  return moves;
+}
+
+function takeLongestRun(counts, amount, minimum) {
+  let best = [];
+  let current = [];
+  for (let value = 3; value <= 14; value += 1) {
+    if ((counts.get(value) || 0) >= amount) current.push(value);
+    else {
+      if (current.length > best.length) best = current;
+      current = [];
+    }
+  }
+  if (current.length > best.length) best = current;
+  if (best.length < minimum) return false;
+  for (const value of best) counts.set(value, counts.get(value) - amount);
+  return true;
+}
+
+function estimateHandTurns(hand) {
+  if (!hand.length) return 0;
+  if (classifyCards(hand)) return 1;
+  const counts = new Map();
+  for (const card of hand) counts.set(card.value, (counts.get(card.value) || 0) + 1);
+  let turns = 0;
+  for (const [amount, minimum] of [[3, 2], [2, 3], [1, 5]]) {
+    while (takeLongestRun(counts, amount, minimum)) turns += 1;
+  }
+  const remaining = [...counts.entries()].filter(([, count]) => count > 0);
+  const triples = remaining.filter(([, count]) => count === 3).length;
+  const attachments = Math.min(triples, remaining.length - triples);
+  turns += remaining.length - attachments;
+  if ((counts.get(16) || 0) && (counts.get(17) || 0)) turns -= 1;
+  return Math.max(1, turns);
+}
+
+function moveBreakPenalty(hand, move) {
+  const held = new Map();
+  const used = new Map();
+  for (const card of hand) held.set(card.value, (held.get(card.value) || 0) + 1);
+  for (const id of move.ids) {
+    const value = DECK[id].value;
+    used.set(value, (used.get(value) || 0) + 1);
+  }
+  let penalty = 0;
+  for (const [value, amount] of used) {
+    const total = held.get(value);
+    if (amount >= total) continue;
+    if (total === 4) penalty += 12;
+    else if (total === 3) penalty += 5;
+    else if (total === 2) penalty += 2;
+  }
+  if (held.has(16) && held.has(17) && (used.has(16) !== used.has(17))) penalty += 10;
+  return penalty;
+}
+
+function publicPotentialCounts(room, player) {
+  const counts = new Map();
+  for (const card of DECK) counts.set(card.value, (counts.get(card.value) || 0) + 1);
+  const knownIds = new Set();
+  for (const card of player.hand) knownIds.add(card.id);
+  for (const play of room.playHistory || []) {
+    for (const card of play.cards || []) knownIds.add(card.id);
+  }
+  for (const card of room.lastPlay?.cards || []) knownIds.add(card.id);
+  for (const id of knownIds) {
+    const card = DECK[id];
+    if (card) counts.set(card.value, Math.max(0, (counts.get(card.value) || 0) - 1));
+  }
+  return counts;
+}
+
+function higherPublicThreats(pattern, potential) {
+  if (pattern.type === 'rocket') return 0;
+  const rocket = (potential.get(16) || 0) > 0 && (potential.get(17) || 0) > 0 ? 1 : 0;
+  const bombs = () => {
+    let count = rocket;
+    for (let value = pattern.type === 'bomb' ? pattern.mainValue + 1 : 3; value <= 15; value += 1) {
+      if ((potential.get(value) || 0) >= 4) count += 1;
+    }
+    return count;
+  };
+  if (pattern.type === 'bomb') return bombs();
+
+  const unit = pattern.type === 'pair' || pattern.type === 'pair-straight' ? 2
+    : pattern.type === 'triple' || pattern.type === 'triple-single' || pattern.type.startsWith('plane') ? 3
+      : pattern.type.startsWith('four-') ? 4 : 1;
+  let sameType = 0;
+  if (pattern.chainLength > 1) {
+    for (let end = pattern.mainValue + 1; end <= 14; end += 1) {
+      const start = end - pattern.chainLength + 1;
+      if (start >= 3 && Array.from({ length: pattern.chainLength }, (_, index) => start + index)
+        .every((value) => (potential.get(value) || 0) >= unit)) sameType += 1;
+    }
+  } else {
+    const maximum = unit === 1 ? 17 : 15;
+    for (let value = pattern.mainValue + 1; value <= maximum; value += 1) {
+      if ((potential.get(value) || 0) >= unit) sameType += 1;
+    }
+  }
+  return sameType + bombs();
+}
+
+function sameTeam(room, firstId, secondId) {
+  return firstId === secondId || (firstId !== room.landlordId && secondId !== room.landlordId);
+}
+
+function aiPublicContext(room, player) {
+  const seats = room.players.map((seat) => ({
+    id: seat.id,
+    cardCount: seat.hand.length,
+    isLandlord: seat.id === room.landlordId,
+  }));
+  const opponents = seats.filter((seat) => !sameTeam(room, player.id, seat.id));
+  const teammate = seats.find((seat) => seat.id !== player.id && sameTeam(room, player.id, seat.id)) || null;
+  const previous = seats.find((seat) => seat.id === room.lastPlay?.playerId) || null;
+  return {
+    opponentMin: opponents.length ? Math.min(...opponents.map((seat) => seat.cardCount)) : 20,
+    teammate,
+    previous,
+    previousIsTeammate: !!previous && previous.id !== player.id && sameTeam(room, player.id, previous.id),
+    teammateActsNext: !!teammate && nextPlayer(room, player.id).id === teammate.id,
+    potential: publicPotentialCounts(room, player),
+  };
+}
+
+function scoreAiMove(room, player, move, context) {
+  const played = new Set(move.ids);
+  const remaining = player.hand.filter((card) => !played.has(card.id));
+  if (!remaining.length) return -1_000_000;
+  const urgent = context.opponentMin <= 2;
+  const explosive = move.pattern.type === 'bomb' || move.pattern.type === 'rocket';
+  let score = estimateHandTurns(remaining) * 110;
+  score += moveBreakPenalty(player.hand, move) * 11;
+  score -= move.ids.length * 4;
+  score += move.pattern.mainValue * (room.lastPlay ? (urgent ? -2 : 1.5) : 0.35);
+  if (explosive && !urgent) score += 145;
+
+  const publicThreats = higherPublicThreats(move.pattern, context.potential);
+  score += publicThreats * (urgent ? 170 : 3);
+  if (urgent && move.pattern.count > context.opponentMin) score -= 135;
+
+  if (!room.lastPlay && context.teammateActsNext && context.teammate?.cardCount <= 2) {
+    const helpsTeammate = context.teammate.cardCount === 1
+      ? move.pattern.type === 'single'
+      : ['single', 'pair'].includes(move.pattern.type);
+    if (helpsTeammate) score -= 85;
+  }
+  return score;
 }
 
 function chooseAiPlay(room, player) {
   const previous = room.lastPlay?.pattern || null;
-  if (previous) {
-    const previousPlayer = room.players.find((seat) => seat.id === room.lastPlay.playerId);
-    if (previousPlayer && previousPlayer.id !== room.landlordId && player.id !== room.landlordId) return null;
-    const sameType = findCombination(player.hand, previous.count, previous);
-    if (sameType) return sameType;
-    const bomb = findCombination(player.hand, 4, previous, true);
-    if (bomb && classifyCards(bomb).type === 'bomb') return bomb;
-    const rocket = findCombination(player.hand, 2, previous, true);
-    return rocket && classifyCards(rocket).type === 'rocket' ? rocket : null;
+  const moves = legalAiMoves(player.hand, previous);
+  if (!moves.length) return null;
+  const context = aiPublicContext(room, player);
+  if (previous && context.previousIsTeammate) {
+    // Keep a farmer teammate's initiative unless the landlord is about to go out.
+    if (context.opponentMin > 2) return null;
   }
-  const wholeHand = classifyCards(player.hand);
-  if (wholeHand) return player.hand.map((card) => card.id);
-  for (let size = Math.min(12, player.hand.length); size >= 2; size -= 1) {
-    const move = findCombination(player.hand, size, null);
-    if (move) return move;
-  }
-  return [sorted(player.hand)[0].id];
+  const ranked = moves.map((move) => ({ move, score: scoreAiMove(room, player, move, context) }));
+  ranked.sort((first, second) => (
+    first.score - second.score
+    || first.move.pattern.mainValue - second.move.pattern.mainValue
+    || second.move.ids.length - first.move.ids.length
+  ));
+  return ranked[0].move.ids;
 }
 
 function aiTakeTurn(room, player) {
@@ -792,5 +996,5 @@ setInterval(() => {
 module.exports = {
   handleRequest,
   liveRoomCount: () => rooms.size,
-  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, finishRound, scheduleTurn, schedulePresenceUpdate },
+  testing: { DECK, rooms, createAttempts, limits: { MAX_ROOMS, MAX_CREATES_PER_ADDRESS, MAX_SSE_PER_PLAYER }, createRoom, state, classifyCards, beats, startRound, applyBid, applyPlay, applyPass, chooseAiPlay, finishRound, scheduleTurn, schedulePresenceUpdate },
 };

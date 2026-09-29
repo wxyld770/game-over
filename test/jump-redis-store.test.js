@@ -112,6 +112,35 @@ test('Redis leaderboard passes namespaced atomic writes and validates their snap
   await store.close();
 });
 
+test('Redis leaderboard supports an isolated game validator and score ceiling', async () => {
+  const client = fakeClient();
+  const candidate = entry('match-player', 500_000, 'Matcher');
+  let validations = 0;
+  const validateEntries = (entries, maximum) => {
+    validations += 1;
+    assert.equal(maximum, 5);
+    if (entries.some((value) => value.score > 1_000_000)) throw new Error('invalid match score');
+    return entries;
+  };
+  client.eval = async (script, options) => {
+    client.commands.push({ script, options });
+    return options.arguments.length === 1 ? [] : [1, [JSON.stringify(candidate)]];
+  };
+  const store = createRedisStore({
+    client,
+    prefix: 'game-over:match3:test',
+    maxEntries: 5,
+    maxScore: 1_000_000,
+    validateEntries,
+  });
+  assert.deepEqual(await store.saveBest(candidate), { entries: [candidate], isPersonalBest: true });
+  const write = client.commands[1];
+  assert.deepEqual(write.options.keys, ['game-over:match3:test:players']);
+  assert.deepEqual(write.options.arguments.slice(1), ['5', '1000000']);
+  assert.equal(validations, 3, 'existing entries, candidate, and Redis snapshot use the game-specific validator');
+  await store.close();
+});
+
 test('Redis leaderboard recovers after a failed connect and bounds stuck commands', async () => {
   const client = fakeClient();
   let attempts = 0;
@@ -170,11 +199,11 @@ async function redisFixture(t, maxEntries = 3) {
     process.once('error', onError);
     process.once('exit', onExit);
   });
-  function store(prefix = 'game-over:jump:v1') {
+  function store(prefix = 'game-over:jump:v1', options = {}) {
     const client = require('redis').createClient({
       socket: { path: socket, reconnectStrategy: false }, disableOfflineQueue: true,
     });
-    const instance = createRedisStore({ client, prefix, maxEntries });
+    const instance = createRedisStore({ client, prefix, maxEntries, ...options });
     clients.push(instance);
     return { instance, client };
   }
@@ -213,6 +242,18 @@ test('Redis Lua saves concurrent personal bests, tie order, capacity and isolate
   assert.deepEqual(await isolated.instance.load(), []);
   await isolated.instance.saveBest(entry('d', 30, 'Dave'));
   assert.equal((await first.instance.load()).length, 3);
+  const match = local.store('game-over:match3:v1', {
+    maxScore: 1_000_000,
+    validateEntries: (values, maximum) => {
+      assert.ok(values.length <= maximum);
+      if (values.some((value) => !Number.isInteger(value.score) || value.score > 1_000_000)) throw new Error('invalid match score');
+      return values;
+    },
+  });
+  const matchEntry = entry('match', 500_000, 'Matcher');
+  await match.instance.saveBest(matchEntry);
+  assert.deepEqual(await match.instance.load(), [matchEntry]);
+  assert.equal((await first.instance.load()).length, 3, 'match-3 key space is isolated from jump scores');
   await first.instance.close();
   const restarted = local.store();
   assert.deepEqual(await restarted.instance.load(), await second.instance.load());

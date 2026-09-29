@@ -1,106 +1,108 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
+const Rules = require('../public/match3-rules.js');
 
-const html = fs.readFileSync(path.join(__dirname, '../public/games/match3.html'), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-assert.ok(script, 'match-3 page has an inline script');
-const begin = script.indexOf('// PURE_GAME_LOGIC_START');
-const end = script.indexOf('// PURE_GAME_LOGIC_END');
-assert.ok(begin >= 0 && end > begin, 'pure game logic is available for model testing');
-const pureLogic = script.slice(begin + '// PURE_GAME_LOGIC_START'.length, end);
+test('随机棋盘没有预消除、颜色不分栏，并且始终至少有一步可走', () => {
+  const colorsByColumn = Array.from({ length: Rules.COLS }, () => new Set());
+  for (let seed = 0; seed < 300; seed += 1) {
+    const game = Rules.createGame(seed);
+    assert.equal(game.board.length, Rules.TOTAL);
+    assert.equal(Rules.matchRuns(game.board).length, 0, `seed ${seed}: no initial match`);
+    assert.ok(Rules.findMoves(game.board, 1).length, `seed ${seed}: playable`);
+    game.board.forEach((kind, index) => colorsByColumn[index % Rules.COLS].add(kind));
+  }
+  assert.ok(colorsByColumn.every((colors) => colors.size === Rules.KINDS), 'all colours can appear in every column');
+});
 
-function gameForSeed(seed) {
-  let randomState = seed >>> 0;
-  const seededMath = Object.create(Math);
-  seededMath.random = () => {
-    randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0;
-    return randomState / 0x100000000;
-  };
-  const context = vm.createContext({ Math: seededMath, Set, Array });
-  vm.runInContext(`${pureLogic}\nglobalThis.logic = { ROWS, COLS, BLOCK_COUNT, TOTAL, makeBoard, globalMatches, analyzeSwap, winningPair, reorderBoard, applyGravity, blockIndices };`, context);
-  return context.logic;
-}
+test('三连、四连、五连和七颗 T 形采用不同分值', () => {
+  function groupFor(cells) {
+    const board = Array(Rules.TOTAL).fill(null);
+    for (const index of cells) board[index] = 2;
+    return Rules.matchGroups(board)[0];
+  }
 
-test('200 个随机棋盘按任意整块消除顺序下落后仍可清屏', () => {
-  for (let seed = 1; seed <= 200; seed += 1) {
-    const game = gameForSeed(seed);
-    let board = game.makeBoard().board;
-    assert.equal(board.length, 72, `seed ${seed}: full board`);
-    assert.ok(board.every(value => Number.isInteger(value)), `seed ${seed}: no empty starting tile`);
-    assert.equal(game.globalMatches(board).size, 0, `seed ${seed}: no pre-existing match`);
+  const line = 3 * Rules.COLS;
+  const three = groupFor([line + 1, line + 2, line + 3]);
+  const four = groupFor([line + 1, line + 2, line + 3, line + 4]);
+  const five = groupFor([line + 1, line + 2, line + 3, line + 4, line + 5]);
+  const tSeven = groupFor([line + 1, line + 2, line + 3, line + 4, line + 5,
+    4 * Rules.COLS + 3, 5 * Rules.COLS + 3]);
+  const crossSeven = groupFor([line + 1, line + 2, line + 3, line + 4, line + 5,
+    2 * Rules.COLS + 3, 4 * Rules.COLS + 3]);
+  const cornerSeven = groupFor([line + 1, line + 2, line + 3, line + 4, line + 5,
+    4 * Rules.COLS + 1, 5 * Rules.COLS + 1]);
+  assert.deepEqual([three.shape, three.points], ['three', 30]);
+  assert.deepEqual([four.shape, four.points], ['four', 90]);
+  assert.deepEqual([five.shape, five.points], ['five', 180]);
+  assert.deepEqual([tSeven.shape, tSeven.points], ['t7', 500]);
+  assert.equal(crossSeven.shape, 'cross', '十字形不能冒充 T 形');
+  assert.equal(cornerSeven.shape, 'cross', 'L 形不能冒充 T 形');
+});
 
-    for (let moveNumber = 0; moveNumber < game.BLOCK_COUNT; moveNumber += 1) {
-      const available = Array.from({ length: game.BLOCK_COUNT }, (_, block) => block)
-        .filter(block => game.winningPair(board, block));
-      assert.equal(available.length, game.BLOCK_COUNT - moveNumber,
-        `seed ${seed}: every surviving block can be cleared after gravity`);
-      const block = available[(seed * 7 + moveNumber * 5) % available.length];
-      if (moveNumber === 5) {
-        const before = Array.from({ length: 6 }, (_, kind) => board.filter(value => value === kind).length);
-        const occupied = board.map(value => value !== null);
-        board = game.reorderBoard(board);
-        assert.deepEqual(Array.from({ length: 6 }, (_, kind) => board.filter(value => value === kind).length), before, `seed ${seed}: reorder keeps existing colors`);
-        assert.deepEqual(board.map(value => value !== null), occupied, `seed ${seed}: reorder adds no tiles`);
-        assert.equal(game.globalMatches(board).size, 0, `seed ${seed}: reorder makes no unsolicited matches`);
-      }
-      const pair = game.winningPair(board, block);
-      assert.ok(pair, `seed ${seed}: block ${block} has a clearing swap`);
-      const beforeMove = board.slice();
-      const outcome = game.analyzeSwap(board, pair[0], pair[1]);
-      assert.equal(outcome.valid, true, `seed ${seed}: move ${moveNumber} is legal`);
-      assert.equal(outcome.cleared.length, 6, `seed ${seed}: each move clears both triples`);
-      board = outcome.swapped;
-      for (const index of outcome.cleared) board[index] = null;
-      if (moveNumber === 2) {
-        const restored = beforeMove;
-        assert.ok(game.winningPair(restored, block), `seed ${seed}: undo restores a solvable board`);
-        board = game.analyzeSwap(restored, pair[0], pair[1]).swapped;
-        for (const index of outcome.cleared) board[index] = null;
-      }
-      const beforeGravity = board.slice();
-      const settled = game.applyGravity(board);
-      board = settled.board;
-      assert.equal(board.filter(value => value !== null).length, 72 - (moveNumber + 1) * 6,
-        `seed ${seed}: gravity neither creates nor loses gems`);
-      for (const { from, to } of settled.drops) {
-        assert.equal(from % game.COLS, to % game.COLS, `seed ${seed}: gems only fall in their column`);
-        assert.ok(to > from, `seed ${seed}: gems fall downward`);
-        assert.equal(board[to], beforeGravity[from], `seed ${seed}: gem lands intact`);
-      }
-      for (let c = 0; c < game.COLS; c += 1) {
-        let seenGem = false;
-        for (let r = 0; r < game.ROWS; r += 1) {
-          if (board[r * game.COLS + c] !== null) seenGem = true;
-          else assert.equal(seenGem, false, `seed ${seed}: no void below a gem`);
-        }
-      }
-      assert.equal(game.globalMatches(board).size, 0,
-        `seed ${seed}: gravity never leaves an uncleared three-match`);
+test('下落会补满新宝石，连锁结束后仍有解，可以无限继续', () => {
+  for (let seed = 1; seed <= 100; seed += 1) {
+    const game = Rules.createGame(seed);
+    const history = [];
+    for (let moveNumber = 0; moveNumber < 80; moveNumber += 1) {
+      const choices = Rules.findMoves(game.board, 24);
+      const [a, b] = choices[(seed * 11 + moveNumber * 7) % choices.length];
+      const result = Rules.swap(game, a, b);
+      history.push(a, b);
+      assert.equal(result.valid, true);
+      assert.ok(result.stages.length >= 1);
+      assert.ok(result.stages.every((stage) => stage.after.every(Number.isInteger)), 'refill keeps board full');
+      assert.equal(Rules.matchRuns(game.board).length, 0, 'all cascades settle before next move');
+      assert.ok(Rules.findMoves(game.board, 1).length, 'dead boards are reshuffled automatically');
     }
-    assert.ok(board.every(value => value === null), `seed ${seed}: all 72 gems are gone`);
+    const replay = Rules.replay(seed, history);
+    assert.equal(replay.score, game.score, `seed ${seed}: server replay score`);
+    assert.equal(replay.moveCount, game.moves);
+    assert.ok(game.score > 0);
   }
 });
 
-test('无效相邻交换不修改棋盘，且只承认双线清除', () => {
-  const game = gameForSeed(47);
-  const board = game.makeBoard().board;
-  const original = board.slice();
-  let validCount = 0;
-  let invalidCount = 0;
-  for (let index = 0; index < game.TOTAL; index += 1) {
-    for (const neighbor of [index + 1, index + game.COLS]) {
-      if (neighbor >= game.TOTAL) continue;
-      const result = game.analyzeSwap(board, index, neighbor);
-      if (result.valid) {
-        validCount += 1;
-        assert.equal(result.cleared.length, 6);
-      } else invalidCount += 1;
+test('无效交换不改变棋盘，重放拒绝伪造或残缺步骤', () => {
+  const initial = Rules.createGame(47);
+  let invalid;
+  for (let index = 0; index < Rules.TOTAL && !invalid; index += 1) {
+    for (const neighbor of [index + 1, index + Rules.COLS]) {
+      if (!Rules.adjacent(index, neighbor)) continue;
+      const probe = Rules.createGame(47);
+      const result = Rules.swap(probe, index, neighbor);
+      if (!result.valid) invalid = [index, neighbor];
     }
   }
-  assert.equal(validCount, game.BLOCK_COUNT, 'one clearing move per untouched block');
-  assert.ok(invalidCount > 0);
-  assert.deepEqual([...board], [...original], 'analyzing failed swaps is side effect free');
+  assert.ok(invalid);
+  const game = Rules.createGame(47);
+  const before = game.board.slice();
+  assert.equal(Rules.swap(game, ...invalid).valid, false);
+  assert.deepEqual(game.board, before);
+  assert.throws(() => Rules.replay(47, invalid), /Invalid move history/);
+  assert.throws(() => Rules.replay(47, [0]), /Invalid move history/);
+  assert.throws(() => Rules.replay(47, [0, Rules.TOTAL]), /Invalid move history/);
+  assert.deepEqual(initial.board, before);
+});
+
+test('排行榜记录达到上限后，本地无尽模式仍可继续交换', () => {
+  const game = Rules.createGame(91);
+  game.moves = Rules.MAX_MOVES;
+  const move = Rules.findMoves(game.board, 1)[0];
+  assert.equal(Rules.swap(game, ...move).valid, true);
+  assert.equal(game.moves, Rules.MAX_MOVES + 1);
+  assert.throws(() => Rules.replay(91, Array((Rules.MAX_MOVES + 1) * 2).fill(0)), /Invalid move history/);
+});
+
+test('服务端接受恰好上榜上限的合法记录，并拒绝再多一步', () => {
+  const seed = 903;
+  const game = Rules.createGame(seed);
+  const history = [];
+  for (let index = 0; index < Rules.MAX_MOVES + 1; index += 1) {
+    const move = Rules.findMoves(game.board, 1)[0];
+    assert.equal(Rules.swap(game, ...move, { captureStages: false }).valid, true);
+    history.push(...move);
+  }
+  const accepted = Rules.replay(seed, history.slice(0, Rules.MAX_MOVES * 2));
+  assert.equal(accepted.moveCount, Rules.MAX_MOVES);
+  assert.ok(accepted.durationMs >= Rules.MAX_MOVES * Rules.MIN_MOVE_MS);
+  assert.throws(() => Rules.replay(seed, history), /Invalid move history/);
 });

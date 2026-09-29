@@ -225,7 +225,7 @@
     .table-arena { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-rows:minmax(102px,auto) minmax(154px,auto) minmax(48px,auto) minmax(84px,auto); align-items:center; margin-top:18px; isolation:isolate; }
     .table-arena::before { content:""; position:absolute; z-index:-1; inset:44px 12% 39px; border:1px dashed rgba(248,226,180,.13); border-radius:50%; pointer-events:none; }
     .players { display:contents; margin:0; }
-    .player { width:min(230px,92%); min-height:82px; display:grid; grid-template-columns:39px minmax(0,1fr); align-content:center; column-gap:9px; padding:10px 11px; }
+    .player { width:min(230px,92%); min-height:82px; display:grid; grid-template-columns:39px minmax(0,1fr) auto; align-content:center; column-gap:9px; padding:10px 11px; }
     .player.seat-left { grid-column:1; grid-row:1; justify-self:start; }
     .player.seat-right { grid-column:2; grid-row:1; justify-self:end; }
     .player.seat-self { grid-column:1 / -1; grid-row:4; justify-self:center; width:min(285px,76%); }
@@ -235,6 +235,12 @@
     .player.active .seat-avatar { animation:seatPulse 1.45s ease-in-out infinite; }
     .player-name { grid-column:2; grid-row:1; min-width:0; font-size:.86rem; line-height:1.25; }
     .player-meta { grid-column:2; grid-row:2; margin:5px 0 0; font-size:.69rem; line-height:1.35; }
+    .player-card-count { grid-column:3; grid-row:1 / 3; align-self:center; display:grid; place-items:center; min-width:53px; min-height:53px; padding:5px 8px; border:1px solid rgba(207,235,218,.28); border-radius:8px; color:#f8edcf; background:rgba(3,28,25,.52); box-shadow:inset 0 1px rgba(255,255,255,.07); font-variant-numeric:tabular-nums; line-height:1; }
+    .player-card-count strong { font-size:1.43rem; }
+    .player-card-count small { margin-top:3px; color:#bed3c6; font-size:.58rem; font-weight:800; }
+    .player.cards-low .player-card-count { border-color:rgba(255,205,106,.7); color:#ffe2a0; background:rgba(101,61,13,.62); }
+    .player.cards-critical .player-card-count { border-color:#ff9e82; color:#fff2dc; background:#913e32; box-shadow:0 0 0 3px rgba(255,137,107,.13),0 0 19px rgba(255,108,76,.25); animation:cardCountUrgent 1.15s ease-in-out infinite; }
+    .player.cards-empty .player-card-count { color:#17392f; background:#f3cf86; animation:none; }
     .seat-location { color:#f0d397; font-size:.64rem; font-weight:700; white-space:nowrap; }
     .center { grid-column:1 / -1; grid-row:2; justify-self:center; width:min(100%,760px); min-height:145px; padding:12px 5px 8px; }
     .played-cards { width:100%; }
@@ -261,7 +267,8 @@
     @keyframes effectWord { from { opacity:0; transform:translateY(25px) scale(.72) rotate(-8deg); } 70% { opacity:1; transform:translateY(-5px) scale(1.08) rotate(2deg); } to { opacity:1; transform:translateY(0) scale(1) rotate(0); } }
     @keyframes effectSpark { from { opacity:1; transform:rotate(var(--angle)) translateY(-10px) scale(1); } to { opacity:0; transform:rotate(var(--angle)) translateY(-130px) scale(.3); } }
     @keyframes tableImpact { 20% { transform:translateX(-3px); } 45% { transform:translateX(3px); } 70% { transform:translateX(-2px); } }
-    @media (max-width:720px) { .table-head { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; } .table-head h2 { white-space:nowrap; } .table-indicators { justify-content:flex-start; gap:6px; } .table-arena { grid-template-rows:minmax(112px,auto) minmax(155px,auto) minmax(52px,auto) minmax(85px,auto); margin-top:15px; } .player { width:min(205px,97%); grid-template-columns:31px minmax(0,1fr); column-gap:6px; padding:8px 7px; } .seat-avatar { width:31px; height:31px; font-size:.83rem; } .player.seat-self { width:min(250px,80%); } .player-name { font-size:.72rem; } .player-meta { margin-top:4px; font-size:.59rem; } .seat-location { font-size:.55rem; } .table-arena.play-from-left { --fly-x:-94px; --fly-y:-83px; } .table-arena.play-from-right { --fly-x:94px; --fly-y:-83px; } .card + .card { margin-left:-23px; } .hand { height:147px; } .hand-viewport { min-height:153px; } }
+    @keyframes cardCountUrgent { 50% { transform:scale(1.08); box-shadow:0 0 0 5px rgba(255,137,107,.16),0 0 25px rgba(255,108,76,.38); } }
+    @media (max-width:720px) { .table-head { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; } .table-head h2 { white-space:nowrap; } .table-indicators { justify-content:flex-start; gap:6px; } .table-arena { grid-template-rows:minmax(112px,auto) minmax(155px,auto) minmax(52px,auto) minmax(85px,auto); margin-top:15px; } .player { width:min(205px,97%); grid-template-columns:31px minmax(0,1fr) auto; column-gap:6px; padding:8px 7px; } .seat-avatar { width:31px; height:31px; font-size:.83rem; } .player.seat-self { width:min(250px,80%); } .player-name { font-size:.72rem; } .player-meta { margin-top:4px; font-size:.59rem; } .player-card-count { min-width:43px; min-height:45px; padding:4px 6px; } .player-card-count strong { font-size:1.18rem; } .player-card-count small { font-size:.5rem; } .seat-location { font-size:.55rem; } .table-arena.play-from-left { --fly-x:-94px; --fly-y:-83px; } .table-arena.play-from-right { --fly-x:94px; --fly-y:-83px; } .card + .card { margin-left:-23px; } .hand { height:147px; } .hand-viewport { min-height:153px; } }
     @media (max-width:430px) { .table-arena { grid-template-rows:minmax(113px,auto) minmax(159px,auto) minmax(52px,auto) minmax(83px,auto); } .table-arena::before { inset:48px 3% 38px; } .player { min-height:81px; width:99%; } .player.seat-self { width:min(218px,80%); } .player-name { font-size:.69rem; } .player-meta { font-size:.57rem; } .center { min-height:152px; padding-inline:0; } .center-message { font-size:.72rem; } .hand { height:143px; padding-top:34px; } .hand-viewport { min-height:149px; } .card + .card { margin-left:-24px; } }
     body.in-game .hero { display:none; }
     .mobile-turn-bar { display:none; }
@@ -645,6 +652,10 @@
           if (player.id === state.selfId) item.classList.add('me');
           if (player.id === state.currentTurnId) item.classList.add('active');
           if (state.landlordId) item.classList.add(player.id === state.landlordId ? 'landlord' : 'farmer');
+          const cardCount = player.cardCount ?? 0;
+          if (cardCount <= 5) item.classList.add('cards-low');
+          if (cardCount <= 2) item.classList.add('cards-critical');
+          if (cardCount === 0) item.classList.add('cards-empty');
           const avatar = document.createElement('span');
           avatar.className = 'seat-avatar';
           avatar.textContent = player.isAi ? '机' : [...player.name][0] || '友';
@@ -681,8 +692,16 @@
           const delta = typeof player.roundResult === 'number' ? player.roundResult : player.roundResult?.delta;
           const result = state.phase === 'finished' && typeof delta === 'number'
             ? ` · 本局 ${delta >= 0 ? '+' : ''}${delta}` : '';
-          meta.textContent = `${player.cardCount ?? 0} 张牌 · 积分 ${player.score ?? 0}${result}${connection}`;
-          item.append(avatar, name, meta);
+          meta.textContent = `积分 ${player.score ?? 0}${result}${connection}`;
+          const count = document.createElement('span');
+          count.className = 'player-card-count';
+          count.setAttribute('aria-label', cardCount ? `剩余 ${cardCount} 张牌` : '手牌已出完');
+          const countNumber = document.createElement('strong');
+          countNumber.textContent = String(cardCount);
+          const countLabel = document.createElement('small');
+          countLabel.textContent = cardCount ? '剩余张数' : '已出完';
+          count.append(countNumber, countLabel);
+          item.append(avatar, name, meta, count);
           return item;
         });
         for (const seat of ['left', 'right']) {

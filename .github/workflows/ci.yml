@@ -46,9 +46,11 @@ jobs:
           node --check server.js
           node --check doudizhu-server.js
           node --check jump-leaderboard.js
+          node --check match3-leaderboard.js
           node --check jump-redis-store.js
           node --check public/app.js
           node --check public/jump-rules.js
+          node --check public/match3-rules.js
           bash -n deploy/deploy-game-over
 
       - name: Run game tests
@@ -67,8 +69,8 @@ jobs:
             --format=ustar --sort=name --mtime='@0' \
             --owner=0 --group=0 --numeric-owner \
             --no-recursion \
-            server.js doudizhu-server.js jump-leaderboard.js jump-redis-store.js package.json package-lock.json \
-            public/app.js public/jump-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html \
+            server.js doudizhu-server.js jump-leaderboard.js match3-leaderboard.js jump-redis-store.js package.json package-lock.json \
+            public/app.js public/jump-rules.js public/match3-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html \
             public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html \
             public/games/spider.html public/games/jump.html public/games/match3.html
           digest="$(sha256sum "${bundle}" | awk '{print $1}')"
@@ -185,6 +187,10 @@ jobs:
           curl --proto '=https' --tlsv1.2 \
             --fail --silent --connect-timeout 10 --max-time 20 \
             https://game.5iyeji.xyz/api/jump/leaderboard \
+            | python3 -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict) and isinstance(value.get("entries"),list)' 2>/dev/null
+          curl --proto '=https' --tlsv1.2 \
+            --fail --silent --connect-timeout 10 --max-time 20 \
+            https://game.5iyeji.xyz/api/match3/leaderboard \
             | python3 -c 'import json,sys; value=json.load(sys.stdin); assert isinstance(value,dict) and isinstance(value.get("entries"),list)' 2>/dev/null
           curl --proto '=https' --tlsv1.2 \
             --fail --silent --show-error --connect-timeout 10 --max-time 20 \

@@ -249,7 +249,7 @@
             </section>
           </div>
           <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
-          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示只标记可行走法，不保证最优解。</p>
+          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；提示会从当前牌面向后推演，优先保留多条可继续路线。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
@@ -270,7 +270,7 @@
             <ol class="rules">
               <li>牌面共 <strong>104 张</strong>：十列起始牌 <strong>54 张</strong>，底牌 <strong>50 张</strong>。</li>
               <li>可移动一张明牌，或一整段连续的 <strong>降序明牌</strong>；目标列顶牌须比移动牌的第一张大 1，空列可放任意可移动牌段。</li>
-              <li>移走盖在暗牌上的牌后，暗牌自动翻开。</li>
+              <li>移走盖在暗牌上的牌后，暗牌自动翻开；翻牌和发牌会结合当前牌面重新规划，尽量保留多条路线。</li>
               <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完八组即获胜。</li>
               <li>只要有空列，就必须先放牌，不能从底牌发下一轮。撤销可恢复上一步移动或发牌。</li>
             </ol>
@@ -294,6 +294,298 @@
   <script>
     "use strict";
     (() => {
+      const ROUTE_CAP = 99;
+
+      function cloneState(state) {
+        return {
+          cols: state.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
+          stock: Array.isArray(state.stock) ? state.stock.slice() : [],
+          completed: state.completed || 0
+        };
+      }
+
+      function pickable(state, colIndex, index) {
+        const col = state.cols[colIndex];
+        if (!col || index < 0 || index >= col.length || !col[index].up) return false;
+        for (let i = index; i < col.length - 1; i++) {
+          if (!col[i + 1].up || col[i].r !== col[i + 1].r + 1) return false;
+        }
+        return true;
+      }
+
+      function legalMoves(state) {
+        const moves = [];
+        const firstEmpty = state.cols.findIndex(col => col.length === 0);
+        for (let fromCol = 0; fromCol < state.cols.length; fromCol++) {
+          const source = state.cols[fromCol];
+          for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
+            if (!pickable(state, fromCol, fromIndex)) continue;
+            const rank = source[fromIndex].r;
+            for (let toCol = 0; toCol < state.cols.length; toCol++) {
+              if (toCol === fromCol) continue;
+              const target = state.cols[toCol];
+              if (!target.length && toCol !== firstEmpty) continue;
+              if (!target.length || target[target.length - 1].r === rank + 1) {
+                moves.push({ fromCol, fromIndex, toCol, count: source.length - fromIndex });
+              }
+            }
+          }
+        }
+        return moves;
+      }
+
+      function collectRuns(state) {
+        let collected = 0;
+        for (const col of state.cols) {
+          while (col.length >= 13) {
+            const run = col.slice(-13);
+            if (!run.every((card, index) => card.up && card.r === 13 - index)) break;
+            col.splice(-13, 13);
+            state.completed++;
+            collected++;
+            if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
+          }
+        }
+        return collected;
+      }
+
+      function applyMove(state, move) {
+        const next = cloneState(state);
+        const source = next.cols[move.fromCol];
+        const moved = source.splice(move.fromIndex);
+        next.cols[move.toCol].push(...moved);
+        if (source.length && !source[source.length - 1].up) source[source.length - 1].up = true;
+        collectRuns(next);
+        return next;
+      }
+
+      function stateFeatures(state) {
+        let hidden = 0;
+        let ordered = 0;
+        let runTotal = 0;
+        let empty = 0;
+        for (const col of state.cols) {
+          if (!col.length) empty++;
+          let currentRun = 0;
+          for (let index = 0; index < col.length; index++) {
+            const card = col[index];
+            if (!card.up) {
+              hidden++;
+              currentRun = 0;
+              continue;
+            }
+            currentRun = 1;
+            for (let next = index; next < col.length - 1; next++) {
+              if (!col[next + 1].up || col[next].r !== col[next + 1].r + 1) break;
+              currentRun++;
+            }
+            runTotal += currentRun * currentRun;
+            index += currentRun - 1;
+          }
+          for (let index = 0; index < col.length - 1; index++) {
+            if (col[index].up && col[index + 1].up && col[index].r === col[index + 1].r + 1) ordered++;
+          }
+        }
+        return { hidden, ordered, runTotal, empty, mobility: legalMoves(state).length };
+      }
+
+      function evaluate(state) {
+        const feature = stateFeatures(state);
+        return state.completed * 12000 - feature.hidden * 240 + feature.ordered * 42 +
+          feature.runTotal * 5 + feature.empty * 65 + Math.min(feature.mobility, 24) * 13;
+      }
+
+      function stateKey(state) {
+        const columns = state.cols.map(col => col.map(card => (card.up ? "u" : "d") + card.r.toString(36)).join(","));
+        columns.sort();
+        return state.completed + ":" + columns.join("|");
+      }
+
+      function transitionBonus(before, after) {
+        const left = stateFeatures(before);
+        const right = stateFeatures(after);
+        return (after.completed - before.completed) * 9000 + (left.hidden - right.hidden) * 900 +
+          (right.ordered - left.ordered) * 55 + (right.mobility - left.mobility) * 8;
+      }
+
+      function moveOrderScore(state, move) {
+        const source = state.cols[move.fromCol];
+        const target = state.cols[move.toCol];
+        const reveals = move.fromIndex > 0 && !source[move.fromIndex - 1].up;
+        const end = target.concat(source.slice(move.fromIndex)).slice(-13);
+        const completes = end.length === 13 && end.every((card, index) => card.up && card.r === 13 - index);
+        return (completes ? 10000 : 0) + (reveals ? 1200 : 0) + (target.length ? 160 : 0) + move.count * 5;
+      }
+
+      function analyze(state, options) {
+        const settings = options || {};
+        const depth = Math.max(1, Math.min(5, settings.depth || 3));
+        const breadth = Math.max(4, Math.min(40, settings.breadth || 22));
+        const nodeLimit = Math.max(80, Math.min(12000, settings.nodeLimit || 2200));
+        const memo = new Map();
+        let nodes = 0;
+
+        function visit(current, remaining, trail) {
+          const key = stateKey(current);
+          const memoKey = remaining + ":" + key;
+          if (memo.has(memoKey)) return memo.get(memoKey);
+          const base = evaluate(current);
+          const moves = legalMoves(current);
+          if (!remaining || !moves.length || nodes >= nodeLimit) {
+            const terminal = { score: base, routes: moves.length || 1 };
+            memo.set(memoKey, terminal);
+            return terminal;
+          }
+          nodes++;
+          const orderedMoves = moves.sort((a, b) => moveOrderScore(current, b) - moveOrderScore(current, a));
+          const candidates = [];
+          for (const move of orderedMoves.slice(0, breadth)) {
+            const next = applyMove(current, move);
+            const nextKey = stateKey(next);
+            if (nextKey === key || trail.has(nextKey)) continue;
+            const nextTrail = new Set(trail);
+            nextTrail.add(nextKey);
+            const child = visit(next, remaining - 1, nextTrail);
+            candidates.push({ score: child.score + transitionBonus(current, next), routes: child.routes });
+          }
+          if (!candidates.length) return { score: base, routes: 1 };
+          candidates.sort((a, b) => b.score - a.score);
+          const best = candidates[0].score;
+          const viable = candidates.filter(candidate => candidate.score >= best - 180);
+          const result = {
+            score: best,
+            routes: Math.min(ROUTE_CAP, viable.reduce((sum, candidate) => sum + Math.max(1, candidate.routes), 0))
+          };
+          memo.set(memoKey, result);
+          return result;
+        }
+
+        const startKey = stateKey(state);
+        const ranked = [];
+        const rootMoves = legalMoves(state).sort((a, b) => moveOrderScore(state, b) - moveOrderScore(state, a));
+        for (const move of rootMoves.slice(0, 80)) {
+          const next = applyMove(state, move);
+          const nextKey = stateKey(next);
+          if (nextKey === startKey) continue;
+          const child = visit(next, depth - 1, new Set([startKey, nextKey]));
+          ranked.push({
+            ...move,
+            value: child.score + transitionBonus(state, next),
+            futureRoutes: child.routes
+          });
+        }
+        ranked.sort((a, b) => b.value - a.value || b.futureRoutes - a.futureRoutes ||
+          a.fromCol - b.fromCol || a.toCol - b.toCol || a.fromIndex - b.fromIndex);
+        const best = ranked.length ? ranked[0].value : evaluate(state);
+        const viable = ranked.filter(move => move.value >= best - 180);
+        return {
+          moves: ranked,
+          routeCount: Math.min(ROUTE_CAP, viable.reduce((sum, move) => sum + Math.max(1, move.futureRoutes), 0)),
+          score: best,
+          nodes
+        };
+      }
+
+      function openingQuality(state) {
+        const moves = legalMoves(state);
+        const sources = new Set(moves.map(move => move.fromCol));
+        const targets = new Set(moves.map(move => move.toCol));
+        const ranks = new Set(moves.map(move => state.cols[move.fromCol][move.fromIndex].r));
+        return sources.size * 45 + targets.size * 28 + ranks.size * 18 + moves.length * 6;
+      }
+
+      function rankRevealChoices(state, colIndex) {
+        const target = state.cols[colIndex] && state.cols[colIndex][state.cols[colIndex].length - 1];
+        if (!target || target.up) return [];
+        const available = new Set(state.stock || []);
+        for (const col of state.cols) {
+          for (const card of col) if (!card.up) available.add(card.r);
+        }
+        const choices = [];
+        for (const rank of available) {
+          const next = cloneState(state);
+          const nextTarget = next.cols[colIndex][next.cols[colIndex].length - 1];
+          nextTarget.r = rank;
+          nextTarget.up = true;
+          collectRuns(next);
+          const result = analyze(next, { depth: 3, breadth: 18, nodeLimit: 850 });
+          const distinctSources = new Set(result.moves.slice(0, 12).map(move => move.fromCol)).size;
+          choices.push({
+            rank,
+            score: result.score + result.routeCount * 150 + distinctSources * 65,
+            routeCount: result.routeCount,
+            moveCount: result.moves.length
+          });
+        }
+        return choices.sort((a, b) => b.routeCount - a.routeCount || b.score - a.score || a.rank - b.rank);
+      }
+
+      function planDeal(state) {
+        if (!Array.isArray(state.stock) || state.stock.length < 10) return [];
+        const counts = Array(14).fill(0);
+        for (const rank of state.stock) counts[rank]++;
+        let beam = [{ ranks: [], counts, heuristic: 0 }];
+        for (let colIndex = 0; colIndex < state.cols.length; colIndex++) {
+          const nextBeam = [];
+          const underneath = state.cols[colIndex][state.cols[colIndex].length - 1];
+          for (const candidate of beam) {
+            for (let rank = 1; rank <= 13; rank++) {
+              if (!candidate.counts[rank]) continue;
+              const nextCounts = candidate.counts.slice();
+              nextCounts[rank]--;
+              let gain = underneath && underneath.r === rank + 1 ? 85 : 0;
+              for (const prior of candidate.ranks) {
+                if (Math.abs(prior - rank) === 1) gain += 17;
+                if (prior === rank) gain -= 4;
+              }
+              nextBeam.push({
+                ranks: candidate.ranks.concat(rank),
+                counts: nextCounts,
+                heuristic: candidate.heuristic + gain
+              });
+            }
+          }
+          nextBeam.sort((a, b) => b.heuristic - a.heuristic || a.ranks.join(",").localeCompare(b.ranks.join(",")));
+          const seen = new Set();
+          beam = [];
+          for (const candidate of nextBeam) {
+            const signature = candidate.ranks.join(",") + ":" + candidate.counts.join(",");
+            if (seen.has(signature)) continue;
+            seen.add(signature);
+            beam.push(candidate);
+            if (beam.length === 120) break;
+          }
+        }
+        const finalists = [];
+        for (const candidate of beam.slice(0, 28)) {
+          const next = cloneState(state);
+          candidate.ranks.forEach((rank, colIndex) => next.cols[colIndex].push({ r: rank, up: true }));
+          collectRuns(next);
+          const result = analyze(next, { depth: 2, breadth: 18, nodeLimit: 520 });
+          finalists.push({
+            ranks: candidate.ranks,
+            routeCount: result.routeCount,
+            score: result.score + result.routeCount * 130 + openingQuality(next) * 3 + candidate.heuristic
+          });
+        }
+        finalists.sort((a, b) => b.routeCount - a.routeCount || b.score - a.score ||
+          a.ranks.join(",").localeCompare(b.ranks.join(",")));
+        return finalists.length ? finalists[0].ranks : state.stock.slice(-10);
+      }
+
+      globalThis.SpiderPlanner = Object.freeze({
+        legalMoves,
+        applyMove,
+        analyze,
+        openingQuality,
+        rankRevealChoices,
+        planDeal
+      });
+    })();
+  </script>
+  <script>
+    "use strict";
+    (() => {
       const STORE_KEY = "game-over-spider-one-suit-v1";
       const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const board = document.getElementById("board");
@@ -308,6 +600,7 @@
       let selected = null;
       let hint = null;
       let hintCursor = 0;
+      let hintRouteCount = 0;
       let hintTimer = null;
       let celebrating = false;
       let celebrationTimer = null;
@@ -324,20 +617,33 @@
       }
 
       function freshGame() {
-        const deck = [];
-        for (let copy = 0; copy < 8; copy++) {
-          for (let rank = 1; rank <= 13; rank++) deck.push(rank);
+        let best = null;
+        let bestQuality = -1;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const deck = [];
+          for (let copy = 0; copy < 8; copy++) {
+            for (let rank = 1; rank <= 13; rank++) deck.push(rank);
+          }
+          for (let i = deck.length - 1; i > 0; i--) {
+            const j = randomIndex(i + 1);
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          const cols = Array.from({ length: 10 }, () => []);
+          for (let col = 0; col < 10; col++) {
+            const count = col < 4 ? 6 : 5;
+            for (let i = 0; i < count; i++) cols[col].push({ r: deck.pop(), up: i === count - 1 });
+          }
+          const candidate = { cols, stock: deck, completed: 0, moves: 0 };
+          const quality = SpiderPlanner.openingQuality(candidate);
+          if (quality > bestQuality) {
+            best = candidate;
+            bestQuality = quality;
+          }
+          if (quality >= 430) break;
         }
-        for (let i = deck.length - 1; i > 0; i--) {
-          const j = randomIndex(i + 1);
-          [deck[i], deck[j]] = [deck[j], deck[i]];
-        }
-        const cols = Array.from({ length: 10 }, () => []);
-        for (let col = 0; col < 10; col++) {
-          const count = col < 4 ? 6 : 5;
-          for (let i = 0; i < count; i++) cols[col].push({ r: deck.pop(), up: i === count - 1 });
-        }
-        return { cols, stock: deck, completed: 0, moves: 0, startedAt: Date.now(), finishedAt: null };
+        best.startedAt = Date.now();
+        best.finishedAt = null;
+        return best;
       }
 
       function cardCountsAreValid(state) {
@@ -427,27 +733,9 @@
         renderBoard();
       }
       function findHints() {
-        const moves = [];
-        for (let fromCol = 0; fromCol < 10; fromCol++) {
-          const source = game.cols[fromCol];
-          for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
-            if (!pickable(fromCol, fromIndex)) continue;
-            const run = source.slice(fromIndex);
-            for (let toCol = 0; toCol < 10; toCol++) {
-              if (!canMove(fromCol, fromIndex, toCol)) continue;
-              const target = game.cols[toCol];
-              const end = target.concat(run).slice(-13);
-              const completes = end.length === 13 &&
-                end.every((card, i) => card.up && card.r === 13 - i);
-              const reveals = fromIndex > 0 && !source[fromIndex - 1].up;
-              const priority = (completes ? 100 : 0) + (reveals ? 35 : 0) +
-                (target.length ? 12 : 0) + Math.min(run.length, 10);
-              moves.push({ fromCol, fromIndex, toCol, count: run.length, priority });
-            }
-          }
-        }
-        return moves.sort((a, b) => b.priority - a.priority ||
-          a.fromCol - b.fromCol || a.toCol - b.toCol);
+        const result = SpiderPlanner.analyze(game, { depth: 4, breadth: 24, nodeLimit: 3200 });
+        hintRouteCount = result.routeCount;
+        return result.moves;
       }
       function showHint() {
         if (game.completed === 8) return;
@@ -468,7 +756,8 @@
             });
           }
           announce("提示：第 " + (move.fromCol + 1) + " 列的 " + move.count +
-            " 张牌 → 第 " + (move.toCol + 1) + " 列。点亮的目标列可放置。");
+            " 张牌 → 第 " + (move.toCol + 1) + " 列。" +
+            (hintRouteCount > 1 ? "这一步会继续保留多条后续路线。" : "这是当前推演最稳妥的一步。"));
           hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
         } else if (game.stock.length && game.cols.every(col => col.length)) {
           selected = null;
@@ -503,16 +792,45 @@
           if (game.completed === 8) render();
         }, 920);
       }
+      function revealTopCard(colIndex) {
+        const col = game.cols[colIndex];
+        const target = col && col[col.length - 1];
+        if (!target || target.up) return;
+        const originalRank = target.r;
+        const choices = SpiderPlanner.rankRevealChoices(game, colIndex);
+        const desiredRank = choices.length ? choices[0].rank : originalRank;
+        if (desiredRank !== originalRank) {
+          const stockIndex = game.stock.lastIndexOf(desiredRank);
+          if (stockIndex >= 0) {
+            game.stock[stockIndex] = originalRank;
+            target.r = desiredRank;
+          } else {
+            let exchanged = false;
+            for (let sourceCol = 0; sourceCol < game.cols.length && !exchanged; sourceCol++) {
+              for (let index = 0; index < game.cols[sourceCol].length; index++) {
+                const candidate = game.cols[sourceCol][index];
+                if (candidate === target || candidate.up || candidate.r !== desiredRank) continue;
+                candidate.r = originalRank;
+                target.r = desiredRank;
+                exchanged = true;
+                break;
+              }
+            }
+          }
+        }
+        target.up = true;
+      }
       function collectCompleteRuns() {
         let collected = 0;
-        for (const col of game.cols) {
+        for (let colIndex = 0; colIndex < game.cols.length; colIndex++) {
+          const col = game.cols[colIndex];
           while (col.length >= 13) {
             const run = col.slice(-13);
             if (!run.every((card, i) => card.up && card.r === 13 - i)) break;
             col.splice(-13, 13);
             game.completed++;
             collected++;
-            if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
+            revealTopCard(colIndex);
           }
         }
         return collected;
@@ -539,7 +857,7 @@
         const source = game.cols[fromCol];
         const moved = source.splice(fromIndex);
         game.cols[toCol].push(...moved);
-        if (source.length && !source[source.length - 1].up) source[source.length - 1].up = true;
+        revealTopCard(fromCol);
         game.moves++;
         const collected = collectCompleteRuns();
         afterAction("已移动 " + moved.length + " 张牌。", collected);
@@ -554,7 +872,13 @@
         }
         clearHint();
         snapshot();
-        for (const col of game.cols) col.push({ r: game.stock.pop(), up: true });
+        const plannedRanks = SpiderPlanner.planDeal(game);
+        for (let colIndex = 0; colIndex < game.cols.length; colIndex++) {
+          const plannedRank = plannedRanks[colIndex];
+          const stockIndex = game.stock.lastIndexOf(plannedRank);
+          const rank = stockIndex >= 0 ? game.stock.splice(stockIndex, 1)[0] : game.stock.pop();
+          game.cols[colIndex].push({ r: rank, up: true });
+        }
         game.moves++;
         const collected = collectCompleteRuns();
         afterAction("新的一轮已经发到十列。", collected);

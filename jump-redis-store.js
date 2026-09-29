@@ -1,4 +1,4 @@
-const MAX_SCORE = require('./public/jump-rules.js').MAX_JUMPS * 8;
+const DEFAULT_MAX_SCORE = require('./public/jump-rules.js').MAX_JUMPS * 8;
 
 const UNAVAILABLE = '\u6392\u884c\u699c\u6682\u65f6\u4e0d\u53ef\u7528\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5';
 const CAPACITY_REACHED = '\u6392\u884c\u699c\u4eba\u6570\u5df2\u8fbe\u4e0a\u9650\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5';
@@ -49,19 +49,28 @@ function unavailable(message = UNAVAILABLE) {
   return Object.assign(new Error(message), { status: 503 });
 }
 
-function validateEntries(entries, maxEntries) {
+function defaultValidateEntries(entries, maxEntries) {
   // A lazy import also allows the leaderboard module to select this store.
   return require('./jump-leaderboard.js').validateEntries(entries, maxEntries);
 }
 
-function decodeEntries(values, maxEntries) {
+function decodeEntries(values, maxEntries, validateEntries) {
   if (!Array.isArray(values) || values.length > maxEntries) throw unavailable();
   return validateEntries(values.map((value) => JSON.parse(value)), maxEntries);
 }
 
-function createRedisStore({ url, client: providedClient, prefix = 'game-over:jump:v1', maxEntries = 10_000 } = {}) {
+function createRedisStore({
+  url,
+  client: providedClient,
+  prefix = 'game-over:jump:v1',
+  maxEntries = 10_000,
+  maxScore = DEFAULT_MAX_SCORE,
+  validateEntries = defaultValidateEntries,
+} = {}) {
   if (typeof prefix !== 'string' || !/^[A-Za-z0-9:_-]{1,200}$/.test(prefix)
-    || !Number.isSafeInteger(maxEntries) || maxEntries < 1) {
+    || !Number.isSafeInteger(maxEntries) || maxEntries < 1
+    || !Number.isSafeInteger(maxScore) || maxScore < 1
+    || typeof validateEntries !== 'function') {
     throw unavailable();
   }
   const key = `${prefix}:players`;
@@ -149,7 +158,7 @@ function createRedisStore({ url, client: providedClient, prefix = 'game-over:jum
       const values = await command((activeClient) => activeClient.eval(READ_ENTRIES, {
         keys: [key], arguments: [String(maxEntries)],
       }));
-      return decodeEntries(values, maxEntries);
+      return decodeEntries(values, maxEntries, validateEntries);
     } catch {
       throw unavailable();
     }
@@ -161,12 +170,12 @@ function createRedisStore({ url, client: providedClient, prefix = 'game-over:jum
       // Refuse to overwrite an existing board containing malformed data.
       await load();
       const result = await command((activeClient) => activeClient.eval(SAVE_BEST, {
-        keys: [key], arguments: [JSON.stringify(validated), String(maxEntries), String(MAX_SCORE)],
+        keys: [key], arguments: [JSON.stringify(validated), String(maxEntries), String(maxScore)],
       }));
       if (!Array.isArray(result) || ![-1, 0, 1].includes(result[0])) throw unavailable();
       if (result[0] === -1) throw unavailable(CAPACITY_REACHED);
       if (result.length !== 2) throw unavailable();
-      return { entries: decodeEntries(result[1], maxEntries), isPersonalBest: result[0] === 1 };
+      return { entries: decodeEntries(result[1], maxEntries, validateEntries), isPersonalBest: result[0] === 1 };
     } catch (error) {
       throw unavailable(error.message === CAPACITY_REACHED ? CAPACITY_REACHED : UNAVAILABLE);
     }
