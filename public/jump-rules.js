@@ -15,6 +15,11 @@
   const CAMERA_SPEED_PX = 96;
   const VIEW_SCALE_SPEED = 0.18;
 
+  function frameDeltaSeconds(now, previous) {
+    if (!Number.isFinite(now) || !Number.isFinite(previous)) return 0;
+    return Math.max(0, Math.min(0.033, (now - previous) / 1000));
+  }
+
   function moveToward(value, target, maximumChange) {
     if (Math.abs(target - value) <= maximumChange) return target;
     return value + Math.sign(target - value) * maximumChange;
@@ -204,6 +209,7 @@
     PLATFORM_WINDOW_SIZE,
     CAMERA_SPEED_PX,
     VIEW_SCALE_SPEED,
+    frameDeltaSeconds,
     updateCameraView,
   });
 }));

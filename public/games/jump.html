@@ -581,7 +581,7 @@
       }
 
       function frame(now) {
-        const dt = Math.min(.033, (now - lastFrame) / 1000 || 0);
+        const dt = rules.frameDeltaSeconds(now, lastFrame);
         lastFrame = now;
         update(dt, now);
         draw(now);

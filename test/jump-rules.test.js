@@ -30,6 +30,14 @@ function nextPerfectHold(game) {
   return null;
 }
 
+test('跳一跳首帧：浏览器帧时间早于初始化时间时仍从零时长开始', () => {
+  assert.equal(Rules.frameDeltaSeconds(100, 100.5), 0);
+  assert.equal(Rules.frameDeltaSeconds(100, 100), 0);
+  assert.equal(Rules.frameDeltaSeconds(116.667, 100), 0.016667);
+  assert.equal(Rules.frameDeltaSeconds(200, 100), 0.033);
+  assert.equal(Rules.frameDeltaSeconds(NaN, 100), 0);
+});
+
 test('跳一跳规则：同一种子、固定步长与浏览器导出产生相同地图和结算', () => {
   const first = Rules.createGame(0);
   const second = Rules.createGame(0);
