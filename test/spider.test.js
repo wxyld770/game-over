@@ -115,19 +115,21 @@ test('stock planning preserves the fixed next round without mutating it', () => 
   assert.equal(JSON.stringify(state), before, 'deal planning must not consume stock before the player deals');
 });
 
-test('four-run deals conserve every card and replay to a complete win', () => {
-  assert.equal(planner.config.TARGET_RUNS, 4);
-  assert.equal(planner.config.TOTAL_CARDS, 52);
-  assert.equal(planner.config.INITIAL_CARDS, 32);
-  assert.equal(planner.config.DEAL_ROUNDS, 2);
+test('eight-run deals conserve all 104 cards and replay through the only stock round to a complete win', () => {
+  assert.equal(planner.config.TARGET_RUNS, 8);
+  assert.equal(planner.config.TOTAL_CARDS, 104);
+  assert.equal(planner.config.INITIAL_CARDS, 94);
+  assert.equal(planner.config.DEAL_ROUNDS, 1);
 
   for (let seed = 1; seed <= 40; seed++) {
     const generated = planner.createSolvableDeal(seededRandom(seed));
     let state = generated.state;
-    assert.equal(state.cols.reduce((sum, col) => sum + col.length, 0), 32, `seed ${seed} should start with 32 cards`);
-    assert.equal(state.stock.length, 20, `seed ${seed} should reserve two deal rounds`);
-    assert.deepEqual(rankCounts(state), Array(13).fill(4), `seed ${seed} should contain four of every rank`);
-    assert.equal(state.cols.flat().filter(card => !card.up).length, 4, `seed ${seed} should retain fixed hidden cards`);
+    assert.equal(state.cols.reduce((sum, col) => sum + col.length, 0), 94, `seed ${seed} should start with 94 cards`);
+    assert.equal(state.stock.length, 10, `seed ${seed} should reserve one deal round`);
+    assert.deepEqual(rankCounts(state), Array(13).fill(8), `seed ${seed} should contain eight of every rank`);
+    assert.equal(state.cols.flat().filter(card => !card.up).length, 66, `seed ${seed} should have many fixed hidden cards to uncover`);
+    assert.equal(generated.plan.filter(action => action.type === 'deal').length, 1);
+    assert.equal(state.cols.every(col => col.length > 0), true);
     assert.equal(planner.isValidState(state), true);
 
     for (const action of generated.plan) {
@@ -136,6 +138,8 @@ test('four-run deals conserve every card and replay to a complete win', () => {
         assert.deepEqual(planned, Array.from(state.stock.slice(-10)).reverse(), `seed ${seed} must keep stock order fixed`);
         state = planner.dealNextRound(state);
         assert.ok(state, `seed ${seed} should allow its planned deal`);
+        assert.equal(state.stock.length, 0);
+        assert.equal(planner.dealNextRound(state), null, 'a second stock round must be impossible');
       } else {
         const legal = Array.from(planner.legalMoves(state));
         const move = legal.find(candidate => candidate.fromCol === action.fromCol &&
@@ -144,18 +148,18 @@ test('four-run deals conserve every card and replay to a complete win', () => {
         state = planner.applyMove(state, move);
       }
       assert.equal(planner.isValidState(state), true, `seed ${seed} must conserve cards after every action`);
-      assert.deepEqual(rankCounts(state), Array(13).fill(4));
+      assert.deepEqual(rankCounts(state), Array(13).fill(8));
     }
 
-    assert.equal(state.completed, 4, `seed ${seed} should collect all four runs`);
+    assert.equal(state.completed, 8, `seed ${seed} should collect all eight runs`);
     assert.equal(state.stock.length, 0);
     assert.ok(state.cols.every(col => col.length === 0));
     const replayed = planner.replayPlan(generated.state, generated.plan);
-    assert.ok(replayed && replayed.completed === 4, `seed ${seed} replay proof should reach the win`);
+    assert.ok(replayed && replayed.completed === 8, `seed ${seed} replay proof should reach the win`);
   }
 });
 
-test('certified hints keep several valid routes and always finish all four runs', () => {
+test('certified hints keep several independent routes and always finish all eight runs', () => {
   for (let seed = 1; seed <= 100; seed++) {
     const generated = planner.createSolvableDeal(seededRandom(seed));
     let state = generated.state;
@@ -163,12 +167,14 @@ test('certified hints keep several valid routes and always finish all four runs'
     let step = 0;
 
     assert.equal(planner.isValidCertificate(certificate), true);
-    assert.equal(Array.from(planner.readyCertificateActions(state, certificate)).length, 4,
-      `seed ${seed} should begin with four independent recovery choices`);
+    assert.equal(Array.from(planner.readyCertificateActions(state, certificate)).length, 2,
+      `seed ${seed} should begin with two independent recovery choices`);
+    let maxIndependentChoices = 0;
 
-    while (state.completed < 4 && step < certificate.nodes.length) {
+    while (state.completed < 8 && step < certificate.nodes.length) {
       const ready = Array.from(planner.readyCertificateActions(state, certificate));
       assert.ok(ready.length, `seed ${seed} must always expose a certified next action`);
+      maxIndependentChoices = Math.max(maxIndependentChoices, ready.length);
       const action = ready[(seed + step) % ready.length];
       const doneBefore = certificate.done.length;
       certificate = planner.advanceCertificate(state, certificate, action);
@@ -187,7 +193,8 @@ test('certified hints keep several valid routes and always finish all four runs'
       step++;
     }
 
-    assert.equal(state.completed, 4, `seed ${seed} should win by following certified hints`);
+    assert.equal(state.completed, 8, `seed ${seed} should win by following certified hints`);
+    assert.ok(maxIndependentChoices >= 3, `seed ${seed} should allow three independent uncovering routes`);
     assert.equal(certificate.done.length, certificate.nodes.length);
     assert.equal(state.stock.length, 0);
     assert.ok(state.cols.every(col => col.length === 0));
@@ -201,17 +208,18 @@ test('certificate marks an early free-form deal as outside the guaranteed routes
   assert.deepEqual(Array.from(planner.readyCertificateActions(generated.state, certificate)), []);
 });
 
-test('legacy eight-run state is rejected by the four-run invariant', () => {
+test('legacy four-run saves are rejected by the eight-run invariant and use a new storage version', () => {
   const oldState = { cols: Array.from({ length: 10 }, () => []), stock: [], completed: 0 };
   let col = 0;
-  for (let copy = 0; copy < 8; copy++) {
+  for (let copy = 0; copy < 4; copy++) {
     for (let rank = 1; rank <= 13; rank++) {
       oldState.cols[col++ % 10].push(up(rank));
     }
   }
   assert.equal(planner.isValidState(oldState), false);
-  assert.match(html, /game-over-spider-one-suit-v2/);
-  assert.match(html, /localStorage\.removeItem\(LEGACY_STORE_KEY\)/);
+  assert.match(html, /const STORE_KEY = "game-over-spider-one-suit-v3"/);
+  assert.match(html, /LEGACY_STORE_KEYS = \["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2"\]/);
+  assert.match(html, /LEGACY_STORE_KEYS\.forEach\(key => localStorage\.removeItem\(key\)\)/);
 });
 
 test('page keeps fixed cards and wires hints through the completion certificate', () => {

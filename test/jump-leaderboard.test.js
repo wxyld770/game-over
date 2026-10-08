@@ -85,7 +85,7 @@ async function fixture(t, options = {}) {
   };
 }
 
-test('跳一跳榜单：服务端计算得分，独立身份排名、同分先达成与最高分更新', async (t) => {
+test('跳一跳榜单：服务端计算得分，同设备多昵称独立排名、同分先达成与最高分更新', async (t) => {
   const app = await fixture(t);
   const empty = await app.request('/leaderboard');
   assert.deepEqual(empty.body, { entries: [], me: null });
@@ -108,23 +108,89 @@ test('跳一跳榜单：服务端计算得分，独立身份排名、同分先�
   assert.ok(equal.body.entries[0].achievedAt < equal.body.entries[1].achievedAt);
   const previousTime = score.body.me.achievedAt;
   const lower = await app.finish(await app.start(first.cookie), '新昵称', LOW);
-  assert.equal(lower.body.personalBest, 10);
-  assert.equal(lower.body.isPersonalBest, false);
+  assert.equal(lower.body.personalBest, Rules.replay(0, LOW).score);
+  assert.equal(lower.body.isPersonalBest, true);
   assert.equal(lower.body.me.name, '新昵称');
-  assert.equal(lower.body.me.achievedAt, previousTime);
+  assert.ok(lower.body.me.achievedAt > previousTime);
+  assert.equal(lower.body.rank, 3);
+  assert.equal(lower.body.entries.length, 3);
   const higher = await app.finish(await app.start(first.cookie), '新昵称', HIGH);
   assert.equal(higher.body.personalBest, 20);
   assert.equal(higher.body.isPersonalBest, true);
   assert.ok(higher.body.me.achievedAt > previousTime);
   const own = await app.request('/leaderboard', undefined, second.cookie);
-  assert.equal(own.body.me.rank, 2);
+  assert.equal(own.body.me.rank, 3);
   assert.equal(own.body.me.score, 10);
+  const original = await app.request(`/leaderboard?name=${encodeURIComponent('张三 同学')}`, undefined, first.cookie);
+  assert.equal(original.body.me.score, 10);
+  assert.equal(original.body.me.rank, 2);
+  assert.equal(original.body.me.achievedAt, previousTime);
+  assert.equal((await app.request('/leaderboard', undefined, first.cookie)).body.me.name, '新昵称');
   assert.equal((await app.request('/leaderboard')).body.me, null);
   assert.ok(own.body.entries.every((entry) => Object.keys(entry).sort().join(',') === 'achievedAt,name,rank,score'));
   const persisted = JSON.parse(await fs.readFile(app.filePath, 'utf8'));
-  assert.equal(persisted.entries.length, 2);
+  assert.equal(persisted.entries.length, 3);
   assert.match(persisted.entries[0].playerId, /^[a-f0-9]{64}$/);
   assert.ok(!JSON.stringify(persisted).includes(first.cookie.slice('jump_player='.length)));
+});
+
+test('跳一跳榜单：同设备昵称规范化后保留各自最高分与首次达成时间', async (t) => {
+  const app = await fixture(t);
+  const first = await app.start();
+  const original = await app.finish(first, 'wellen team', MID);
+  const second = await app.finish(await app.start(first.cookie), 'wxyld', HIGH);
+  assert.equal(second.body.rank, 1);
+  assert.equal(second.body.me.name, 'wxyld');
+  assert.equal(second.body.entries.length, 2);
+
+  for (const jumps of [LOW, MID]) {
+    const unchanged = await app.finish(await app.start(first.cookie), '  ｗｅｌｌｅｎ　 team  ', jumps);
+    assert.equal(unchanged.status, 200);
+    assert.equal(unchanged.body.isPersonalBest, false);
+    assert.equal(unchanged.body.personalBest, original.body.score);
+    assert.equal(unchanged.body.me.name, 'wellen team');
+    assert.equal(unchanged.body.me.achievedAt, original.body.me.achievedAt);
+    assert.equal(unchanged.body.rank, 2);
+    assert.equal(unchanged.body.entries.length, 2);
+  }
+  const normalized = await app.request(`/leaderboard?name=${encodeURIComponent('  ｗｅｌｌｅｎ　 team  ')}`, undefined, first.cookie);
+  assert.equal(normalized.body.me.name, 'wellen team');
+  assert.equal(normalized.body.me.rank, 2);
+  assert.equal((await app.request('/leaderboard?name=unknown', undefined, first.cookie)).body.me, null);
+
+  const higher = await app.finish(await app.start(first.cookie), 'wellen team', HIGH);
+  assert.equal(higher.body.isPersonalBest, true);
+  assert.equal(higher.body.personalBest, second.body.score);
+  assert.equal(higher.body.rank, 2, '同分保留先达到最高分的另一昵称排名');
+  assert.ok(higher.body.me.achievedAt > original.body.me.achievedAt);
+  app.restart();
+  assert.equal((await app.request('/leaderboard?name=wxyld', undefined, first.cookie)).body.me.rank, 1);
+  assert.equal((await app.request('/leaderboard?name=wellen%20team', undefined, first.cookie)).body.me.rank, 2);
+});
+
+test('跳一跳榜单：旧版设备记录在新增昵称保存及重启后仍完整保留', async (t) => {
+  const app = await fixture(t);
+  const token = 'A'.repeat(43);
+  const cookie = `jump_player=${token}`;
+  const legacy = {
+    playerId: crypto.createHash('sha256').update(token).digest('hex'),
+    name: 'wellen', score: 100, achievedAt: '2026-09-28T07:00:00.000Z',
+  };
+  await fs.writeFile(app.filePath, JSON.stringify({ version: 1, entries: [legacy] }));
+  assert.equal((await app.request('/leaderboard?name=wellen', undefined, cookie)).body.me.score, 100);
+  const added = await app.finish(await app.start(cookie), 'wxyld', HIGH);
+  assert.equal(added.status, 200);
+  assert.equal(added.body.me.name, 'wxyld');
+  assert.equal(added.body.personalBest, 20, '新昵称的个人纪录不能继承旧昵称分数');
+  const persisted = JSON.parse(await fs.readFile(app.filePath, 'utf8'));
+  assert.equal(persisted.entries.length, 2);
+  assert.deepEqual(persisted.entries.find((entry) => entry.name === 'wellen'), legacy);
+  app.restart();
+  const restored = await app.request('/leaderboard?name=wellen', undefined, cookie);
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.me.score, 100);
+  assert.equal(restored.body.entries.length, 2);
+  assert.equal((await app.request('/leaderboard?name=wxyld', undefined, cookie)).body.me.score, 20);
 });
 
 test('跳一跳榜单：拒绝伪造分数、未完局、快速伪造提交、无效昵称与跨身份提交', async (t) => {
@@ -218,18 +284,21 @@ test('跳一跳榜单：零分不上榜，重启后保留排名与浏览器最�
   assert.equal((await app.request(`/runs/${run.runId}/finish`, { name: '永久玩家', jumps: MID }, run.cookie)).status, 404);
 });
 
-test('跳一跳榜单：只公开前20名，个人排名可以超过20', async (t) => {
+test('跳一跳榜单：同设备多昵称只公开前20名，指定昵称个人排名可以超过20', async (t) => {
   const app = await fixture(t);
   let finalRun;
+  let cookie = '';
   for (let index = 0; index < 22; index += 1) {
-    finalRun = await app.start();
+    finalRun = await app.start(cookie);
+    cookie = finalRun.cookie;
     assert.equal((await app.finish(finalRun, `玩家${index}`, LOW)).status, 200);
   }
-  const board = await app.request('/leaderboard', undefined, finalRun.cookie);
+  const board = await app.request(`/leaderboard?name=${encodeURIComponent('玩家21')}`, undefined, finalRun.cookie);
   assert.equal(board.body.entries.length, 20);
   assert.equal(board.body.me.rank, 22);
   assert.equal(board.body.entries[0].name, '玩家0');
   assert.equal(board.body.entries.at(-1).rank, 20);
+  assert.equal((await app.request('/leaderboard', undefined, finalRun.cookie)).body.me.rank, 1);
 });
 
 test('跳一跳榜单：限制请求频率、运行数量、记录容量并清理过期游戏', async (t) => {
@@ -248,6 +317,7 @@ test('跳一跳榜单：限制请求频率、运行数量、记录容量并清�
   const owner = await capacity.start();
   assert.equal((await capacity.finish(owner, '甲', LOW)).status, 200);
   assert.equal((await capacity.finish(await capacity.start(), '乙', LOW)).status, 503);
+  assert.equal((await capacity.finish(await capacity.start(owner.cookie), '乙', LOW)).status, 503);
   assert.equal((await capacity.finish(await capacity.start(owner.cookie), '甲', MID)).status, 200);
   assert.equal((await capacity.request('/leaderboard')).body.entries.length, 1);
 
@@ -298,12 +368,14 @@ test('跳一跳文件存储：并发写入保留所有身份及最高分', async
   await Promise.all([
     store.saveBest({ playerId: idA, name: '甲', score: 20, achievedAt: at }),
     store.saveBest({ playerId: idB, name: '乙', score: 10, achievedAt: at }),
+    store.saveBest({ playerId: idA, name: '丙', score: 7, achievedAt: at }),
     store.saveBest({ playerId: idA, name: '甲', score: 3, achievedAt: at }),
   ]);
   const entries = await store.load();
-  assert.equal(entries.length, 2);
-  assert.equal(entries.find((entry) => entry.playerId === idA).score, 20);
-  assert.equal((await createFileStore(app.filePath).load()).length, 2);
+  assert.equal(entries.length, 3);
+  assert.equal(entries.find((entry) => entry.playerId === idA && entry.name === '甲').score, 20);
+  assert.equal(entries.find((entry) => entry.playerId === idA && entry.name === '丙').score, 7);
+  assert.equal((await createFileStore(app.filePath).load()).length, 3);
   await assert.rejects(store.saveBest({ playerId: idA, name: null, score: 20, achievedAt: at }));
   assert.equal((await store.load()).find((entry) => entry.playerId === idA).name, '甲');
 });

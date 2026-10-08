@@ -31,19 +31,23 @@ function normalizeName(value) {
   return name;
 }
 
+function entryKey(entry) {
+  return `${entry.playerId}:${entry.name}`;
+}
+
 function validateEntries(entries, maxEntries) {
   if (!Array.isArray(entries) || entries.length > maxEntries) throw new Error('Invalid leaderboard entries');
   const players = new Set();
   return entries.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)
       || typeof entry.playerId !== 'string' || !/^[a-f0-9]{64}$/.test(entry.playerId)
-      || players.has(entry.playerId) || typeof entry.name !== 'string' || normalizeName(entry.name) !== entry.name
+      || players.has(entryKey(entry)) || typeof entry.name !== 'string' || normalizeName(entry.name) !== entry.name
       || !Number.isInteger(entry.score) || entry.score <= 0 || entry.score > JumpRules.MAX_JUMPS * 8
       || typeof entry.achievedAt !== 'string' || !Number.isFinite(Date.parse(entry.achievedAt))
       || new Date(entry.achievedAt).toISOString() !== entry.achievedAt) {
       throw new Error('Invalid leaderboard entry');
     }
-    players.add(entry.playerId);
+    players.add(entryKey(entry));
     return { playerId: entry.playerId, name: entry.name, score: entry.score, achievedAt: entry.achievedAt };
   });
 }
@@ -64,7 +68,7 @@ function createFileStore(filePath, options = {}) {
           const value = JSON.parse(await storage.readFile(filePath, 'utf8'));
           if (!value || value.version !== 1) throw new Error('Invalid leaderboard file version');
           const saved = validateEntries(value.entries, maxEntries);
-          entries = new Map(saved.map((entry) => [entry.playerId, entry]));
+          entries = new Map(saved.map((entry) => [entryKey(entry), entry]));
         } catch (error) {
           if (error.code !== 'ENOENT') throw requestError(503, '排行榜暂时不可用，请稍后再试', error);
         }
@@ -91,13 +95,13 @@ function createFileStore(filePath, options = {}) {
       await load();
       const [validated] = validateEntries([candidate], maxEntries);
       candidate = validated;
-      const previous = entries.get(candidate.playerId);
+      const key = entryKey(candidate);
+      const previous = entries.get(key);
       if (!previous && entries.size >= maxEntries) throw requestError(503, '排行榜人数已达上限，请稍后再试');
       const isPersonalBest = !previous || candidate.score > previous.score;
-      const best = isPersonalBest ? candidate : { ...previous, name: candidate.name };
-      if (isPersonalBest || best.name !== previous.name) {
+      if (isPersonalBest) {
         const nextEntries = new Map(entries);
-        nextEntries.set(candidate.playerId, best);
+        nextEntries.set(key, candidate);
         await persist(nextEntries);
         entries = nextEntries;
       }
@@ -163,14 +167,15 @@ function sendJson(res, status, data, headers = {}) {
   res.end(JSON.stringify(data));
 }
 
-function leaderboard(entries, identity) {
-  const sorted = [...entries].sort((a, b) => b.score - a.score || a.achievedAt.localeCompare(b.achievedAt) || a.playerId.localeCompare(b.playerId));
+function leaderboard(entries, identity, name = null) {
+  const sorted = [...entries].sort((a, b) => b.score - a.score || a.achievedAt.localeCompare(b.achievedAt)
+    || a.playerId.localeCompare(b.playerId) || a.name.localeCompare(b.name));
   let me = null;
   const publicEntries = [];
   sorted.forEach((entry, index) => {
     const row = { rank: index + 1, name: entry.name, score: entry.score, achievedAt: entry.achievedAt };
     if (index < 20) publicEntries.push(row);
-    if (entry.playerId === identity) me = row;
+    if (!me && entry.playerId === identity && (name === null || entry.name === name)) me = row;
   });
   return { entries: publicEntries, me };
 }
@@ -215,7 +220,8 @@ function createJumpLeaderboard(options = {}) {
         if (req.method !== 'GET') throw requestError(405, '请求方式不支持');
         sweep(now());
         const entries = await store.load();
-        return sendJson(res, 200, leaderboard(entries, playerId(cookieToken(req))));
+        const name = normalizeName(new URL(req.url, 'http://localhost').searchParams.get('name'));
+        return sendJson(res, 200, leaderboard(entries, playerId(cookieToken(req)), name));
       }
       if (pathname === '/api/jump/runs') {
         if (req.method !== 'POST') throw requestError(405, '请求方式不支持');
@@ -270,7 +276,7 @@ function createJumpLeaderboard(options = {}) {
         } else {
           saved = { entries: await store.load(), isPersonalBest: false };
         }
-        const board = leaderboard(saved.entries, run.playerId);
+        const board = leaderboard(saved.entries, run.playerId, name);
         const result = {
           score: replay.score,
           saved: replay.score > 0,

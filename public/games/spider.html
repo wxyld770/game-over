@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a211c">
-  <meta name="description" content="单花色蜘蛛纸牌：整理固定四组 K 到 A，共 52 张牌。支持点选、拖拽、提示、撤销和自动续局。">
+  <meta name="description" content="单花色蜘蛛纸牌：整理八组 K 到 A，共 104 张牌，一轮底牌。支持点选、拖拽、提示、撤销和自动续局。">
   <title>蜘蛛纸牌 · Game Over</title>
   <style>
     :root {
@@ -233,7 +233,7 @@
         <div>
           <p class="eyebrow">SOLO CLASSIC · ONE SUIT</p>
           <h1>蜘蛛纸牌</h1>
-          <p>四组黑桃，十列牌阵。理清每一步，把四组 K 到 A 全部收走。</p>
+          <p>八组黑桃，十列牌阵。理清每一步，把八组 K 到 A 全部收走。</p>
         </div>
         <div class="toolbar">
           <button class="action" id="hintButton" type="button">✦ 提示</button>
@@ -242,8 +242,8 @@
         </div>
       </section>
       <div class="stats" aria-label="牌局数据">
-        <div class="stat"><span>已完成</span><strong id="completeStat">0 / 4</strong></div>
-        <div class="stat"><span>剩余发牌</span><strong id="dealsStat">2 次</strong></div>
+        <div class="stat"><span>已完成</span><strong id="completeStat">0 / 8</strong></div>
+        <div class="stat"><span>剩余发牌</span><strong id="dealsStat">1 次</strong></div>
         <div class="stat"><span>移动步数</span><strong id="movesStat">0</strong></div>
         <div class="stat"><span>用时</span><strong id="timeStat">00:00</strong></div>
       </div>
@@ -268,7 +268,7 @@
           <section class="side-panel">
             <h2>底牌</h2>
             <button class="stock-button" id="dealButton" type="button" aria-label="从底牌向十列各发一张牌">
-              <span><strong>发一轮牌</strong><small id="dealHint">还可发 2 轮</small></span>
+              <span><strong>发一轮牌</strong><small id="dealHint">还可发 1 轮</small></span>
               <span class="stock-cards" aria-hidden="true"><i class="stock-card"></i><i class="stock-card"></i><i class="stock-card"></i></span>
             </button>
             <p style="margin-top: 10px">每次给十列各发一张。<strong>有空列时不能发牌。</strong></p>
@@ -276,15 +276,15 @@
           <section class="side-panel">
             <h2>完成的牌组</h2>
             <p>从 K 到 A 排成完整的 13 张，就会自动收走。</p>
-            <div class="complete-track" id="completeTrack" aria-label="四组完成进度"></div>
+            <div class="complete-track" id="completeTrack" aria-label="八组完成进度"></div>
           </section>
           <section class="side-panel">
             <h2>玩法规则</h2>
             <ol class="rules">
-              <li>牌面固定为 <strong>52 张</strong>：每个点数各 4 张；十列起始牌 <strong>32 张</strong>，底牌 <strong>20 张</strong>。</li>
+              <li>牌面固定为 <strong>104 张</strong>：每个点数各 8 张；十列起始牌 <strong>94 张</strong>，底牌 <strong>10 张</strong>，只能发 <strong>1 轮</strong>。</li>
               <li>可移动一张明牌，或一整段连续的 <strong>降序明牌</strong>；目标列顶牌须比移动牌的第一张大 1，空列可放任意可移动牌段。</li>
               <li>移走盖在暗牌上的牌后，暗牌自动翻开；所有牌的点数在开局时已经固定。</li>
-              <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完四组即获胜。</li>
+              <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完八组即获胜。</li>
               <li>只要有空列，就必须先放牌，不能从底牌发下一轮。撤销可恢复上一步移动或发牌。</li>
             </ol>
           </section>
@@ -296,7 +296,7 @@
   <div class="win-cover" id="winCover" hidden role="dialog" aria-modal="true" aria-labelledby="winTitle">
     <div class="win-panel">
       <div class="win-icon" aria-hidden="true">✦ ♠ ✦</div>
-      <h2 id="winTitle">四组全部收齐！</h2>
+      <h2 id="winTitle">八组全部收齐！</h2>
       <p id="winSummary"></p>
       <div class="win-actions">
         <button class="action primary" id="winNewButton" type="button">再来一局</button>
@@ -308,13 +308,12 @@
     "use strict";
     (() => {
       const ROUTE_CAP = 99;
-      const TARGET_RUNS = 4;
+      const TARGET_RUNS = 8;
       const COLUMN_COUNT = 10;
       const DEAL_SIZE = 10;
-      const DEAL_ROUNDS = 2;
-      const TOTAL_CARDS = 52;
-      const INITIAL_CARDS = 32;
-      const SEGMENT_PARTITIONS = [[3, 3, 7], [3, 3, 7], [6, 7], [6, 7]];
+      const DEAL_ROUNDS = 1;
+      const TOTAL_CARDS = TARGET_RUNS * 13;
+      const INITIAL_CARDS = TOTAL_CARDS - DEAL_SIZE * DEAL_ROUNDS;
 
       function cloneState(state) {
         return {
@@ -335,7 +334,6 @@
 
       function legalMoves(state) {
         const moves = [];
-        const firstEmpty = state.cols.findIndex(col => col.length === 0);
         for (let fromCol = 0; fromCol < state.cols.length; fromCol++) {
           const source = state.cols[fromCol];
           for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
@@ -344,7 +342,6 @@
             for (let toCol = 0; toCol < state.cols.length; toCol++) {
               if (toCol === fromCol) continue;
               const target = state.cols[toCol];
-              if (!target.length && toCol !== firstEmpty) continue;
               if (!target.length || target[target.length - 1].r === rank + 1) {
                 moves.push({ fromCol, fromIndex, toCol, count: source.length - fromIndex });
               }
@@ -425,74 +422,78 @@
       }
 
       function createSolvableDeal(randomIndex) {
-        const segments = [];
-        SEGMENT_PARTITIONS.forEach((parts, group) => {
-          let rank = 13;
-          parts.forEach((length, order) => {
-            const ranks = [];
-            for (let index = 0; index < length; index++) ranks.push(rank--);
-            segments.push({ group, order, ranks });
-          });
-        });
-        shuffle(segments, randomIndex);
-
-        const locations = new Map();
-        const cols = [];
-        const firstRound = [];
-        const secondRound = [];
-        segments.forEach((segment, colIndex) => {
-          locations.set(segment.group + ":" + segment.order, colIndex);
-          cols.push(segment.ranks.slice(0, -2).map(rank => ({ r: rank, up: true })));
-          firstRound.push(segment.ranks[segment.ranks.length - 2]);
-          secondRound.push(segment.ranks[segment.ranks.length - 1]);
-        });
-
-        const sourceCols = segments.map((segment, index) => segment.ranks.length === 3 ? index : -1).filter(index => index >= 0);
-        const donorCols = segments.map((segment, index) => segment.ranks.length >= 6 ? index : -1).filter(index => index >= 0);
-        shuffle(donorCols, randomIndex);
-        const recovery = [];
+        const columnOrder = shuffle(Array.from({ length: COLUMN_COUNT }, (_, index) => index), randomIndex);
+        const cols = Array.from({ length: COLUMN_COUNT }, () => []);
+        const round = Array(COLUMN_COUNT);
+        const plan = [];
         const certificateNodes = [];
-        sourceCols.forEach((sourceCol, index) => {
-          const donorCol = donorCols[index];
-          const donor = cols[donorCol];
-          const takeLimit = Math.min(2, donor.length - 1);
-          const takeCount = 1 + randomSlot(randomIndex, takeLimit);
-          const moved = donor.splice(donor.length - takeCount, takeCount);
-          cols[sourceCol][0].up = false;
-          const fromIndex = cols[sourceCol].length;
-          cols[sourceCol].push(...moved);
-          const action = { type: "move", fromCol: sourceCol, fromIndex, toCol: donorCol };
-          recovery.push(action);
-          certificateNodes.push({ ...action, id: "recover-" + index, requires: [] });
-        });
 
-        const stock = secondRound.slice().reverse().concat(firstRound.slice().reverse());
-        const plan = recovery.slice();
-        const recoveryIds = certificateNodes.map(node => node.id);
-        for (let round = 0; round < DEAL_ROUNDS; round++) {
-          const action = { type: "deal" };
-          const id = "deal-" + (round + 1);
-          const requires = round === 0 ? recoveryIds : ["deal-" + round];
+        function record(action, id, requires) {
           plan.push(action);
           certificateNodes.push({ ...action, id, requires });
         }
-        SEGMENT_PARTITIONS.forEach((parts, group) => {
-          let requires = ["deal-" + DEAL_ROUNDS];
-          for (let order = parts.length - 1; order > 0; order--) {
-            const action = {
-              type: "move",
-              fromCol: locations.get(group + ":" + order),
-              fromIndex: 0,
-              toCol: locations.get(group + ":" + (order - 1))
-            };
-            const id = "assemble-" + group + "-" + order;
-            plan.push(action);
-            certificateNodes.push({ ...action, id, requires });
-            requires = [id];
-          }
+
+        // Two split groups release work columns; the six other groups are hidden,
+        // randomly interleaved across three independent pairs of source columns.
+        const splitGroups = [];
+        for (let group = 0; group < 2; group++) {
+          const highCol = columnOrder[group * 2];
+          const lowCol = columnOrder[group * 2 + 1];
+          const cut = 6 + randomSlot(randomIndex, 2);
+          const highRanks = Array.from({ length: cut }, (_, index) => 13 - index);
+          const lowRanks = Array.from({ length: 13 - cut }, (_, index) => 13 - cut - index);
+          cols[highCol] = highRanks.slice(0, -1).map(r => ({ r, up: true }));
+          cols[lowCol] = lowRanks.slice(0, -1).map(r => ({ r, up: true }));
+          round[highCol] = highRanks[highRanks.length - 1];
+          round[lowCol] = 1;
+          const takeCount = 1 + randomSlot(randomIndex, 2);
+          const moved = cols[lowCol].splice(cols[lowCol].length - takeCount, takeCount);
+          const fromIndex = cols[highCol].length;
+          cols[highCol].push(...moved);
+          record({ type: "move", fromCol: highCol, fromIndex, toCol: lowCol }, "recover-" + group, []);
+          splitGroups.push({ highCol, lowCol });
+        }
+        record({ type: "deal" }, "deal-1", ["recover-0", "recover-1"]);
+        splitGroups.forEach(({ highCol, lowCol }, group) => {
+          record({ type: "move", fromCol: lowCol, fromIndex: 0, toCol: highCol },
+            "assemble-" + group, ["deal-1"]);
         });
+
+        const workColumns = shuffle(columnOrder.slice(0, 4), randomIndex);
+        for (let lane = 0; lane < 3; lane++) {
+          const sourceCols = columnOrder.slice(4 + lane * 2, 6 + lane * 2);
+          const workCol = workColumns[lane];
+          const splitGroup = splitGroups.findIndex(group => group.highCol === workCol || group.lowCol === workCol);
+          const exposures = [];
+          for (let group = 0; group < 2; group++) {
+            for (let rank = 13; rank >= 1; rank--) exposures.push({ group, rank });
+          }
+          const sourceRanks = new Map(sourceCols.map(col => [col, []]));
+          for (let index = 0; index < exposures.length; index += 2) {
+            const order = shuffle(sourceCols.slice(), randomIndex);
+            for (let offset = 0; offset < 2; offset++) {
+              const exposure = exposures[index + offset];
+              exposure.fromCol = order[offset];
+              sourceRanks.get(exposure.fromCol).push(exposure.rank);
+            }
+          }
+          sourceCols.forEach(col => {
+            const ranks = sourceRanks.get(col).slice().reverse();
+            round[col] = ranks.pop();
+            cols[col] = ranks.map((r, index) => ({ r, up: index === ranks.length - 1 }));
+          });
+          const remaining = new Map(sourceCols.map(col => [col, 13]));
+          let requires = ["assemble-" + splitGroup];
+          exposures.forEach(({ group, rank, fromCol }) => {
+            const fromIndex = remaining.get(fromCol) - 1;
+            remaining.set(fromCol, fromIndex);
+            const id = "uncover-" + lane + "-" + group + "-" + rank;
+            record({ type: "move", fromCol, fromIndex, toCol: workCol }, id, requires);
+            requires = [id];
+          });
+        }
         return {
-          state: { cols, stock, completed: 0 },
+          state: { cols, stock: round.reverse(), completed: 0 },
           plan,
           certificate: { version: 1, valid: true, done: [], nodes: certificateNodes }
         };
@@ -530,7 +531,7 @@
       function isValidCertificate(certificate) {
         if (!certificate || certificate.version !== 1 || typeof certificate.valid !== "boolean" ||
             !Array.isArray(certificate.done) || !Array.isArray(certificate.nodes) ||
-            certificate.nodes.length < 1 || certificate.nodes.length > 32) return false;
+            certificate.nodes.length < 1 || certificate.nodes.length > TOTAL_CARDS + DEAL_ROUNDS) return false;
         const seen = new Set();
         for (const node of certificate.nodes) {
           if (!node || typeof node.id !== "string" || !node.id || seen.has(node.id) ||
@@ -745,8 +746,8 @@
   <script>
     "use strict";
     (() => {
-      const STORE_KEY = "game-over-spider-one-suit-v2";
-      const LEGACY_STORE_KEY = "game-over-spider-one-suit-v1";
+      const STORE_KEY = "game-over-spider-one-suit-v3";
+      const LEGACY_STORE_KEYS = ["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2"];
       const { TARGET_RUNS } = SpiderPlanner.config;
       const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const board = document.getElementById("board");
@@ -964,7 +965,7 @@
       function afterAction(message, collected) {
         if (game.completed === TARGET_RUNS) {
           game.finishedAt = Date.now();
-          announce("恭喜，四组牌全部收齐！");
+          announce("恭喜，八组牌全部收齐！");
         } else if (collected) {
           announce("收齐 " + collected + " 组 K 到 A！继续加油。");
         } else {
@@ -1330,7 +1331,7 @@
       document.addEventListener("keydown", event => {
         if (event.key === "Escape" && !winCover.hidden) winCover.hidden = true;
       });
-      try { localStorage.removeItem(LEGACY_STORE_KEY); } catch (_) {}
+      try { LEGACY_STORE_KEYS.forEach(key => localStorage.removeItem(key)); } catch (_) {}
       if (!readSaved()) {
         game = freshGame();
         save();

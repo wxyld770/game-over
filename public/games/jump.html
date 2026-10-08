@@ -128,6 +128,7 @@
       let physicsDebt = 0;
       let submitting = false;
       let rankingLoading = false;
+      let savedNickname = '';
       let displayWidth = 900;
       let displayHeight = 450;
       let pixelRatio = 1;
@@ -155,7 +156,8 @@
       let state = 'loading';
       let lastFrame = performance.now();
       try { best = Math.max(0, Number(localStorage.getItem('jump:best')) || 0); } catch {}
-      try { nickname.value = localStorage.getItem('jump:name') || ''; } catch {}
+      try { savedNickname = (localStorage.getItem('jump:name') || '').normalize('NFKC').trim().replace(/\s+/gu, ' '); } catch {}
+      nickname.value = savedNickname;
       bestText.textContent = best;
 
       function fit() {
@@ -206,7 +208,7 @@
 
       function renderRanking(data) {
         rankingList.replaceChildren();
-        for (const entry of data.entries || []) {
+        for (const entry of (data.entries || []).slice(0, 20)) {
           const item = document.createElement('li');
           item.className = 'ranking-row';
           const place = document.createElement('span');
@@ -233,7 +235,8 @@
         refreshRanking.disabled = true;
         rankingStatus.className = 'ranking-status';
         rankingStatus.textContent = '正在加载排行榜...';
-        try { renderRanking(await request('/api/jump/leaderboard')); }
+        const query = savedNickname ? `?${new URLSearchParams({ name: savedNickname })}` : '';
+        try { renderRanking(await request(`/api/jump/leaderboard${query}`)); }
         catch (error) {
           rankingStatus.className = 'ranking-status error';
           rankingStatus.textContent = error.name === 'TimeoutError' || error.name === 'TypeError' ? '无法连接排行榜，请稍后刷新。' : error.message;
@@ -627,7 +630,7 @@
       scoreForm.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (submitting || !rankedRun || state !== 'over') return;
-        const name = nickname.value.trim();
+        const name = nickname.value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
         if (!name || [...name].length > 18) {
           scoreStatus.className = 'score-status error';
           scoreStatus.textContent = '请输入 1 到 18 个字符的昵称。';
@@ -646,6 +649,8 @@
             method: 'POST', body: JSON.stringify({ name, jumps: jumpHistory }),
           });
           if (version !== runVersion) return;
+          savedNickname = name;
+          nickname.value = name;
           try { localStorage.setItem('jump:name', name); } catch {}
           renderRanking(result);
           scoreStatus.className = 'score-status success';

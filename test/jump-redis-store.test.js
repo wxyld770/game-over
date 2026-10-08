@@ -211,7 +211,7 @@ async function redisFixture(t, maxEntries = 3) {
 }
 
 test('Redis Lua saves concurrent personal bests, tie order, capacity and isolated namespaces', { skip: !hasRedisServer }, async (t) => {
-  const local = await redisFixture(t);
+  const local = await redisFixture(t, 4);
   const first = local.store();
   const second = local.store();
   await Promise.all([
@@ -222,26 +222,32 @@ test('Redis Lua saves concurrent personal bests, tie order, capacity and isolate
   const entries = await first.instance.load();
   assert.equal(entries.length, 2);
   assert.equal(entries.find((row) => row.playerId === id('a')).score, 20);
-  const tie = await second.instance.saveBest(entry('a', 20, 'New name', LATER));
+  const renamed = await second.instance.saveBest(entry('a', 25, 'New name', LATER));
+  assert.equal(renamed.isPersonalBest, true);
+  assert.equal(renamed.entries.length, 3);
+  assert.deepEqual(renamed.entries.find((row) => row.name === 'Alice'), entry('a', 20, 'Alice', AT));
+  assert.deepEqual(renamed.entries.find((row) => row.name === 'New name'), entry('a', 25, 'New name', LATER));
+  const tie = await second.instance.saveBest(entry('a', 20, 'Alice', LATER));
   assert.equal(tie.isPersonalBest, false);
-  assert.deepEqual(tie.entries.find((row) => row.playerId === id('a')), entry('a', 20, 'New name', AT));
-  const lower = await first.instance.saveBest(entry('a', 1, 'Latest name', LATER));
+  assert.deepEqual(tie.entries.find((row) => row.name === 'Alice'), entry('a', 20, 'Alice', AT));
+  const lower = await first.instance.saveBest(entry('a', 1, 'Alice', LATER));
   assert.equal(lower.isPersonalBest, false);
-  assert.deepEqual(lower.entries.find((row) => row.playerId === id('a')), entry('a', 20, 'Latest name', AT));
+  assert.deepEqual(lower.entries.find((row) => row.name === 'Alice'), entry('a', 20, 'Alice', AT));
   const competing = await Promise.allSettled([
     first.instance.saveBest(entry('c', 15, 'Carol')),
     second.instance.saveBest(entry('d', 25, 'Dave')),
   ]);
   assert.equal(competing.filter((result) => result.status === 'fulfilled').length, 1);
   assert.equal(competing.find((result) => result.status === 'rejected').reason.status, 503);
-  assert.equal((await first.instance.load()).length, 3);
+  assert.equal((await first.instance.load()).length, 4);
   const improved = await first.instance.saveBest(entry('a', 25, 'Alice', LATER));
   assert.equal(improved.isPersonalBest, true);
-  assert.deepEqual(improved.entries.find((row) => row.playerId === id('a')), entry('a', 25, 'Alice', LATER));
+  assert.deepEqual(improved.entries.find((row) => row.name === 'Alice'), entry('a', 25, 'Alice', LATER));
+  assert.deepEqual(improved.entries.find((row) => row.name === 'New name'), entry('a', 25, 'New name', LATER));
   const isolated = local.store('game-over:jump:separate');
   assert.deepEqual(await isolated.instance.load(), []);
   await isolated.instance.saveBest(entry('d', 30, 'Dave'));
-  assert.equal((await first.instance.load()).length, 3);
+  assert.equal((await first.instance.load()).length, 4);
   const match = local.store('game-over:match3:v1', {
     maxScore: 1_000_000,
     validateEntries: (values, maximum) => {
@@ -253,10 +259,42 @@ test('Redis Lua saves concurrent personal bests, tie order, capacity and isolate
   const matchEntry = entry('match', 500_000, 'Matcher');
   await match.instance.saveBest(matchEntry);
   assert.deepEqual(await match.instance.load(), [matchEntry]);
-  assert.equal((await first.instance.load()).length, 3, 'match-3 key space is isolated from jump scores');
+  assert.equal((await first.instance.load()).length, 4, 'match-3 key space is isolated from jump scores');
   await first.instance.close();
   const restarted = local.store();
   assert.deepEqual(await restarted.instance.load(), await second.instance.load());
+});
+
+test('Redis Lua preserves legacy names while migrating device fields, including full capacity', { skip: !hasRedisServer }, async (t) => {
+  const local = await redisFixture(t);
+  const { instance, client } = local.store();
+  await instance.load();
+  const key = 'game-over:jump:v1:players';
+  const legacy = entry('a', 20, 'wellen');
+  await client.hSet(key, legacy.playerId, JSON.stringify(legacy));
+  const renamed = await instance.saveBest(entry('a', 30, 'wxyld', LATER));
+  assert.equal(renamed.isPersonalBest, true);
+  assert.equal(renamed.entries.length, 2);
+  assert.deepEqual(renamed.entries.find((row) => row.name === 'wellen'), legacy);
+  assert.deepEqual(renamed.entries.find((row) => row.name === 'wxyld'), entry('a', 30, 'wxyld', LATER));
+  assert.equal(await client.hGet(key, legacy.playerId), null);
+  assert.equal(await client.hGet(key, `${legacy.playerId}:wellen`), JSON.stringify(legacy));
+
+  const lower = await instance.saveBest(entry('a', 1, 'wellen', LATER));
+  assert.equal(lower.isPersonalBest, false);
+  assert.deepEqual(lower.entries.find((row) => row.name === 'wellen'), legacy);
+  const other = entry('b', 10, 'Bob');
+  await client.hSet(key, other.playerId, JSON.stringify(other));
+  await assert.rejects(instance.saveBest(entry('b', 15, 'New Bob', LATER)), { status: 503 });
+  assert.equal(await client.hGet(key, other.playerId), JSON.stringify(other), 'failed capacity checks must not mutate the legacy record');
+  const updated = await instance.saveBest(entry('b', 15, 'Bob', LATER));
+  assert.equal(updated.entries.length, 3);
+  assert.equal(updated.isPersonalBest, true);
+  assert.equal(await client.hGet(key, other.playerId), null);
+  assert.deepEqual(updated.entries.find((row) => row.name === 'Bob'), entry('b', 15, 'Bob', LATER));
+
+  const restarted = local.store();
+  assert.deepEqual(await restarted.instance.load(), await instance.load());
 });
 
 test('Redis Lua rejects malformed data without overwriting it', { skip: !hasRedisServer }, async (t) => {

@@ -21,7 +21,18 @@ local count = redis.call('HLEN', KEYS[1])
 if count > maximum then
   return redis.error_reply('INVALID_LEADERBOARD')
 end
-local value = redis.call('HGET', KEYS[1], candidate.playerId)
+local field = candidate.playerId .. ':' .. candidate.name
+local legacy = redis.call('HGET', KEYS[1], candidate.playerId)
+local legacyField
+if legacy then
+  local previous = cjson.decode(legacy)
+  if previous.playerId ~= candidate.playerId then
+    return redis.error_reply('INVALID_LEADERBOARD')
+  end
+  legacyField = previous.playerId .. ':' .. previous.name
+end
+local value = redis.call('HGET', KEYS[1], field)
+if not value and legacyField == field then value = legacy end
 if not value and count >= maximum then
   return {-1}
 end
@@ -29,7 +40,7 @@ local isPersonalBest = 1
 if value then
   local valid, previous = pcall(cjson.decode, value)
   if not valid or type(previous) ~= 'table'
-    or previous.playerId ~= candidate.playerId or type(previous.name) ~= 'string'
+    or previous.playerId ~= candidate.playerId or previous.name ~= candidate.name
     or type(previous.achievedAt) ~= 'string' or type(previous.score) ~= 'number'
     or previous.score <= 0 or previous.score > tonumber(ARGV[3])
     or previous.score ~= math.floor(previous.score) then
@@ -41,7 +52,12 @@ if value then
     candidate.achievedAt = previous.achievedAt
   end
 end
-redis.call('HSET', KEYS[1], candidate.playerId, cjson.encode(candidate))
+-- Keep the old nickname when converting a device-only record to named records.
+if legacy then
+  redis.call('HSET', KEYS[1], legacyField, legacy)
+  redis.call('HDEL', KEYS[1], candidate.playerId)
+end
+redis.call('HSET', KEYS[1], field, cjson.encode(candidate))
 return {isPersonalBest, redis.call('HVALS', KEYS[1])}
 `;
 

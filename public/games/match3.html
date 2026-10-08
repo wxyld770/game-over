@@ -79,10 +79,12 @@
     let rankingLoading = false;
     let submitting = false;
     let localBest = 0;
+    let savedNickname = '';
     try {
       localBest = Math.max(0, Number(localStorage.getItem('match3:best')) || 0);
-      $('nickname').value = localStorage.getItem('match3:name') || '';
+      savedNickname = (localStorage.getItem('match3:name') || '').normalize('NFKC').trim().replace(/\s+/gu, ' ');
     } catch {}
+    $('nickname').value = savedNickname;
 
     function setMessage(text, tone = '') {
       $('message').textContent = text;
@@ -152,7 +154,7 @@
 
     function renderRanking(data) {
       $('ranking').replaceChildren();
-      for (const entry of data.entries || []) {
+      for (const entry of (data.entries || []).slice(0, 20)) {
         const item = document.createElement('li');
         const place = document.createElement('span');
         const name = document.createElement('span');
@@ -172,7 +174,8 @@
       rankingLoading = true;
       $('rankingStatus').className = 'ranking-status';
       $('rankingStatus').textContent = '正在加载排行榜...';
-      try { renderRanking(await request('/api/match3/leaderboard')); }
+      const query = savedNickname ? `?${new URLSearchParams({ name: savedNickname })}` : '';
+      try { renderRanking(await request(`/api/match3/leaderboard${query}`)); }
       catch (error) {
         $('rankingStatus').className = 'ranking-status error';
         $('rankingStatus').textContent = error.name === 'TimeoutError' || error.name === 'TypeError' ? '无法连接排行榜，请稍后刷新。' : error.message;
@@ -422,6 +425,8 @@
         const result = await request(`/api/match3/runs/${submittedRun.runId}/finish`, {
           method: 'POST', body: JSON.stringify({ name, moves: submittedMoves }),
         });
+        savedNickname = name;
+        $('nickname').value = name;
         try { localStorage.setItem('match3:name', name); } catch {}
         $('submitStatus').textContent = result.isPersonalBest
           ? `新纪录 ${result.personalBest.toLocaleString('zh-CN')} 分，当前第 ${result.rank} 名！`
