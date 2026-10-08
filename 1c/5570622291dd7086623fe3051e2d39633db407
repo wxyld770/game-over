@@ -1,0 +1,19 @@
+public/games/doudizhu.html
+  s_168e1bfdeccdef::t_b9313871730479 236-237,271,280,331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "1c5570622291dd7086623fe3051e2d39633db407",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
