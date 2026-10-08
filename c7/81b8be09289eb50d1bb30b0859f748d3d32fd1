@@ -1,0 +1,39 @@
+test/jump-redis-store.test.js
+  s_168e1bfdeccdef::t_8ee9f445d0808f 214,225-230,232-233,235,242,245-246,250,262,268-297
+jump-redis-store.js
+  s_168e1bfdeccdef::t_4838211d992cc8 24-35,43,55-60
+test/jump-leaderboard.test.js
+  s_168e1bfdeccdef::t_9c9e26f3c601d0 88,111-112,114-116,122,124-128,132,137-195,287,290,292-293,296,301,320,371,375-378
+test/match3-leaderboard.test.js
+  s_168e1bfdeccdef::t_9c9e26f3c601d0 7,28-30,36,60,62-71,100-176
+test/spider.test.js
+  s_168e1bfdeccdef::t_6adc01372683e0 118-122,127-132,141-142,151,154,158,162,170-172,174,177,196-197,211,214,220-222
+jump-leaderboard.js
+  s_168e1bfdeccdef::t_4838211d992cc8 34-37,44,50,71,98-99,102,104,170-172,178,223-224,279
+match3-leaderboard.js
+  s_168e1bfdeccdef::t_4838211d992cc8 35-38,45,51,72,98-99,102,104,171,173,179,224-225,297
+public/games/jump.html
+  s_168e1bfdeccdef::t_0e8a480e6eadab 131,159-160,211,238-239,633,652-653
+public/games/match3.html
+  s_168e1bfdeccdef::t_0e8a480e6eadab 82,85,87,157,177-178,428-429
+public/games/spider.html
+  s_168e1bfdeccdef::t_2105373ecc777d 7,236,245-246,271,279,284,287,299,311,314-316,425-428,431,435-459,461-494,496,534,749-750,968,1334
+README.md
+  s_168e1bfdeccdef::t_0e8a480e6eadab 78,82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "c781b8be09289eb50d1bb30b0859f748d3d32fd1",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
