@@ -262,7 +262,7 @@
             </section>
           </div>
           <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
-          <p class="bottom-note">牌局会自动保存在这台设备上。手机上左右滑动牌桌，可查看全部十列；偏离初始解法后，提示仍会按当前牌面给出不重复的下一步。</p>
+          <p class="bottom-note">牌局自动保存。暗牌和底牌在开局时固定，提示会按当前牌面寻找完整收牌路线。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
@@ -304,450 +304,606 @@
       </div>
     </div>
   </div>
-  <script>
-    "use strict";
-    (() => {
-      const ROUTE_CAP = 99;
-      const TARGET_RUNS = 8;
-      const COLUMN_COUNT = 10;
-      const DEAL_SIZE = 10;
-      const DEAL_ROUNDS = 1;
-      const TOTAL_CARDS = TARGET_RUNS * 13;
-      const INITIAL_CARDS = TOTAL_CARDS - DEAL_SIZE * DEAL_ROUNDS;
+  <script id="spiderSolver">
+(function (root, factory) {
+  "use strict";
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else root.SpiderSolver = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
 
-      function cloneState(state) {
-        return {
-          cols: state.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
-          stock: Array.isArray(state.stock) ? state.stock.slice() : [],
-          completed: state.completed || 0
-        };
+  function canonicalKey(state) {
+    const count = state.cols.length;
+    const stock = state.stock || [];
+    // A column keeps its future stock cards when equivalent columns permute.
+    const columns = state.cols.map(function (col, index) {
+      let future = "";
+      for (let offset = index; offset < stock.length; offset += count) {
+        future += "," + stock[stock.length - 1 - offset];
+      }
+      return col.map(function (card) { return (card.up ? "u" : "d") + card.r; }).join(",") + "/" + future;
+    });
+    columns.sort();
+    return (state.completed || 0) + ":" + stock.length + ":" + columns.join("|");
+  }
+
+  function features(state) {
+    let hidden = 0;
+    let ordered = 0;
+    let empty = 0;
+    let segments = 0;
+    for (const col of state.cols) {
+      if (!col.length) empty++;
+      for (let index = 0; index < col.length; index++) {
+        if (!col[index].up) hidden++;
+        else if (index && col[index - 1].up && col[index - 1].r === col[index].r + 1) ordered++;
+        else segments++;
+      }
+    }
+    return { hidden: hidden, ordered: ordered, empty: empty, segments: segments };
+  }
+
+  function create(rules) {
+    if (!rules || typeof rules.legalMoves !== "function" || typeof rules.applyMove !== "function" ||
+        typeof rules.dealNextRound !== "function") throw new TypeError("Spider solver requires game transition rules");
+
+    function solve(state, options) {
+      const settings = options || {};
+      const nodeLimit = Math.max(1, settings.nodeLimit || 20000);
+      const timeLimit = Math.max(1, settings.timeLimitMs || 250);
+      const maxDepth = Math.max(1, settings.maxDepth || 400);
+      const targetRuns = settings.targetRuns || 8;
+      const clock = typeof performance !== "undefined" && typeof performance.now === "function" ?
+        function () { return performance.now(); } : function () { return Date.now(); };
+      const started = clock();
+      const seen = new Map();
+      const trail = new Set();
+      const path = [];
+      let nodes = 0;
+      let generated = 0;
+      let cutoff = null;
+      let depthCutoff = false;
+      let found = null;
+
+      function isSolved(current) {
+        return current.completed >= targetRuns && !current.stock.length && current.cols.every(function (col) { return !col.length; });
       }
 
-      function pickable(state, colIndex, index) {
-        const col = state.cols[colIndex];
-        if (!col || index < 0 || index >= col.length || !col[index].up) return false;
-        for (let i = index; i < col.length - 1; i++) {
-          if (!col[i + 1].up || col[i].r !== col[i + 1].r + 1) return false;
+      function overBudget() {
+        if (nodes >= nodeLimit) cutoff = "node-limit";
+        else if (clock() - started >= timeLimit) cutoff = "time-limit";
+        return cutoff !== null;
+      }
+
+      function visit(current, depth) {
+        if (isSolved(current)) {
+          found = path.slice();
+          return true;
         }
-        return true;
-      }
+        if (overBudget()) return false;
+        if (depth >= maxDepth) {
+          depthCutoff = true;
+          return false;
+        }
+        const key = canonicalKey(current);
+        if (trail.has(key) || (seen.has(key) && seen.get(key) <= depth)) return false;
+        seen.set(key, depth);
+        trail.add(key);
+        nodes++;
+        const before = features(current);
+        const children = [];
+        const unique = new Set();
 
-      function legalMoves(state) {
-        const moves = [];
-        for (let fromCol = 0; fromCol < state.cols.length; fromCol++) {
-          const source = state.cols[fromCol];
-          for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
-            if (!pickable(state, fromCol, fromIndex)) continue;
-            const rank = source[fromIndex].r;
-            for (let toCol = 0; toCol < state.cols.length; toCol++) {
-              if (toCol === fromCol) continue;
-              const target = state.cols[toCol];
-              if (!target.length || target[target.length - 1].r === rank + 1) {
-                moves.push({ fromCol, fromIndex, toCol, count: source.length - fromIndex });
-              }
-            }
+        function add(next, action) {
+          if (!next) return;
+          generated++;
+          const nextKey = canonicalKey(next);
+          if (nextKey === key || trail.has(nextKey) || unique.has(nextKey) ||
+              (seen.has(nextKey) && seen.get(nextKey) <= depth + 1)) return;
+          unique.add(nextKey);
+          const after = features(next);
+          const completed = next.completed - current.completed;
+          const reveals = before.hidden - after.hidden;
+          const source = action.type === "move" ? current.cols[action.fromCol] : null;
+          const target = action.type === "move" ? current.cols[action.toCol] : null;
+          const movesWholeColumn = source && action.fromIndex === 0;
+          const score = completed * 100000 + reveals * 5000 +
+            (after.ordered - before.ordered) * 120 + (before.segments - after.segments) * 150 +
+            (after.empty - before.empty) * 90 +
+            (action.type === "deal" ? 2000 : 0) +
+            (target && target.length ? 40 : 0) - (movesWholeColumn && target && !target.length ? 20 : 0);
+          children.push({ state: next, action: action, score: score });
+        }
+
+        for (const move of rules.legalMoves(current)) {
+          if (clock() - started >= timeLimit) {
+            cutoff = "time-limit";
+            break;
+          }
+          add(rules.applyMove(current, move), Object.assign({ type: "move" }, move));
+        }
+        if (!cutoff && current.stock.length) add(rules.dealNextRound(current), { type: "deal" });
+        children.sort(function (left, right) { return right.score - left.score; });
+        for (const child of children) {
+          if (cutoff) break;
+          path.push(child.action);
+          const solved = visit(child.state, depth + 1);
+          path.pop();
+          if (solved) {
+            trail.delete(key);
+            return true;
           }
         }
-        return moves;
+        trail.delete(key);
+        return false;
       }
 
-      function collectRuns(state) {
-        let collected = 0;
-        for (const col of state.cols) {
-          while (col.length >= 13) {
-            const run = col.slice(-13);
-            if (!run.every((card, index) => card.up && card.r === 13 - index)) break;
-            col.splice(-13, 13);
-            state.completed++;
-            collected++;
-            if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
+      visit(state, 0);
+      const status = found ? "solved" : (cutoff || depthCutoff ? "unknown" : "dead-end");
+      return {
+        status: status,
+        plan: found || [],
+        nodes: nodes,
+        generated: generated,
+        elapsedMs: clock() - started,
+        reason: found ? null : cutoff || (depthCutoff ? "depth-limit" : null)
+      };
+    }
+
+    return Object.freeze({ solve: solve });
+  }
+
+  return Object.freeze({ create: create, canonicalKey: canonicalKey });
+});
+  </script>
+  <script id="spiderRules">
+"use strict";
+(() => {
+  const SpiderSolver = typeof module === "object" && module.exports ? require("./spider-solver.js") : globalThis.SpiderSolver;
+  const ROUTE_CAP = 99;
+  const TARGET_RUNS = 8;
+  const COLUMN_COUNT = 10;
+  const DEAL_SIZE = 10;
+  const DEAL_ROUNDS = 1;
+  const TOTAL_CARDS = TARGET_RUNS * 13;
+  const INITIAL_CARDS = TOTAL_CARDS - DEAL_SIZE * DEAL_ROUNDS;
+
+  function cloneState(state) {
+    return {
+      cols: state.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
+      stock: Array.isArray(state.stock) ? state.stock.slice() : [],
+      completed: state.completed || 0
+    };
+  }
+
+  function pickable(state, colIndex, index) {
+    const col = state.cols[colIndex];
+    if (!col || index < 0 || index >= col.length || !col[index].up) return false;
+    for (let i = index; i < col.length - 1; i++) {
+      if (!col[i + 1].up || col[i].r !== col[i + 1].r + 1) return false;
+    }
+    return true;
+  }
+
+  function legalMoves(state) {
+    const moves = [];
+    for (let fromCol = 0; fromCol < state.cols.length; fromCol++) {
+      const source = state.cols[fromCol];
+      for (let fromIndex = 0; fromIndex < source.length; fromIndex++) {
+        if (!pickable(state, fromCol, fromIndex)) continue;
+        const rank = source[fromIndex].r;
+        for (let toCol = 0; toCol < state.cols.length; toCol++) {
+          if (toCol === fromCol) continue;
+          const target = state.cols[toCol];
+          if (!target.length || target[target.length - 1].r === rank + 1) {
+            moves.push({ fromCol, fromIndex, toCol, count: source.length - fromIndex });
           }
         }
-        return collected;
       }
+    }
+    return moves;
+  }
 
-      function applyMove(state, move) {
-        const next = cloneState(state);
-        const source = next.cols[move.fromCol];
-        const moved = source.splice(move.fromIndex);
-        next.cols[move.toCol].push(...moved);
-        if (source.length && !source[source.length - 1].up) source[source.length - 1].up = true;
-        collectRuns(next);
-        return next;
+  function collectRuns(state) {
+    let collected = 0;
+    for (const col of state.cols) {
+      while (col.length >= 13) {
+        const run = col.slice(-13);
+        if (!run.every((card, index) => card.up && card.r === 13 - index)) break;
+        col.splice(-13, 13);
+        state.completed++;
+        collected++;
+        if (col.length && !col[col.length - 1].up) col[col.length - 1].up = true;
       }
+    }
+    return collected;
+  }
 
-      function dealNextRound(state) {
-        if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE || state.cols.some(col => !col.length)) return null;
-        const next = cloneState(state);
-        for (let colIndex = 0; colIndex < COLUMN_COUNT; colIndex++) {
-          next.cols[colIndex].push({ r: next.stock.pop(), up: true });
+  function applyMove(state, move) {
+    const next = cloneState(state);
+    const source = next.cols[move.fromCol];
+    const moved = source.splice(move.fromIndex);
+    next.cols[move.toCol].push(...moved);
+    if (source.length && !source[source.length - 1].up) source[source.length - 1].up = true;
+    collectRuns(next);
+    return next;
+  }
+
+  function dealNextRound(state) {
+    if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE || state.cols.some(col => !col.length)) return null;
+    const next = cloneState(state);
+    for (let colIndex = 0; colIndex < COLUMN_COUNT; colIndex++) {
+      next.cols[colIndex].push({ r: next.stock.pop(), up: true });
+    }
+    collectRuns(next);
+    return next;
+  }
+
+  function isValidState(state) {
+    if (!state || !Array.isArray(state.cols) || state.cols.length !== COLUMN_COUNT ||
+        !Array.isArray(state.stock) || state.stock.length > DEAL_SIZE * DEAL_ROUNDS || state.stock.length % DEAL_SIZE !== 0 ||
+        !Number.isInteger(state.completed) || state.completed < 0 || state.completed > TARGET_RUNS) return false;
+    const counts = Array(14).fill(state.completed);
+    for (const rank of state.stock) {
+      if (!Number.isInteger(rank) || rank < 1 || rank > 13) return false;
+      counts[rank]++;
+    }
+    for (const col of state.cols) {
+      if (!Array.isArray(col) || col.length > TOTAL_CARDS) return false;
+      let seenUp = false;
+      for (const card of col) {
+        if (!card || !Number.isInteger(card.r) || card.r < 1 || card.r > 13 || typeof card.up !== "boolean") return false;
+        if (seenUp && !card.up) return false;
+        if (card.up) seenUp = true;
+        counts[card.r]++;
+      }
+    }
+    return counts.slice(1).every(count => count === TARGET_RUNS);
+  }
+
+  function randomSlot(randomIndex, max) {
+    const value = typeof randomIndex === "function" ? randomIndex(max) : Math.floor(Math.random() * max);
+    return Number.isInteger(value) && value >= 0 && value < max ? value : 0;
+  }
+
+  function shuffle(items, randomIndex) {
+    for (let index = items.length - 1; index > 0; index--) {
+      const swapIndex = randomSlot(randomIndex, index + 1);
+      [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
+    }
+    return items;
+  }
+
+  function createSolvableDeal(randomIndex) {
+    const columnOrder = shuffle(Array.from({ length: COLUMN_COUNT }, (_, index) => index), randomIndex);
+    const cols = Array.from({ length: COLUMN_COUNT }, () => []);
+    const round = Array(COLUMN_COUNT);
+    const plan = [];
+    const certificateNodes = [];
+    const coreCols = columnOrder.slice(0, 6);
+    const splitGroups = [];
+
+    // Descending hidden prefixes keep uncovered moves reversible; Aces start visible.
+    for (const col of coreCols) {
+      const hidden = 5 + randomSlot(randomIndex, 6);
+      cols[col] = Array.from({ length: 12 }, (_, index) => ({ r: 12 - index, up: index >= hidden }));
+      round[col] = 13;
+    }
+    for (let group = 0; group < 2; group++) {
+      const highCol = columnOrder[6 + group * 2];
+      const lowCol = columnOrder[7 + group * 2];
+      const cut = 2 + randomSlot(randomIndex, 3);
+      cols[highCol] = Array.from({ length: 12 - cut }, (_, index) => ({ r: 13 - index, up: true }));
+      cols[lowCol] = Array.from({ length: cut - 1 }, (_, index) => ({ r: cut - index, up: true }));
+      round[highCol] = cut + 1;
+      round[lowCol] = 1;
+      splitGroups.push({ highCol, lowCol });
+    }
+
+    const state = { cols, stock: round.reverse(), completed: 0 };
+    let proof = cloneState(state);
+    function record(action, id, requires) {
+      if (action.type === "deal") {
+        proof = dealNextRound(proof);
+      } else {
+        const move = legalMoves(proof).find(candidate => candidate.fromCol === action.fromCol &&
+          candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
+        if (!move) throw new Error("Invalid generated Spider solution");
+        proof = applyMove(proof, move);
+      }
+      plan.push(action);
+      certificateNodes.push({ ...action, id, requires });
+    }
+    function recordMove(fromCol, fromIndex, toCol, id, requires) {
+      record({ type: "move", fromCol, fromIndex, toCol }, id, requires);
+    }
+    record({ type: "deal" }, "deal-1", []);
+    splitGroups.forEach(({ highCol, lowCol }, group) => {
+      recordMove(lowCol, 0, highCol, "assemble-" + group, ["deal-1"]);
+    });
+
+    let requires = ["assemble-0", "assemble-1"];
+    for (const col of shuffle(coreCols.slice(), randomIndex)) {
+      const spaces = shuffle(proof.cols.map((cards, index) => cards.length ? -1 : index).filter(index => index >= 0), randomIndex);
+      const kingCol = spaces[0];
+      const bufferCol = spaces[1];
+      const kingId = "king-" + col;
+      recordMove(col, proof.cols[col].length - 1, kingCol, kingId, requires);
+      requires = [kingId];
+      while (proof.cols[col].some(card => !card.up)) {
+        const index = proof.cols[col].findIndex(card => card.up);
+        const liftId = "lift-" + col + "-" + index;
+        const returnId = "return-" + col + "-" + index;
+        recordMove(col, index, bufferCol, liftId, requires);
+        recordMove(bufferCol, 0, col, returnId, [liftId]);
+        requires = [returnId];
+      }
+      const completeId = "complete-" + col;
+      recordMove(col, 0, kingCol, completeId, requires);
+      requires = [completeId];
+    }
+    return {
+      state,
+      plan,
+      certificate: { version: 1, valid: true, done: [], nodes: certificateNodes }
+    };
+  }
+
+  function replayPlan(state, plan) {
+    let current = cloneState(state);
+    for (const action of plan) {
+      if (action.type === "deal") {
+        current = dealNextRound(current);
+        if (!current) return null;
+        continue;
+      }
+      const move = legalMoves(current).find(candidate => candidate.fromCol === action.fromCol &&
+        candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
+      if (!move) return null;
+      current = applyMove(current, move);
+    }
+    return current;
+  }
+
+  function cloneCertificate(certificate) {
+    if (!certificate) return null;
+    return {
+      version: certificate.version,
+      valid: certificate.valid,
+      done: Array.isArray(certificate.done) ? certificate.done.slice() : [],
+      nodes: Array.isArray(certificate.nodes) ? certificate.nodes.map(node => ({
+        ...node,
+        requires: Array.isArray(node.requires) ? node.requires.slice() : []
+      })) : []
+    };
+  }
+
+  function isValidCertificate(certificate) {
+    if (!certificate || certificate.version !== 1 || typeof certificate.valid !== "boolean" ||
+        !Array.isArray(certificate.done) || !Array.isArray(certificate.nodes) ||
+        certificate.nodes.length < 1 || certificate.nodes.length > TOTAL_CARDS * 2 + DEAL_ROUNDS) return false;
+    const seen = new Set();
+    for (const node of certificate.nodes) {
+      if (!node || typeof node.id !== "string" || !node.id || seen.has(node.id) ||
+          !Array.isArray(node.requires) || node.requires.some(id => !seen.has(id))) return false;
+      if (node.type === "move") {
+        if (![node.fromCol, node.toCol].every(value => Number.isInteger(value) && value >= 0 && value < COLUMN_COUNT) ||
+            node.fromCol === node.toCol || !Number.isInteger(node.fromIndex) || node.fromIndex < 0 || node.fromIndex >= TOTAL_CARDS) return false;
+      } else if (node.type !== "deal") return false;
+      seen.add(node.id);
+    }
+    const done = new Set(certificate.done);
+    return done.size === certificate.done.length && certificate.done.every(id => seen.has(id));
+  }
+
+  function actionMatches(left, right) {
+    return left && right && left.type === right.type && (left.type === "deal" ||
+      (left.fromCol === right.fromCol && left.fromIndex === right.fromIndex && left.toCol === right.toCol));
+  }
+
+  function readyCertificateActions(state, certificate) {
+    if (!isValidCertificate(certificate) || !certificate.valid) return [];
+    const done = new Set(certificate.done);
+    const moves = legalMoves(state);
+    const ready = [];
+    for (const node of certificate.nodes) {
+      if (done.has(node.id) || !node.requires.every(id => done.has(id))) continue;
+      if (node.type === "deal") {
+        if (state.stock.length >= DEAL_SIZE && state.cols.every(col => col.length)) ready.push({ ...node });
+        continue;
+      }
+      const move = moves.find(candidate => node.fromCol === candidate.fromCol &&
+        node.fromIndex === candidate.fromIndex && node.toCol === candidate.toCol);
+      if (move) ready.push({ ...node, count: move.count });
+    }
+    return ready;
+  }
+
+  function advanceCertificate(state, certificate, action) {
+    const next = cloneCertificate(certificate);
+    if (!isValidCertificate(next) || !next.valid) return next;
+    const matched = readyCertificateActions(state, next).find(node => actionMatches(node, action));
+    if (matched) next.done.push(matched.id);
+    else next.valid = false;
+    return next;
+  }
+
+  function stateFeatures(state) {
+    let hidden = 0;
+    let ordered = 0;
+    let runTotal = 0;
+    let empty = 0;
+    for (const col of state.cols) {
+      if (!col.length) empty++;
+      let currentRun = 0;
+      for (let index = 0; index < col.length; index++) {
+        const card = col[index];
+        if (!card.up) {
+          hidden++;
+          currentRun = 0;
+          continue;
         }
-        collectRuns(next);
-        return next;
-      }
-
-      function isValidState(state) {
-        if (!state || !Array.isArray(state.cols) || state.cols.length !== COLUMN_COUNT ||
-            !Array.isArray(state.stock) || state.stock.length > DEAL_SIZE * DEAL_ROUNDS || state.stock.length % DEAL_SIZE !== 0 ||
-            !Number.isInteger(state.completed) || state.completed < 0 || state.completed > TARGET_RUNS) return false;
-        const counts = Array(14).fill(state.completed);
-        for (const rank of state.stock) {
-          if (!Number.isInteger(rank) || rank < 1 || rank > 13) return false;
-          counts[rank]++;
+        currentRun = 1;
+        for (let next = index; next < col.length - 1; next++) {
+          if (!col[next + 1].up || col[next].r !== col[next + 1].r + 1) break;
+          currentRun++;
         }
-        for (const col of state.cols) {
-          if (!Array.isArray(col) || col.length > TOTAL_CARDS) return false;
-          let seenUp = false;
-          for (const card of col) {
-            if (!card || !Number.isInteger(card.r) || card.r < 1 || card.r > 13 || typeof card.up !== "boolean") return false;
-            if (seenUp && !card.up) return false;
-            if (card.up) seenUp = true;
-            counts[card.r]++;
-          }
-        }
-        return counts.slice(1).every(count => count === TARGET_RUNS);
+        runTotal += currentRun * currentRun;
+        index += currentRun - 1;
       }
-
-      function randomSlot(randomIndex, max) {
-        const value = typeof randomIndex === "function" ? randomIndex(max) : Math.floor(Math.random() * max);
-        return Number.isInteger(value) && value >= 0 && value < max ? value : 0;
+      for (let index = 0; index < col.length - 1; index++) {
+        if (col[index].up && col[index + 1].up && col[index].r === col[index + 1].r + 1) ordered++;
       }
+    }
+    return { hidden, ordered, runTotal, empty, mobility: legalMoves(state).length };
+  }
 
-      function shuffle(items, randomIndex) {
-        for (let index = items.length - 1; index > 0; index--) {
-          const swapIndex = randomSlot(randomIndex, index + 1);
-          [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-        }
-        return items;
+  function evaluate(state) {
+    const feature = stateFeatures(state);
+    return state.completed * 12000 - feature.hidden * 240 + feature.ordered * 42 +
+      feature.runTotal * 5 + feature.empty * 65 + Math.min(feature.mobility, 24) * 13;
+  }
+
+  function stateKey(state) {
+    const columns = state.cols.map(col => col.map(card => (card.up ? "u" : "d") + card.r.toString(36)).join(","));
+    if (!state.stock.length) columns.sort();
+    return state.completed + ":" + (state.stock || []).join(",") + ":" + columns.join("|");
+  }
+
+  function nonRepeatingMoves(state, recentStates, options) {
+    const recent = new Set((recentStates || []).map(stateKey));
+    return analyze(state, options).moves.filter(move => !recent.has(stateKey(applyMove(state, move))));
+  }
+
+  function transitionBonus(before, after) {
+    const left = stateFeatures(before);
+    const right = stateFeatures(after);
+    return (after.completed - before.completed) * 9000 + (left.hidden - right.hidden) * 900 +
+      (right.ordered - left.ordered) * 55 + (right.mobility - left.mobility) * 8;
+  }
+
+  function moveOrderScore(state, move) {
+    const source = state.cols[move.fromCol];
+    const target = state.cols[move.toCol];
+    const reveals = move.fromIndex > 0 && !source[move.fromIndex - 1].up;
+    const end = target.concat(source.slice(move.fromIndex)).slice(-13);
+    const completes = end.length === 13 && end.every((card, index) => card.up && card.r === 13 - index);
+    return (completes ? 10000 : 0) + (reveals ? 1200 : 0) + (target.length ? 160 : 0) + move.count * 5;
+  }
+
+  function analyze(state, options) {
+    const settings = options || {};
+    const depth = Math.max(1, Math.min(5, settings.depth || 3));
+    const breadth = Math.max(4, Math.min(40, settings.breadth || 22));
+    const nodeLimit = Math.max(80, Math.min(12000, settings.nodeLimit || 2200));
+    const memo = new Map();
+    let nodes = 0;
+
+    function visit(current, remaining, trail) {
+      const key = stateKey(current);
+      const memoKey = remaining + ":" + key;
+      if (memo.has(memoKey)) return memo.get(memoKey);
+      const base = evaluate(current);
+      const moves = legalMoves(current);
+      if (!remaining || !moves.length || nodes >= nodeLimit) {
+        const terminal = { score: base, routes: moves.length || 1 };
+        memo.set(memoKey, terminal);
+        return terminal;
       }
-
-      function createSolvableDeal(randomIndex) {
-        const columnOrder = shuffle(Array.from({ length: COLUMN_COUNT }, (_, index) => index), randomIndex);
-        const cols = Array.from({ length: COLUMN_COUNT }, () => []);
-        const round = Array(COLUMN_COUNT);
-        const plan = [];
-        const certificateNodes = [];
-
-        function record(action, id, requires) {
-          plan.push(action);
-          certificateNodes.push({ ...action, id, requires });
-        }
-
-        // Two split groups release work columns; the six other groups are hidden,
-        // randomly interleaved across three independent pairs of source columns.
-        const splitGroups = [];
-        for (let group = 0; group < 2; group++) {
-          const highCol = columnOrder[group * 2];
-          const lowCol = columnOrder[group * 2 + 1];
-          const cut = 6 + randomSlot(randomIndex, 2);
-          const highRanks = Array.from({ length: cut }, (_, index) => 13 - index);
-          const lowRanks = Array.from({ length: 13 - cut }, (_, index) => 13 - cut - index);
-          cols[highCol] = highRanks.slice(0, -1).map(r => ({ r, up: true }));
-          cols[lowCol] = lowRanks.slice(0, -1).map(r => ({ r, up: true }));
-          round[highCol] = highRanks[highRanks.length - 1];
-          round[lowCol] = 1;
-          const takeCount = 1 + randomSlot(randomIndex, 2);
-          const moved = cols[lowCol].splice(cols[lowCol].length - takeCount, takeCount);
-          const fromIndex = cols[highCol].length;
-          cols[highCol].push(...moved);
-          record({ type: "move", fromCol: highCol, fromIndex, toCol: lowCol }, "recover-" + group, []);
-          splitGroups.push({ highCol, lowCol });
-        }
-        record({ type: "deal" }, "deal-1", ["recover-0", "recover-1"]);
-        splitGroups.forEach(({ highCol, lowCol }, group) => {
-          record({ type: "move", fromCol: lowCol, fromIndex: 0, toCol: highCol },
-            "assemble-" + group, ["deal-1"]);
-        });
-
-        const workColumns = shuffle(columnOrder.slice(0, 4), randomIndex);
-        for (let lane = 0; lane < 3; lane++) {
-          const sourceCols = columnOrder.slice(4 + lane * 2, 6 + lane * 2);
-          const workCol = workColumns[lane];
-          const splitGroup = splitGroups.findIndex(group => group.highCol === workCol || group.lowCol === workCol);
-          const exposures = [];
-          for (let group = 0; group < 2; group++) {
-            for (let rank = 13; rank >= 1; rank--) exposures.push({ group, rank });
-          }
-          const sourceRanks = new Map(sourceCols.map(col => [col, []]));
-          for (let index = 0; index < exposures.length; index += 2) {
-            const order = shuffle(sourceCols.slice(), randomIndex);
-            for (let offset = 0; offset < 2; offset++) {
-              const exposure = exposures[index + offset];
-              exposure.fromCol = order[offset];
-              sourceRanks.get(exposure.fromCol).push(exposure.rank);
-            }
-          }
-          sourceCols.forEach(col => {
-            const ranks = sourceRanks.get(col).slice().reverse();
-            round[col] = ranks.pop();
-            cols[col] = ranks.map((r, index) => ({ r, up: index === ranks.length - 1 }));
-          });
-          const remaining = new Map(sourceCols.map(col => [col, 13]));
-          let requires = ["assemble-" + splitGroup];
-          exposures.forEach(({ group, rank, fromCol }) => {
-            const fromIndex = remaining.get(fromCol) - 1;
-            remaining.set(fromCol, fromIndex);
-            const id = "uncover-" + lane + "-" + group + "-" + rank;
-            record({ type: "move", fromCol, fromIndex, toCol: workCol }, id, requires);
-            requires = [id];
-          });
-        }
-        return {
-          state: { cols, stock: round.reverse(), completed: 0 },
-          plan,
-          certificate: { version: 1, valid: true, done: [], nodes: certificateNodes }
-        };
+      nodes++;
+      const orderedMoves = moves.sort((a, b) => moveOrderScore(current, b) - moveOrderScore(current, a));
+      const candidates = [];
+      for (const move of orderedMoves.slice(0, breadth)) {
+        const next = applyMove(current, move);
+        const nextKey = stateKey(next);
+        if (nextKey === key || trail.has(nextKey)) continue;
+        const nextTrail = new Set(trail);
+        nextTrail.add(nextKey);
+        const child = visit(next, remaining - 1, nextTrail);
+        candidates.push({ score: child.score + transitionBonus(current, next), routes: child.routes });
       }
+      if (!candidates.length) return { score: base, routes: 1 };
+      candidates.sort((a, b) => b.score - a.score);
+      const best = candidates[0].score;
+      const viable = candidates.filter(candidate => candidate.score >= best - 180);
+      const result = {
+        score: best,
+        routes: Math.min(ROUTE_CAP, viable.reduce((sum, candidate) => sum + Math.max(1, candidate.routes), 0))
+      };
+      memo.set(memoKey, result);
+      return result;
+    }
 
-      function replayPlan(state, plan) {
-        let current = cloneState(state);
-        for (const action of plan) {
-          if (action.type === "deal") {
-            current = dealNextRound(current);
-            if (!current) return null;
-            continue;
-          }
-          const move = legalMoves(current).find(candidate => candidate.fromCol === action.fromCol &&
-            candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
-          if (!move) return null;
-          current = applyMove(current, move);
-        }
-        return current;
-      }
-
-      function cloneCertificate(certificate) {
-        if (!certificate) return null;
-        return {
-          version: certificate.version,
-          valid: certificate.valid,
-          done: Array.isArray(certificate.done) ? certificate.done.slice() : [],
-          nodes: Array.isArray(certificate.nodes) ? certificate.nodes.map(node => ({
-            ...node,
-            requires: Array.isArray(node.requires) ? node.requires.slice() : []
-          })) : []
-        };
-      }
-
-      function isValidCertificate(certificate) {
-        if (!certificate || certificate.version !== 1 || typeof certificate.valid !== "boolean" ||
-            !Array.isArray(certificate.done) || !Array.isArray(certificate.nodes) ||
-            certificate.nodes.length < 1 || certificate.nodes.length > TOTAL_CARDS + DEAL_ROUNDS) return false;
-        const seen = new Set();
-        for (const node of certificate.nodes) {
-          if (!node || typeof node.id !== "string" || !node.id || seen.has(node.id) ||
-              !Array.isArray(node.requires) || node.requires.some(id => !seen.has(id))) return false;
-          if (node.type === "move") {
-            if (![node.fromCol, node.toCol].every(value => Number.isInteger(value) && value >= 0 && value < COLUMN_COUNT) ||
-                node.fromCol === node.toCol || !Number.isInteger(node.fromIndex) || node.fromIndex < 0 || node.fromIndex >= TOTAL_CARDS) return false;
-          } else if (node.type !== "deal") return false;
-          seen.add(node.id);
-        }
-        const done = new Set(certificate.done);
-        return done.size === certificate.done.length && certificate.done.every(id => seen.has(id));
-      }
-
-      function actionMatches(left, right) {
-        return left && right && left.type === right.type && (left.type === "deal" ||
-          (left.fromCol === right.fromCol && left.fromIndex === right.fromIndex && left.toCol === right.toCol));
-      }
-
-      function readyCertificateActions(state, certificate) {
-        if (!isValidCertificate(certificate) || !certificate.valid) return [];
-        const done = new Set(certificate.done);
-        const moves = legalMoves(state);
-        const ready = [];
-        for (const node of certificate.nodes) {
-          if (done.has(node.id) || !node.requires.every(id => done.has(id))) continue;
-          if (node.type === "deal") {
-            if (state.stock.length >= DEAL_SIZE && state.cols.every(col => col.length)) ready.push({ ...node });
-            continue;
-          }
-          const move = moves.find(candidate => node.fromCol === candidate.fromCol &&
-            node.fromIndex === candidate.fromIndex && node.toCol === candidate.toCol);
-          if (move) ready.push({ ...node, count: move.count });
-        }
-        return ready;
-      }
-
-      function advanceCertificate(state, certificate, action) {
-        const next = cloneCertificate(certificate);
-        if (!isValidCertificate(next) || !next.valid) return next;
-        const matched = readyCertificateActions(state, next).find(node => actionMatches(node, action));
-        if (matched) next.done.push(matched.id);
-        else next.valid = false;
-        return next;
-      }
-
-      function stateFeatures(state) {
-        let hidden = 0;
-        let ordered = 0;
-        let runTotal = 0;
-        let empty = 0;
-        for (const col of state.cols) {
-          if (!col.length) empty++;
-          let currentRun = 0;
-          for (let index = 0; index < col.length; index++) {
-            const card = col[index];
-            if (!card.up) {
-              hidden++;
-              currentRun = 0;
-              continue;
-            }
-            currentRun = 1;
-            for (let next = index; next < col.length - 1; next++) {
-              if (!col[next + 1].up || col[next].r !== col[next + 1].r + 1) break;
-              currentRun++;
-            }
-            runTotal += currentRun * currentRun;
-            index += currentRun - 1;
-          }
-          for (let index = 0; index < col.length - 1; index++) {
-            if (col[index].up && col[index + 1].up && col[index].r === col[index + 1].r + 1) ordered++;
-          }
-        }
-        return { hidden, ordered, runTotal, empty, mobility: legalMoves(state).length };
-      }
-
-      function evaluate(state) {
-        const feature = stateFeatures(state);
-        return state.completed * 12000 - feature.hidden * 240 + feature.ordered * 42 +
-          feature.runTotal * 5 + feature.empty * 65 + Math.min(feature.mobility, 24) * 13;
-      }
-
-      function stateKey(state) {
-        const columns = state.cols.map(col => col.map(card => (card.up ? "u" : "d") + card.r.toString(36)).join(","));
-        columns.sort();
-        return state.completed + ":" + (state.stock || []).join(",") + ":" + columns.join("|");
-      }
-
-      function nonRepeatingMoves(state, recentStates, options) {
-        const recent = new Set((recentStates || []).map(stateKey));
-        return analyze(state, options).moves.filter(move => !recent.has(stateKey(applyMove(state, move))));
-      }
-
-      function transitionBonus(before, after) {
-        const left = stateFeatures(before);
-        const right = stateFeatures(after);
-        return (after.completed - before.completed) * 9000 + (left.hidden - right.hidden) * 900 +
-          (right.ordered - left.ordered) * 55 + (right.mobility - left.mobility) * 8;
-      }
-
-      function moveOrderScore(state, move) {
-        const source = state.cols[move.fromCol];
-        const target = state.cols[move.toCol];
-        const reveals = move.fromIndex > 0 && !source[move.fromIndex - 1].up;
-        const end = target.concat(source.slice(move.fromIndex)).slice(-13);
-        const completes = end.length === 13 && end.every((card, index) => card.up && card.r === 13 - index);
-        return (completes ? 10000 : 0) + (reveals ? 1200 : 0) + (target.length ? 160 : 0) + move.count * 5;
-      }
-
-      function analyze(state, options) {
-        const settings = options || {};
-        const depth = Math.max(1, Math.min(5, settings.depth || 3));
-        const breadth = Math.max(4, Math.min(40, settings.breadth || 22));
-        const nodeLimit = Math.max(80, Math.min(12000, settings.nodeLimit || 2200));
-        const memo = new Map();
-        let nodes = 0;
-
-        function visit(current, remaining, trail) {
-          const key = stateKey(current);
-          const memoKey = remaining + ":" + key;
-          if (memo.has(memoKey)) return memo.get(memoKey);
-          const base = evaluate(current);
-          const moves = legalMoves(current);
-          if (!remaining || !moves.length || nodes >= nodeLimit) {
-            const terminal = { score: base, routes: moves.length || 1 };
-            memo.set(memoKey, terminal);
-            return terminal;
-          }
-          nodes++;
-          const orderedMoves = moves.sort((a, b) => moveOrderScore(current, b) - moveOrderScore(current, a));
-          const candidates = [];
-          for (const move of orderedMoves.slice(0, breadth)) {
-            const next = applyMove(current, move);
-            const nextKey = stateKey(next);
-            if (nextKey === key || trail.has(nextKey)) continue;
-            const nextTrail = new Set(trail);
-            nextTrail.add(nextKey);
-            const child = visit(next, remaining - 1, nextTrail);
-            candidates.push({ score: child.score + transitionBonus(current, next), routes: child.routes });
-          }
-          if (!candidates.length) return { score: base, routes: 1 };
-          candidates.sort((a, b) => b.score - a.score);
-          const best = candidates[0].score;
-          const viable = candidates.filter(candidate => candidate.score >= best - 180);
-          const result = {
-            score: best,
-            routes: Math.min(ROUTE_CAP, viable.reduce((sum, candidate) => sum + Math.max(1, candidate.routes), 0))
-          };
-          memo.set(memoKey, result);
-          return result;
-        }
-
-        const startKey = stateKey(state);
-        const ranked = [];
-        const rootMoves = legalMoves(state).sort((a, b) => moveOrderScore(state, b) - moveOrderScore(state, a));
-        for (const move of rootMoves.slice(0, 80)) {
-          const next = applyMove(state, move);
-          const nextKey = stateKey(next);
-          if (nextKey === startKey) continue;
-          const child = visit(next, depth - 1, new Set([startKey, nextKey]));
-          ranked.push({
-            ...move,
-            value: child.score + transitionBonus(state, next),
-            futureRoutes: child.routes
-          });
-        }
-        ranked.sort((a, b) => b.value - a.value || b.futureRoutes - a.futureRoutes ||
-          a.fromCol - b.fromCol || a.toCol - b.toCol || a.fromIndex - b.fromIndex);
-        const best = ranked.length ? ranked[0].value : evaluate(state);
-        const viable = ranked.filter(move => move.value >= best - 180);
-        return {
-          moves: ranked,
-          routeCount: Math.min(ROUTE_CAP, viable.reduce((sum, move) => sum + Math.max(1, move.futureRoutes), 0)),
-          score: best,
-          nodes
-        };
-      }
-
-      function openingQuality(state) {
-        const moves = legalMoves(state);
-        const sources = new Set(moves.map(move => move.fromCol));
-        const targets = new Set(moves.map(move => move.toCol));
-        const ranks = new Set(moves.map(move => state.cols[move.fromCol][move.fromIndex].r));
-        return sources.size * 45 + targets.size * 28 + ranks.size * 18 + moves.length * 6;
-      }
-
-      function planDeal(state) {
-        if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE) return [];
-        return state.stock.slice(-DEAL_SIZE).reverse();
-      }
-
-      globalThis.SpiderPlanner = Object.freeze({
-        config: Object.freeze({ TARGET_RUNS, COLUMN_COUNT, DEAL_SIZE, DEAL_ROUNDS, TOTAL_CARDS, INITIAL_CARDS }),
-        legalMoves,
-        applyMove,
-        dealNextRound,
-        isValidState,
-        createSolvableDeal,
-        replayPlan,
-        cloneCertificate,
-        isValidCertificate,
-        readyCertificateActions,
-        advanceCertificate,
-        analyze,
-        stateKey,
-        nonRepeatingMoves,
-        openingQuality,
-        planDeal
+    const startKey = stateKey(state);
+    const ranked = [];
+    const rootMoves = legalMoves(state).sort((a, b) => moveOrderScore(state, b) - moveOrderScore(state, a));
+    for (const move of rootMoves.slice(0, 80)) {
+      const next = applyMove(state, move);
+      const nextKey = stateKey(next);
+      if (nextKey === startKey) continue;
+      const child = visit(next, depth - 1, new Set([startKey, nextKey]));
+      ranked.push({
+        ...move,
+        value: child.score + transitionBonus(state, next),
+        futureRoutes: child.routes
       });
-    })();
+    }
+    ranked.sort((a, b) => b.value - a.value || b.futureRoutes - a.futureRoutes ||
+      a.fromCol - b.fromCol || a.toCol - b.toCol || a.fromIndex - b.fromIndex);
+    const best = ranked.length ? ranked[0].value : evaluate(state);
+    const viable = ranked.filter(move => move.value >= best - 180);
+    return {
+      moves: ranked,
+      routeCount: Math.min(ROUTE_CAP, viable.reduce((sum, move) => sum + Math.max(1, move.futureRoutes), 0)),
+      score: best,
+      nodes
+    };
+  }
+
+  function openingQuality(state) {
+    const moves = legalMoves(state);
+    const sources = new Set(moves.map(move => move.fromCol));
+    const targets = new Set(moves.map(move => move.toCol));
+    const ranks = new Set(moves.map(move => state.cols[move.fromCol][move.fromIndex].r));
+    return sources.size * 45 + targets.size * 28 + ranks.size * 18 + moves.length * 6;
+  }
+
+  function planDeal(state) {
+    if (!Array.isArray(state.stock) || state.stock.length < DEAL_SIZE) return [];
+    return state.stock.slice(-DEAL_SIZE).reverse();
+  }
+
+  const solver = SpiderSolver.create({ legalMoves, applyMove, dealNextRound, stateKey });
+  const planner = Object.freeze({
+    config: Object.freeze({ TARGET_RUNS, COLUMN_COUNT, DEAL_SIZE, DEAL_ROUNDS, TOTAL_CARDS, INITIAL_CARDS }),
+    legalMoves,
+    applyMove,
+    dealNextRound,
+    isValidState,
+    createSolvableDeal,
+    replayPlan,
+    cloneCertificate,
+    isValidCertificate,
+    readyCertificateActions,
+    advanceCertificate,
+    analyze,
+    stateKey,
+    nonRepeatingMoves,
+    openingQuality,
+    planDeal,
+    solve: solver.solve,
+    canonicalKey: SpiderSolver.canonicalKey
+  });
+  if (typeof module === "object" && module.exports) module.exports = planner;
+  else globalThis.SpiderPlanner = planner;
+})();
   </script>
   <script>
     "use strict";
     (() => {
-      const STORE_KEY = "game-over-spider-one-suit-v3";
-      const LEGACY_STORE_KEYS = ["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2"];
+      const STORE_KEY = "game-over-spider-one-suit-v4";
+      const LEGACY_STORE_KEYS = ["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2", "game-over-spider-one-suit-v3"];
       const { TARGET_RUNS } = SpiderPlanner.config;
       const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const board = document.getElementById("board");
@@ -768,6 +924,9 @@
       let dragState = null;
       let dragFrame = 0;
       let ignoreClickUntil = 0;
+      let checking = false;
+      let solverWorker = null;
+      let searchId = 0;
 
       function randomIndex(max) {
         if (window.crypto && window.crypto.getRandomValues) {
@@ -789,13 +948,17 @@
         generated.state.moves = 0;
         generated.state.startedAt = Date.now();
         generated.state.finishedAt = null;
-        generated.state.certificate = SpiderPlanner.cloneCertificate(generated.certificate);
+        generated.state.solution = generated.plan;
         return generated.state;
       }
 
       function cardCountsAreValid(state) {
-        return SpiderPlanner.isValidState(state) && Number.isInteger(state.moves) &&
-          state.moves >= 0 && state.moves <= 1000000 && SpiderPlanner.isValidCertificate(state.certificate);
+        if (!SpiderPlanner.isValidState(state) || !Number.isInteger(state.moves) ||
+            state.moves < 0 || state.moves > 1000000 || !Array.isArray(state.solution) || state.solution.length > 400) return false;
+        try {
+          const end = SpiderPlanner.replayPlan(state, state.solution);
+          return !!end && end.completed === TARGET_RUNS && !end.stock.length && end.cols.every(col => !col.length);
+        } catch (_) { return false; }
       }
 
       function readSaved() {
@@ -820,7 +983,7 @@
           stock: game.stock.slice(),
           completed: game.completed,
           moves: game.moves,
-          certificate: SpiderPlanner.cloneCertificate(game.certificate)
+          solution: game.solution.map(action => ({ ...action }))
         });
         if (history.length > 100) history.shift();
       }
@@ -881,44 +1044,104 @@
       }
 
       function showHint() {
-        if (game.completed === TARGET_RUNS) return;
+        if (checking || game.completed === TARGET_RUNS) return;
         clearHint();
-        const actions = SpiderPlanner.readyCertificateActions(game, game.certificate);
-        if (actions.length) {
-          const action = actions[hintCursor % actions.length];
-          hintCursor = (hintCursor + 1) % actions.length;
-          if (action.type === "deal") {
-            selected = null;
-            renderBoard();
-            dealButton.classList.add("hint-deal");
-            announce("提示：从底牌发下一轮。");
-            hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
-            return;
-          }
-          presentMoveHint(action, actions.length > 1 ? "还有其他顺序也可以完整收完。" : "");
-          return;
-        }
-
-        const candidates = SpiderPlanner.nonRepeatingMoves(game, history.slice(-8), {
-          depth: 4,
-          breadth: 28,
-          nodeLimit: 3600
-        });
-        if (candidates.length) {
-          presentMoveHint(candidates[0], "已避开最近走过的牌面。");
-          return;
-        }
-        if (game.stock.length && game.cols.every(col => col.length)) {
+        const action = game.solution[0];
+        if (!action) return;
+        if (action.type === "deal") {
           selected = null;
           renderBoard();
           dealButton.classList.add("hint-deal");
-          announce("当前没有不重复的整理步骤，建议从底牌发下一轮。");
+          announce("提示：发出最后一轮底牌，之后仍可收齐八组。");
           hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
           return;
         }
-        selected = null;
-        renderBoard();
-        announce("当前没有不重复的安全移动，建议撤销最近一步。");
+        const move = SpiderPlanner.legalMoves(game).find(candidate => candidate.fromCol === action.fromCol &&
+          candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
+        if (move) presentMoveHint(move, "这一步之后仍有完整收牌路线。");
+      }
+
+      function setChecking(value) {
+        checking = value;
+        board.setAttribute("aria-busy", String(value));
+        dealButton.disabled = value || !game.stock.length || game.completed === TARGET_RUNS;
+        hintButton.disabled = value || game.completed === TARGET_RUNS;
+        undoButton.disabled = value || !history.length;
+        document.getElementById("newButton").disabled = value;
+      }
+
+      function searchSolution(state) {
+        if (!window.Worker) return new Promise(resolve => {
+          setTimeout(() => resolve(SpiderPlanner.solve(state, { nodeLimit: 12000, timeLimitMs: 200 })), 0);
+        });
+        try {
+          if (!solverWorker) {
+            const workerSource = document.getElementById("spiderSolver").textContent + "\n" +
+              document.getElementById("spiderRules").textContent + "\nself.onmessage = " + function(event) {
+                const { id, state } = event.data;
+                try {
+                  if (!SpiderPlanner.isValidState(state)) throw new Error("Invalid Spider position");
+                  const result = SpiderPlanner.solve(state, { nodeLimit: 60000, timeLimitMs: 2200, maxDepth: 400 });
+                  self.postMessage({ id, result });
+                } catch (_) { self.postMessage({ id, result: { status: "unknown", plan: [] } }); }
+              }.toString() + ";";
+            const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+            try { solverWorker = new Worker(workerUrl); }
+            finally { URL.revokeObjectURL(workerUrl); }
+          }
+        }
+        catch (_) { return Promise.resolve({ status: "unknown", plan: [] }); }
+        const worker = solverWorker;
+        const id = ++searchId;
+        return new Promise(resolve => {
+          const finish = result => {
+            clearTimeout(timer);
+            worker.onmessage = null;
+            worker.onerror = null;
+            resolve(result);
+          };
+          const stop = () => {
+            worker.terminate();
+            if (solverWorker === worker) solverWorker = null;
+            finish({ status: "unknown", plan: [] });
+          };
+          const timer = setTimeout(stop, 3500);
+          worker.onmessage = event => { if (event.data.id === id) finish(event.data.result); };
+          worker.onerror = stop;
+          worker.postMessage({ id, state });
+        });
+      }
+
+      async function performAction(action) {
+        if (checking) return;
+        const before = game;
+        const next = action.type === "deal" ? SpiderPlanner.dealNextRound(before) : SpiderPlanner.applyMove(before, action);
+        if (!next) return;
+        setChecking(true);
+        const first = before.solution[0];
+        const follows = first && first.type === action.type && (action.type === "deal" ||
+          (first.fromCol === action.fromCol && first.fromIndex === action.fromIndex && first.toCol === action.toCol));
+        try {
+          if (follows) next.solution = before.solution.slice(1);
+          else {
+            announce("正在确认这一步之后的完整收牌路线…");
+            const result = await searchSolution(next);
+            const proof = result.status === "solved" ? SpiderPlanner.replayPlan(next, result.plan) : null;
+            if (!proof || proof.completed !== TARGET_RUNS || proof.stock.length || proof.cols.some(col => col.length)) {
+              announce(result.status === "dead-end"
+                ? "这一步会让牌局无法收完，牌已留在原位。可换一个目标列或点提示。"
+                : "暂未确认这一步之后能收完，牌已留在原位。可换一个目标列或点提示。");
+              return;
+            }
+            next.solution = result.plan;
+          }
+          snapshot();
+          const collected = next.completed - before.completed;
+          game = { ...next, moves: before.moves + 1, startedAt: before.startedAt, finishedAt: null };
+          afterAction(action.type === "deal" ? "最后一轮底牌已发出。" : "已移动 " + action.count + " 张牌。", collected);
+        } catch (_) {
+          announce("暂未确认收牌路线，牌已留在原位。可换一个目标列或点提示。");
+        } finally { setChecking(false); }
       }
       function clearCelebration() {
         clearTimeout(celebrationTimer);
@@ -978,41 +1201,23 @@
         render();
       }
       function moveCards(fromCol, fromIndex, toCol) {
-        if (game.completed === TARGET_RUNS || !canMove(fromCol, fromIndex, toCol)) return false;
-        snapshot();
-        game.certificate = SpiderPlanner.advanceCertificate(game, game.certificate, {
-          type: "move", fromCol, fromIndex, toCol
-        });
-        const source = game.cols[fromCol];
-        const moved = source.splice(fromIndex);
-        game.cols[toCol].push(...moved);
-        revealTopCard(fromCol);
-        game.moves++;
-        const collected = collectCompleteRuns();
-        afterAction("已移动 " + moved.length + " 张牌。", collected);
+        if (checking || game.completed === TARGET_RUNS || !canMove(fromCol, fromIndex, toCol)) return false;
+        const count = game.cols[fromCol].length - fromIndex;
+        void performAction({ type: "move", fromCol, fromIndex, toCol, count });
         return true;
       }
       function deal() {
-        if (game.completed === TARGET_RUNS) return;
+        if (checking || game.completed === TARGET_RUNS) return;
         if (!game.stock.length) { announce("底牌已发完，试着整理明牌。"); return; }
         if (game.cols.some(col => !col.length)) {
           announce("先填满所有空列，才能从底牌发下一轮。");
           return;
         }
         clearHint();
-        snapshot();
-        game.certificate = SpiderPlanner.advanceCertificate(game, game.certificate, { type: "deal" });
-        const plannedRanks = SpiderPlanner.planDeal(game);
-        for (let colIndex = 0; colIndex < game.cols.length; colIndex++) {
-          const rank = game.stock.pop();
-          if (rank !== plannedRanks[colIndex]) throw new Error("底牌顺序校验失败");
-          game.cols[colIndex].push({ r: rank, up: true });
-        }
-        game.moves++;
-        const collected = collectCompleteRuns();
-        afterAction("新的一轮已经发到十列。", collected);
+        void performAction({ type: "deal" });
       }
       function undo() {
+        if (checking) return;
         clearHint();
         clearCelebration();
         hintCursor = 0;
@@ -1022,7 +1227,7 @@
         game.stock = previous.stock;
         game.completed = previous.completed;
         game.moves = previous.moves;
-        game.certificate = previous.certificate;
+        game.solution = previous.solution;
         game.finishedAt = null;
         selected = null;
         save();
@@ -1030,6 +1235,7 @@
         announce("已撤销上一步。");
       }
       function startNew(force) {
+        if (checking) return;
         if (!force && game && game.moves > 0 && game.completed < TARGET_RUNS &&
             !window.confirm("开始新游戏会清除当前进度，确定吗？")) return;
         clearHint();
@@ -1224,6 +1430,7 @@
       }
 
       board.addEventListener("click", event => {
+        if (checking) return;
         if (performance.now() < ignoreClickUntil) {
           event.preventDefault();
           event.stopPropagation();
@@ -1264,7 +1471,7 @@
         }
       });
       board.addEventListener("pointerdown", event => {
-        if ((event.pointerType === "mouse" && event.button !== 0) || dragState) return;
+        if (checking || (event.pointerType === "mouse" && event.button !== 0) || dragState) return;
         const card = event.target.closest(".card.face-up");
         const column = card && card.closest(".column");
         if (!card || !column || game.completed === TARGET_RUNS) return;
