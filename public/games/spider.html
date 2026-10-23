@@ -202,7 +202,7 @@
       .intro { display: block; padding-top: 20px; }
       .intro > div:first-child { min-width: 0; }
       .intro p:last-child { overflow-wrap: anywhere; }
-      .toolbar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; margin-top: 17px; }
+      .toolbar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); width: 100%; margin-top: 17px; }
       .toolbar .action { min-width: 0; width: 100%; padding: 8px 4px; font-size: .78rem; line-height: 1.25; }
       .stats { width: 100%; gap: 6px; }
       .stat { min-width: 0; min-height: 62px; padding: 8px 7px; }
@@ -238,6 +238,7 @@
         <div class="toolbar">
           <button class="action" id="hintButton" type="button">✦ 提示</button>
           <button class="action" id="undoButton" type="button">↶ 撤销上一步</button>
+          <button class="action" id="restartButton" type="button">↺ 重玩本局</button>
           <button class="action primary" id="newButton" type="button">↻ 新游戏</button>
         </div>
       </section>
@@ -262,7 +263,7 @@
             </section>
           </div>
           <div class="status" id="status" role="status" aria-live="polite">点选一组可移动的牌，再点目标列；也可拖拽或点“提示”。</div>
-          <p class="bottom-note">牌局自动保存。暗牌和底牌在开局时固定，提示会按当前牌面寻找完整收牌路线。</p>
+          <p class="bottom-note">开局已验证可收齐八组，暗牌和底牌始终固定。你可以自由尝试；走不通时可撤销或重玩本局。</p>
         </div>
         <aside class="side">
           <section class="side-panel">
@@ -313,19 +314,23 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  function canonicalKey(state) {
+  function columnKeys(state) {
     const count = state.cols.length;
     const stock = state.stock || [];
     // A column keeps its future stock cards when equivalent columns permute.
-    const columns = state.cols.map(function (col, index) {
+    return state.cols.map(function (col, index) {
       let future = "";
       for (let offset = index; offset < stock.length; offset += count) {
         future += "," + stock[stock.length - 1 - offset];
       }
       return col.map(function (card) { return (card.up ? "u" : "d") + card.r; }).join(",") + "/" + future;
     });
+  }
+
+  function canonicalKey(state) {
+    const columns = columnKeys(state);
     columns.sort();
-    return (state.completed || 0) + ":" + stock.length + ":" + columns.join("|");
+    return (state.completed || 0) + ":" + (state.stock || []).length + ":" + columns.join("|");
   }
 
   function features(state) {
@@ -364,7 +369,10 @@
       let generated = 0;
       let cutoff = null;
       let depthCutoff = false;
+      let excludedPosition = false;
       let found = null;
+      const forbidden = new Set(Array.isArray(settings.forbiddenKeys) ? settings.forbiddenKeys : []);
+      const referencePositions = new Map();
 
       function isSolved(current) {
         return current.completed >= targetRuns && !current.stock.length && current.cols.every(function (col) { return !col.length; });
@@ -376,7 +384,76 @@
         return cutoff !== null;
       }
 
+      function applyAction(current, action) {
+        if (!action || typeof action !== "object") return null;
+        if (action.type === "deal") return rules.dealNextRound(current);
+        if (action.type !== "move") return null;
+        const legal = rules.legalMoves(current).find(function (move) {
+          return move.fromCol === action.fromCol && move.fromIndex === action.fromIndex && move.toCol === action.toCol;
+        });
+        return legal ? rules.applyMove(current, legal) : null;
+      }
+
+      // A reference route accelerates search only after every one of its actions
+      // has been replayed through the real rules to a complete win.
+      if (settings.referenceState && Array.isArray(settings.referencePlan) && settings.referencePlan.length <= 1600) {
+        try {
+          let current = settings.referenceState;
+          const positions = [{ state: current, offset: 0 }];
+          for (let offset = 0; offset < settings.referencePlan.length; offset++) {
+            if (overBudget()) break;
+            current = applyAction(current, settings.referencePlan[offset]);
+            if (!current) break;
+            positions.push({ state: current, offset: offset + 1 });
+          }
+          if (!cutoff && positions.length === settings.referencePlan.length + 1 && isSolved(current)) {
+            for (const position of positions) referencePositions.set(canonicalKey(position.state), position);
+          }
+        } catch (_) { referencePositions.clear(); }
+      }
+
+      function reuseReference(current, depth, key) {
+        const reference = referencePositions.get(key);
+        if (!reference) return null;
+        const available = new Map();
+        columnKeys(current).forEach(function (signature, index) {
+          if (!available.has(signature)) available.set(signature, []);
+          available.get(signature).push(index);
+        });
+        const mapping = columnKeys(reference.state).map(function (signature) {
+          const choices = available.get(signature);
+          return choices && choices.length ? choices.shift() : -1;
+        });
+        if (mapping.some(function (index) { return index < 0; })) return null;
+        const remaining = settings.referencePlan.slice(reference.offset);
+        if (depth + remaining.length > maxDepth) {
+          depthCutoff = true;
+          return null;
+        }
+        let proof = current;
+        const continuation = [];
+        for (const action of remaining) {
+          if (overBudget()) return null;
+          const mapped = action.type === "deal" ? { type: "deal" } : {
+            type: "move", fromCol: mapping[action.fromCol], fromIndex: action.fromIndex, toCol: mapping[action.toCol]
+          };
+          proof = applyAction(proof, mapped);
+          if (!proof) return null;
+          if (forbidden.has(canonicalKey(proof))) {
+            excludedPosition = true;
+            return null;
+          }
+          continuation.push(mapped);
+        }
+        return isSolved(proof) ? continuation : null;
+      }
+
       function visit(current, depth) {
+        const key = canonicalKey(current);
+        if (forbidden.has(key)) {
+          excludedPosition = true;
+          return false;
+        }
         if (isSolved(current)) {
           found = path.slice();
           return true;
@@ -386,8 +463,13 @@
           depthCutoff = true;
           return false;
         }
-        const key = canonicalKey(current);
         if (trail.has(key) || (seen.has(key) && seen.get(key) <= depth)) return false;
+        const continuation = reuseReference(current, depth, key);
+        if (continuation) {
+          found = path.concat(continuation);
+          return true;
+        }
+        if (cutoff) return false;
         seen.set(key, depth);
         trail.add(key);
         nodes++;
@@ -399,6 +481,10 @@
           if (!next) return;
           generated++;
           const nextKey = canonicalKey(next);
+          if (forbidden.has(nextKey)) {
+            excludedPosition = true;
+            return;
+          }
           if (nextKey === key || trail.has(nextKey) || unique.has(nextKey) ||
               (seen.has(nextKey) && seen.get(nextKey) <= depth + 1)) return;
           unique.add(nextKey);
@@ -440,14 +526,14 @@
       }
 
       visit(state, 0);
-      const status = found ? "solved" : (cutoff || depthCutoff ? "unknown" : "dead-end");
+      const status = found ? "solved" : (cutoff || depthCutoff || excludedPosition ? "unknown" : "dead-end");
       return {
         status: status,
         plan: found || [],
         nodes: nodes,
         generated: generated,
         elapsedMs: clock() - started,
-        reason: found ? null : cutoff || (depthCutoff ? "depth-limit" : null)
+        reason: found ? null : cutoff || (depthCutoff ? "depth-limit" : excludedPosition ? "excluded-position" : null)
       };
     }
 
@@ -558,6 +644,7 @@
         if (card.up) seenUp = true;
         counts[card.r]++;
       }
+      if (col.length && !col[col.length - 1].up) return false;
     }
     return counts.slice(1).every(count => count === TARGET_RUNS);
   }
@@ -567,87 +654,163 @@
     return Number.isInteger(value) && value >= 0 && value < max ? value : 0;
   }
 
-  function shuffle(items, randomIndex) {
-    for (let index = items.length - 1; index > 0; index--) {
-      const swapIndex = randomSlot(randomIndex, index + 1);
-      [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-    }
-    return items;
-  }
-
   function createSolvableDeal(randomIndex) {
-    const columnOrder = shuffle(Array.from({ length: COLUMN_COUNT }, (_, index) => index), randomIndex);
-    const cols = Array.from({ length: COLUMN_COUNT }, () => []);
-    const round = Array(COLUMN_COUNT);
-    const plan = [];
-    const certificateNodes = [];
-    const coreCols = columnOrder.slice(0, 6);
-    const splitGroups = [];
-
-    // Descending hidden prefixes keep uncovered moves reversible; Aces start visible.
-    for (const col of coreCols) {
-      const hidden = 5 + randomSlot(randomIndex, 6);
-      cols[col] = Array.from({ length: 12 }, (_, index) => ({ r: 12 - index, up: index >= hidden }));
-      round[col] = 13;
-    }
-    for (let group = 0; group < 2; group++) {
-      const highCol = columnOrder[6 + group * 2];
-      const lowCol = columnOrder[7 + group * 2];
-      const cut = 2 + randomSlot(randomIndex, 3);
-      cols[highCol] = Array.from({ length: 12 - cut }, (_, index) => ({ r: 13 - index, up: true }));
-      cols[lowCol] = Array.from({ length: cut - 1 }, (_, index) => ({ r: cut - index, up: true }));
-      round[highCol] = cut + 1;
-      round[lowCol] = 1;
-      splitGroups.push({ highCol, lowCol });
-    }
-
-    const state = { cols, stock: round.reverse(), completed: 0 };
-    let proof = cloneState(state);
-    function record(action, id, requires) {
-      if (action.type === "deal") {
-        proof = dealNextRound(proof);
-      } else {
-        const move = legalMoves(proof).find(candidate => candidate.fromCol === action.fromCol &&
-          candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
-        if (!move) throw new Error("Invalid generated Spider solution");
-        proof = applyMove(proof, move);
-      }
-      plan.push(action);
-      certificateNodes.push({ ...action, id, requires });
-    }
-    function recordMove(fromCol, fromIndex, toCol, id, requires) {
-      record({ type: "move", fromCol, fromIndex, toCol }, id, requires);
-    }
-    record({ type: "deal" }, "deal-1", []);
-    splitGroups.forEach(({ highCol, lowCol }, group) => {
-      recordMove(lowCol, 0, highCol, "assemble-" + group, ["deal-1"]);
-    });
-
-    let requires = ["assemble-0", "assemble-1"];
-    for (const col of shuffle(coreCols.slice(), randomIndex)) {
-      const spaces = shuffle(proof.cols.map((cards, index) => cards.length ? -1 : index).filter(index => index >= 0), randomIndex);
-      const kingCol = spaces[0];
-      const bufferCol = spaces[1];
-      const kingId = "king-" + col;
-      recordMove(col, proof.cols[col].length - 1, kingCol, kingId, requires);
-      requires = [kingId];
-      while (proof.cols[col].some(card => !card.up)) {
-        const index = proof.cols[col].findIndex(card => card.up);
-        const liftId = "lift-" + col + "-" + index;
-        const returnId = "return-" + col + "-" + index;
-        recordMove(col, index, bufferCol, liftId, requires);
-        recordMove(bufferCol, 0, col, returnId, [liftId]);
-        requires = [returnId];
-      }
-      const completeId = "complete-" + col;
-      recordMove(col, 0, kingCol, completeId, requires);
-      requires = [completeId];
-    }
-    return {
-      state,
-      plan,
-      certificate: { version: 1, valid: true, done: [], nodes: certificateNodes }
+    let randomState = (randomSlot(randomIndex, 0x100000000) ^ 0x9e3779b9) >>> 0;
+    const draw = max => {
+      randomState = (randomState + 0x6d2b79f5) >>> 0;
+      let value = randomState;
+      value = Math.imul(value ^ value >>> 15, value | 1);
+      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+      return Math.floor(((value ^ value >>> 14) >>> 0) / 0x100000000 * max);
     };
+    const randomize = items => {
+      for (let index = items.length - 1; index > 0; index--) {
+        const other = draw(index + 1);
+        [items[index], items[other]] = [items[other], items[index]];
+      }
+      return items;
+    };
+    const fullRun = col => col.length >= 13 && col.slice(-13).every((card, index) => card.r === 13 - index);
+
+    function attempt() {
+      const cols = Array.from({ length: COLUMN_COUNT }, () => []);
+      const backwards = [];
+      const capacities = randomize([11, 11, 11, 11, 10, 10, 10, 10, 10, 10]);
+      // Restore each collected run, then scatter small tails across other columns.
+      // Reversing these moves rebuilds the run using ordinary Spider moves.
+      for (let group = 0; group < TARGET_RUNS; group++) {
+        let donors = cols.map((col, index) => col.length < capacities[index] ? index : -1).filter(index => index >= 0);
+        if (group === TARGET_RUNS - 1) {
+          const smallest = Math.min(...donors.map(index => capacities[index] - cols[index].length));
+          donors = donors.filter(index => capacities[index] - cols[index].length === smallest);
+        } else {
+          const fewestKings = Math.min(...donors.map(index => cols[index].filter(card => card.r === 13).length));
+          donors = donors.filter(index => cols[index].filter(card => card.r === 13).length === fewestKings);
+        }
+        const donor = donors[draw(donors.length)];
+        const base = cols[donor].length;
+        const room = capacities[donor] - base;
+        const keep = group === TARGET_RUNS - 1 ? room : Math.min(room, 1 + draw(3));
+        cols[donor].push(...Array.from({ length: 13 }, (_, index) => ({ r: 13 - index, up: true })));
+        let remaining = 13;
+        while (remaining > keep) {
+          const receivers = cols.map((col, index) => index !== donor && col.length < capacities[index] ? index : -1)
+            .filter(index => index >= 0);
+          if (!receivers.length) return null;
+          const receiver = receivers[draw(receivers.length)];
+          const count = Math.min(remaining - keep, capacities[receiver] - cols[receiver].length,
+            draw(10) < 7 ? 1 : 2 + draw(2));
+          const fromIndex = cols[receiver].length;
+          cols[receiver].push(...cols[donor].splice(base + remaining - count));
+          remaining -= count;
+          backwards.push({ type: "move", fromCol: receiver, fromIndex, toCol: donor });
+        }
+      }
+
+      function mix(minimum, maximum, wanted, tries) {
+        let mixed = 0;
+        for (let trial = 0; trial < tries && mixed < wanted; trial++) {
+          const fromCol = draw(COLUMN_COUNT);
+          const toCol = draw(COLUMN_COUNT);
+          if (fromCol === toCol) continue;
+          const source = cols[fromCol];
+          const target = cols[toCol];
+          const room = Math.min(source.length - minimum, maximum - target.length, 4);
+          if (room < 1) continue;
+          const count = 1 + draw(room);
+          const index = source.length - count;
+          if (index && source[index - 1].r !== source[index].r + 1) continue;
+          let ordered = true;
+          for (let card = index; card < source.length - 1; card++) {
+            if (source[card].r !== source[card + 1].r + 1) ordered = false;
+          }
+          if (!ordered) continue;
+          const targetIndex = target.length;
+          const moved = source.splice(index);
+          target.push(...moved);
+          if (fullRun(source) || fullRun(target)) {
+            target.splice(targetIndex);
+            source.push(...moved);
+            continue;
+          }
+          backwards.push({ type: "move", fromCol: toCol, fromIndex: targetIndex, toCol: fromCol });
+          mixed++;
+        }
+        return mixed;
+      }
+
+      mix(9, 13, 8 + draw(8), 600);
+      if (cols.some(col => col.length < 9 || col.length > 13)) return null;
+      const round = cols.map(col => col.pop().r);
+      if (round.filter(rank => rank === 13).length > 3 || new Set(round).size < 4) return null;
+      backwards.push({ type: "deal" });
+      // Mixing before the future deal also allows players to choose when to deal.
+      const openingMix = mix(8, 12, 5 + draw(8), 600);
+      if (!openingMix) return null;
+      const plan = backwards.reverse();
+      const state = { cols, stock: round.reverse(), completed: 0 };
+      if (!isValidState(state)) return null;
+
+      // Find which original cards the proof exposes individually. A card moved
+      // inside a larger stack before exposure must remain face up at the start.
+      const maximumHidden = cols.map(col => col.length - 1);
+      const seen = new Set();
+      const probe = cols.map((col, colIndex) => col.map((card, index) => ({ r: card.r, origin: colIndex, index })));
+      const stock = state.stock.slice();
+      const expose = col => {
+        const card = col[col.length - 1];
+        if (card && card.origin !== undefined) seen.add(card.origin + ":" + card.index);
+      };
+      probe.forEach(expose);
+      for (const action of plan) {
+        if (action.type === "deal") {
+          if (probe.some(col => !col.length)) return null;
+          for (const col of probe) col.push({ r: stock.pop() });
+        } else {
+          const source = probe[action.fromCol];
+          const moved = source.splice(action.fromIndex);
+          for (const card of moved) {
+            if (card.origin !== undefined && !seen.has(card.origin + ":" + card.index)) {
+              maximumHidden[card.origin] = Math.min(maximumHidden[card.origin], card.index);
+            }
+          }
+          probe[action.toCol].push(...moved);
+          expose(source);
+        }
+        for (const col of probe) {
+          while (fullRun(col)) {
+            for (const card of col.slice(-13)) {
+              if (card.origin !== undefined && !seen.has(card.origin + ":" + card.index)) {
+                maximumHidden[card.origin] = Math.min(maximumHidden[card.origin], card.index);
+              }
+            }
+            col.splice(-13);
+            expose(col);
+          }
+        }
+      }
+      cols.forEach((col, index) => {
+        const maximum = maximumHidden[index];
+        const hidden = maximum ? Math.max(1, maximum - draw(Math.min(maximum, 3))) : 0;
+        col.forEach((card, cardIndex) => { card.up = cardIndex >= hidden; });
+      });
+      if (cols.flat().filter(card => !card.up).length < 20 ||
+          cols.filter(col => col.some(card => card.r === 1)).length < 3 ||
+          !cols.some(col => col.some(card => card.r === 1 && card.up))) return null;
+      const proof = replayPlan(state, plan);
+      if (!proof || proof.completed !== TARGET_RUNS || proof.stock.length || proof.cols.some(col => col.length)) return null;
+      const moves = legalMoves(state);
+      const movingRanks = new Set(moves.map(move => state.cols[move.fromCol][move.fromIndex].r));
+      const descending = cols.reduce((total, col) => total + col.slice(1).filter((card, index) => col[index].r === card.r + 1).length, 0);
+      if (moves.length < 3 || movingRanks.size < 2 || descending > (INITIAL_CARDS - COLUMN_COUNT) / 2) return null;
+      return { state, plan };
+    }
+
+    for (let trial = 0; trial < 100; trial++) {
+      const generated = attempt();
+      if (generated) return generated;
+    }
+    throw new Error("Unable to generate a verified Spider deal");
   }
 
   function replayPlan(state, plan) {
@@ -664,69 +827,6 @@
       current = applyMove(current, move);
     }
     return current;
-  }
-
-  function cloneCertificate(certificate) {
-    if (!certificate) return null;
-    return {
-      version: certificate.version,
-      valid: certificate.valid,
-      done: Array.isArray(certificate.done) ? certificate.done.slice() : [],
-      nodes: Array.isArray(certificate.nodes) ? certificate.nodes.map(node => ({
-        ...node,
-        requires: Array.isArray(node.requires) ? node.requires.slice() : []
-      })) : []
-    };
-  }
-
-  function isValidCertificate(certificate) {
-    if (!certificate || certificate.version !== 1 || typeof certificate.valid !== "boolean" ||
-        !Array.isArray(certificate.done) || !Array.isArray(certificate.nodes) ||
-        certificate.nodes.length < 1 || certificate.nodes.length > TOTAL_CARDS * 2 + DEAL_ROUNDS) return false;
-    const seen = new Set();
-    for (const node of certificate.nodes) {
-      if (!node || typeof node.id !== "string" || !node.id || seen.has(node.id) ||
-          !Array.isArray(node.requires) || node.requires.some(id => !seen.has(id))) return false;
-      if (node.type === "move") {
-        if (![node.fromCol, node.toCol].every(value => Number.isInteger(value) && value >= 0 && value < COLUMN_COUNT) ||
-            node.fromCol === node.toCol || !Number.isInteger(node.fromIndex) || node.fromIndex < 0 || node.fromIndex >= TOTAL_CARDS) return false;
-      } else if (node.type !== "deal") return false;
-      seen.add(node.id);
-    }
-    const done = new Set(certificate.done);
-    return done.size === certificate.done.length && certificate.done.every(id => seen.has(id));
-  }
-
-  function actionMatches(left, right) {
-    return left && right && left.type === right.type && (left.type === "deal" ||
-      (left.fromCol === right.fromCol && left.fromIndex === right.fromIndex && left.toCol === right.toCol));
-  }
-
-  function readyCertificateActions(state, certificate) {
-    if (!isValidCertificate(certificate) || !certificate.valid) return [];
-    const done = new Set(certificate.done);
-    const moves = legalMoves(state);
-    const ready = [];
-    for (const node of certificate.nodes) {
-      if (done.has(node.id) || !node.requires.every(id => done.has(id))) continue;
-      if (node.type === "deal") {
-        if (state.stock.length >= DEAL_SIZE && state.cols.every(col => col.length)) ready.push({ ...node });
-        continue;
-      }
-      const move = moves.find(candidate => node.fromCol === candidate.fromCol &&
-        node.fromIndex === candidate.fromIndex && node.toCol === candidate.toCol);
-      if (move) ready.push({ ...node, count: move.count });
-    }
-    return ready;
-  }
-
-  function advanceCertificate(state, certificate, action) {
-    const next = cloneCertificate(certificate);
-    if (!isValidCertificate(next) || !next.valid) return next;
-    const matched = readyCertificateActions(state, next).find(node => actionMatches(node, action));
-    if (matched) next.done.push(matched.id);
-    else next.valid = false;
-    return next;
   }
 
   function stateFeatures(state) {
@@ -883,10 +983,6 @@
     isValidState,
     createSolvableDeal,
     replayPlan,
-    cloneCertificate,
-    isValidCertificate,
-    readyCertificateActions,
-    advanceCertificate,
     analyze,
     stateKey,
     nonRepeatingMoves,
@@ -902,8 +998,8 @@
   <script>
     "use strict";
     (() => {
-      const STORE_KEY = "game-over-spider-one-suit-v4";
-      const LEGACY_STORE_KEYS = ["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2", "game-over-spider-one-suit-v3"];
+      const STORE_KEY = "game-over-spider-one-suit-v5";
+      const LEGACY_STORE_KEYS = ["game-over-spider-one-suit-v1", "game-over-spider-one-suit-v2", "game-over-spider-one-suit-v3", "game-over-spider-one-suit-v4"];
       const { TARGET_RUNS } = SpiderPlanner.config;
       const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const board = document.getElementById("board");
@@ -924,9 +1020,10 @@
       let dragState = null;
       let dragFrame = 0;
       let ignoreClickUntil = 0;
-      let checking = false;
       let solverWorker = null;
       let searchId = 0;
+      let hintVersion = 0;
+      let cancelSearch = null;
 
       function randomIndex(max) {
         if (window.crypto && window.crypto.getRandomValues) {
@@ -949,16 +1046,32 @@
         generated.state.startedAt = Date.now();
         generated.state.finishedAt = null;
         generated.state.solution = generated.plan;
+        generated.state.initial = copyPosition(generated.state);
         return generated.state;
       }
 
+      function copyPosition(state) {
+        return {
+          cols: state.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
+          stock: state.stock.slice(),
+          completed: state.completed,
+          moves: state.moves || 0,
+          solution: Array.isArray(state.solution) ? state.solution.map(action => ({ ...action })) : null
+        };
+      }
+
       function cardCountsAreValid(state) {
-        if (!SpiderPlanner.isValidState(state) || !Number.isInteger(state.moves) ||
-            state.moves < 0 || state.moves > 1000000 || !Array.isArray(state.solution) || state.solution.length > 400) return false;
+        return SpiderPlanner.isValidState(state) && Number.isInteger(state.moves) &&
+          state.moves >= 0 && state.moves <= 1000000;
+      }
+
+      function verifiedSolution(state, plan) {
+        if (!Array.isArray(plan) || plan.length > 800) return null;
         try {
-          const end = SpiderPlanner.replayPlan(state, state.solution);
-          return !!end && end.completed === TARGET_RUNS && !end.stock.length && end.cols.every(col => !col.length);
-        } catch (_) { return false; }
+          const end = SpiderPlanner.replayPlan(state, plan);
+          return end && end.completed === TARGET_RUNS && !end.stock.length && end.cols.every(col => !col.length)
+            ? plan : null;
+        } catch (_) { return null; }
       }
 
       function readSaved() {
@@ -968,7 +1081,11 @@
               !Number.isFinite(saved.game.startedAt) ||
               (saved.game.finishedAt !== null && !Number.isFinite(saved.game.finishedAt))) return false;
           game = saved.game;
+          game.solution = verifiedSolution(game, game.solution);
+          if (!game.initial || !cardCountsAreValid(game.initial) || game.initial.completed !== 0 ||
+              game.initial.stock.length !== 10 || !verifiedSolution(game.initial, game.initial.solution)) game.initial = null;
           history = Array.isArray(saved.history) ? saved.history.filter(cardCountsAreValid).slice(-100) : [];
+          history.forEach(state => { if (!Array.isArray(state.solution) || state.solution.length > 800) state.solution = null; });
           return true;
         } catch (_) { return false; }
       }
@@ -978,13 +1095,7 @@
       }
 
       function snapshot() {
-        history.push({
-          cols: game.cols.map(col => col.map(card => ({ r: card.r, up: card.up }))),
-          stock: game.stock.slice(),
-          completed: game.completed,
-          moves: game.moves,
-          solution: game.solution.map(action => ({ ...action }))
-        });
+        history.push(copyPosition(game));
         if (history.length > 100) history.shift();
       }
 
@@ -1021,6 +1132,7 @@
         });
       }
       function clearSelection() {
+        cancelPendingHint();
         selected = null;
         clearHint();
         renderBoard();
@@ -1043,45 +1155,73 @@
         hintTimer = setTimeout(() => { hint = null; renderBoard(); }, 3200);
       }
 
-      function showHint() {
-        if (checking || game.completed === TARGET_RUNS) return;
-        clearHint();
-        const action = game.solution[0];
-        if (!action) return;
+      function presentActionHint(action, verified) {
         if (action.type === "deal") {
           selected = null;
           renderBoard();
           dealButton.classList.add("hint-deal");
-          announce("提示：发出最后一轮底牌，之后仍可收齐八组。");
+          announce(verified ? "提示：可以发出最后一轮底牌，这条路线可以收齐八组。" : "可以尝试发牌打开局面，或撤销最近的移动。");
           hintTimer = setTimeout(() => dealButton.classList.remove("hint-deal"), 3200);
           return;
         }
         const move = SpiderPlanner.legalMoves(game).find(candidate => candidate.fromCol === action.fromCol &&
           candidate.fromIndex === action.fromIndex && candidate.toCol === action.toCol);
-        if (move) presentMoveHint(move, "这一步之后仍有完整收牌路线。");
+        if (move) presentMoveHint(move, verified ? "这条路线可以收齐八组。" : "这是整理建议，尚未确认完整通关路线。");
       }
 
-      function setChecking(value) {
-        checking = value;
-        board.setAttribute("aria-busy", String(value));
-        dealButton.disabled = value || !game.stock.length || game.completed === TARGET_RUNS;
-        hintButton.disabled = value || game.completed === TARGET_RUNS;
-        undoButton.disabled = value || !history.length;
-        document.getElementById("newButton").disabled = value;
+      async function showHint() {
+        if (hintButton.disabled || game.completed === TARGET_RUNS || dragState) return;
+        clearHint();
+        if (game.solution && game.solution.length) {
+          presentActionHint(game.solution[0], true);
+          return;
+        }
+        const version = hintVersion;
+        const state = copyPosition(game);
+        hintButton.disabled = true;
+        hintButton.textContent = "寻找提示…";
+        announce("正在寻找收牌路线，可以继续移动牌或撤销。");
+        const result = await searchSolution(state);
+        if (version !== hintVersion) return;
+        hintButton.disabled = false;
+        hintButton.textContent = "✦ 提示";
+        if (dragState) return;
+        const plan = result.status === "solved" ? verifiedSolution(game, result.plan) : null;
+        if (plan) {
+          game.solution = plan;
+          save();
+          presentActionHint(plan[0], true);
+        } else if (result.status === "dead-end") {
+          announce("当前局面无法收齐，可撤销最近的移动，或重玩本局。");
+        } else {
+          const suggested = SpiderPlanner.nonRepeatingMoves(game, history.slice(-8), { depth: 2, breadth: 12, nodeLimit: 160 });
+          if (suggested.length) {
+            presentActionHint({ type: "move", ...suggested[hintCursor++ % suggested.length] }, false);
+          } else if (SpiderPlanner.dealNextRound(game)) {
+            presentActionHint({ type: "deal" }, false);
+          } else {
+            announce("暂未找到完整路线。你仍可自由移动，也可以撤销或重玩本局。");
+          }
+        }
+      }
+
+      function cancelPendingHint() {
+        hintVersion++;
+        if (cancelSearch) cancelSearch();
+        hintButton.textContent = "✦ 提示";
+        hintButton.disabled = game.completed === TARGET_RUNS;
       }
 
       function searchSolution(state) {
-        if (!window.Worker) return new Promise(resolve => {
-          setTimeout(() => resolve(SpiderPlanner.solve(state, { nodeLimit: 12000, timeLimitMs: 200 })), 0);
-        });
+        if (!window.Worker) return Promise.resolve({ status: "unknown", plan: [] });
         try {
           if (!solverWorker) {
             const workerSource = document.getElementById("spiderSolver").textContent + "\n" +
               document.getElementById("spiderRules").textContent + "\nself.onmessage = " + function(event) {
-                const { id, state } = event.data;
+                const { id, state, referenceState, referencePlan } = event.data;
                 try {
                   if (!SpiderPlanner.isValidState(state)) throw new Error("Invalid Spider position");
-                  const result = SpiderPlanner.solve(state, { nodeLimit: 60000, timeLimitMs: 2200, maxDepth: 400 });
+                  const result = SpiderPlanner.solve(state, { nodeLimit: 60000, timeLimitMs: 2200, maxDepth: 800, referenceState, referencePlan });
                   self.postMessage({ id, result });
                 } catch (_) { self.postMessage({ id, result: { status: "unknown", plan: [] } }); }
               }.toString() + ";";
@@ -1098,6 +1238,7 @@
             clearTimeout(timer);
             worker.onmessage = null;
             worker.onerror = null;
+            cancelSearch = null;
             resolve(result);
           };
           const stop = () => {
@@ -1105,43 +1246,29 @@
             if (solverWorker === worker) solverWorker = null;
             finish({ status: "unknown", plan: [] });
           };
+          cancelSearch = stop;
           const timer = setTimeout(stop, 3500);
           worker.onmessage = event => { if (event.data.id === id) finish(event.data.result); };
           worker.onerror = stop;
-          worker.postMessage({ id, state });
+          try {
+            worker.postMessage({ id, state, referenceState: game.initial, referencePlan: game.initial && game.initial.solution });
+          } catch (_) { stop(); }
         });
       }
 
-      async function performAction(action) {
-        if (checking) return;
+      function performAction(action) {
         const before = game;
         const next = action.type === "deal" ? SpiderPlanner.dealNextRound(before) : SpiderPlanner.applyMove(before, action);
         if (!next) return;
-        setChecking(true);
-        const first = before.solution[0];
+        const first = before.solution && before.solution[0];
         const follows = first && first.type === action.type && (action.type === "deal" ||
           (first.fromCol === action.fromCol && first.fromIndex === action.fromIndex && first.toCol === action.toCol));
-        try {
-          if (follows) next.solution = before.solution.slice(1);
-          else {
-            announce("正在确认这一步之后的完整收牌路线…");
-            const result = await searchSolution(next);
-            const proof = result.status === "solved" ? SpiderPlanner.replayPlan(next, result.plan) : null;
-            if (!proof || proof.completed !== TARGET_RUNS || proof.stock.length || proof.cols.some(col => col.length)) {
-              announce(result.status === "dead-end"
-                ? "这一步会让牌局无法收完，牌已留在原位。可换一个目标列或点提示。"
-                : "暂未确认这一步之后能收完，牌已留在原位。可换一个目标列或点提示。");
-              return;
-            }
-            next.solution = result.plan;
-          }
-          snapshot();
-          const collected = next.completed - before.completed;
-          game = { ...next, moves: before.moves + 1, startedAt: before.startedAt, finishedAt: null };
-          afterAction(action.type === "deal" ? "最后一轮底牌已发出。" : "已移动 " + action.count + " 张牌。", collected);
-        } catch (_) {
-          announce("暂未确认收牌路线，牌已留在原位。可换一个目标列或点提示。");
-        } finally { setChecking(false); }
+        next.solution = follows ? before.solution.slice(1) : null;
+        snapshot();
+        cancelPendingHint();
+        const collected = next.completed - before.completed;
+        game = { ...next, moves: before.moves + 1, startedAt: before.startedAt, finishedAt: null, initial: before.initial };
+        afterAction(action.type === "deal" ? "最后一轮底牌已发出。" : "已移动 " + action.count + " 张牌。", collected);
       }
       function clearCelebration() {
         clearTimeout(celebrationTimer);
@@ -1201,13 +1328,13 @@
         render();
       }
       function moveCards(fromCol, fromIndex, toCol) {
-        if (checking || game.completed === TARGET_RUNS || !canMove(fromCol, fromIndex, toCol)) return false;
+        if (game.completed === TARGET_RUNS || !canMove(fromCol, fromIndex, toCol)) return false;
         const count = game.cols[fromCol].length - fromIndex;
         void performAction({ type: "move", fromCol, fromIndex, toCol, count });
         return true;
       }
       function deal() {
-        if (checking || game.completed === TARGET_RUNS) return;
+        if (game.completed === TARGET_RUNS) return;
         if (!game.stock.length) { announce("底牌已发完，试着整理明牌。"); return; }
         if (game.cols.some(col => !col.length)) {
           announce("先填满所有空列，才能从底牌发下一轮。");
@@ -1217,17 +1344,17 @@
         void performAction({ type: "deal" });
       }
       function undo() {
-        if (checking) return;
         clearHint();
         clearCelebration();
         hintCursor = 0;
         const previous = history.pop();
         if (!previous) { announce("没有可撤销的步骤。"); return; }
+        cancelPendingHint();
         game.cols = previous.cols;
         game.stock = previous.stock;
         game.completed = previous.completed;
         game.moves = previous.moves;
-        game.solution = previous.solution;
+        game.solution = verifiedSolution(previous, previous.solution);
         game.finishedAt = null;
         selected = null;
         save();
@@ -1235,18 +1362,34 @@
         announce("已撤销上一步。");
       }
       function startNew(force) {
-        if (checking) return;
         if (!force && game && game.moves > 0 && game.completed < TARGET_RUNS &&
             !window.confirm("开始新游戏会清除当前进度，确定吗？")) return;
         clearHint();
         clearCelebration();
         hintCursor = 0;
+        cancelPendingHint();
         game = freshGame();
         history = [];
         selected = null;
         save();
         render();
         announce("新游戏开始。点选一张牌，再点目标列；也可以拖拽。");
+      }
+
+      function restartGame() {
+        if (!game.initial) return;
+        if (game.moves > 0 && !window.confirm("重玩会回到本局最初的牌面，确定吗？")) return;
+        clearHint();
+        clearCelebration();
+        cancelPendingHint();
+        const initial = copyPosition(game.initial);
+        game = { ...copyPosition(initial), initial, startedAt: Date.now(), finishedAt: null };
+        history = [];
+        selected = null;
+        hintCursor = 0;
+        save();
+        render();
+        announce("已恢复本局最初的牌面，可以尝试其他走法。");
       }
 
       function columnHeight(col) {
@@ -1318,6 +1461,7 @@
         dealButton.disabled = !game.stock.length || game.completed === TARGET_RUNS;
         undoButton.disabled = !history.length;
         hintButton.disabled = game.completed === TARGET_RUNS;
+        document.getElementById("restartButton").disabled = !game.initial;
         document.getElementById("completeTrack").innerHTML = Array.from({ length: TARGET_RUNS }, (_, i) =>
           '<span class="complete-slot' + (i < game.completed ? ' done' : '') + '" aria-label="第 ' + (i + 1) + ' 组' + (i < game.completed ? '已完成' : '未完成') + '">♠</span>'
         ).join("");
@@ -1430,7 +1574,6 @@
       }
 
       board.addEventListener("click", event => {
-        if (checking) return;
         if (performance.now() < ignoreClickUntil) {
           event.preventDefault();
           event.stopPropagation();
@@ -1450,6 +1593,7 @@
           if (moveCards(selected.col, selected.index, colIndex)) return;
         }
         if (index >= 0 && pickable(colIndex, index)) {
+          cancelPendingHint();
           clearHint();
           selected = { col: colIndex, index };
           renderBoard();
@@ -1471,13 +1615,15 @@
         }
       });
       board.addEventListener("pointerdown", event => {
-        if (checking || (event.pointerType === "mouse" && event.button !== 0) || dragState) return;
+        if ((event.pointerType === "mouse" && event.button !== 0) || dragState) return;
         const card = event.target.closest(".card.face-up");
         const column = card && card.closest(".column");
         if (!card || !column || game.completed === TARGET_RUNS) return;
         const col = Number(column.dataset.col);
         const index = Number(card.dataset.index);
         if (!pickable(col, index)) return;
+        cancelPendingHint();
+        clearHint();
         dragState = {
           pointerId: event.pointerId,
           pointerType: event.pointerType,
@@ -1532,6 +1678,7 @@
       dealButton.addEventListener("click", deal);
       hintButton.addEventListener("click", showHint);
       undoButton.addEventListener("click", undo);
+      document.getElementById("restartButton").addEventListener("click", restartGame);
       document.getElementById("newButton").addEventListener("click", () => startNew(false));
       document.getElementById("winNewButton").addEventListener("click", () => startNew(true));
       document.getElementById("winCloseButton").addEventListener("click", () => { winCover.hidden = true; });
