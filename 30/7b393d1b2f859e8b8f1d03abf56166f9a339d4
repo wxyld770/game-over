@@ -1,0 +1,24 @@
+test/spider.test.js
+  s_168e1bfdeccdef::t_3b5fd6f1092ede 146-148
+  s_168e1bfdeccdef::t_859ee1eac79e5a 167-169,180-181,184,201-203,211-212
+public/games/spider.html
+  s_168e1bfdeccdef::t_1d4f5c55cc7b88 783,1057-1059
+  s_168e1bfdeccdef::t_7c34b371f96c39 285,695-697,709,717,769-770,772-773
+  s_168e1bfdeccdef::t_149d241ed0193e 376,411-414,501-513
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "307b393d1b2f859e8b8f1d03abf56166f9a339d4",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
