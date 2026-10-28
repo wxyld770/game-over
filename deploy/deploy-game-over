@@ -43,11 +43,11 @@ bundle, destination = sys.argv[1:]
 allowed = {
     'server.js', 'doudizhu-server.js', 'jump-leaderboard.js', 'match3-leaderboard.js',
     'jump-redis-store.js', 'package.json', 'package-lock.json',
-    'public/app.js', 'public/jump-rules.js', 'public/match3-rules.js', 'public/favicon.svg', 'public/index.html',
+    'public/app.js', 'public/jump-rules.js', 'public/match3-rules.js', 'public/emberwild-rules.js', 'public/favicon.svg', 'public/index.html',
     'public/styles.css', 'public/hub.html',
     'public/games/doudizhu.html', 'public/games/sudoku.html',
     'public/games/minesweeper.html', 'public/games/spider.html',
-    'public/games/jump.html', 'public/games/match3.html',
+    'public/games/jump.html', 'public/games/match3.html', 'public/games/emberwild.html',
 }
 with tarfile.open(bundle, 'r:gz') as archive:
     members = archive.getmembers()
@@ -77,6 +77,7 @@ PY
   "${node_bin}/node" --check "${staging}/public/app.js"
   "${node_bin}/node" --check "${staging}/public/jump-rules.js"
   "${node_bin}/node" --check "${staging}/public/match3-rules.js"
+  "${node_bin}/node" --check "${staging}/public/emberwild-rules.js"
 
   [[ -x "${node_bin}/npm" && -x /usr/sbin/runuser && -x /usr/bin/timeout ]] || {
     echo 'The Node/npm toolchain or restricted install runtime is missing.' >&2
@@ -106,7 +107,7 @@ PY
 fi
 
 same_contents=true
-for file in server.js doudizhu-server.js jump-leaderboard.js match3-leaderboard.js jump-redis-store.js package.json package-lock.json public/app.js public/jump-rules.js public/match3-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html; do
+for file in server.js doudizhu-server.js jump-leaderboard.js match3-leaderboard.js jump-redis-store.js package.json package-lock.json public/app.js public/jump-rules.js public/match3-rules.js public/emberwild-rules.js public/favicon.svg public/index.html public/styles.css public/hub.html public/games/doudizhu.html public/games/sudoku.html public/games/minesweeper.html public/games/spider.html public/games/jump.html public/games/match3.html public/games/emberwild.html; do
   if ! cmp -s -- "${previous}/${file}" "${release}/${file}"; then
     same_contents=false
     break

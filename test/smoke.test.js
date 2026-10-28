@@ -88,11 +88,14 @@ test('HTTP smoke: health, homepage, room creation, joining, capacity', { timeout
   const homeHtml = await homepage.text();
   assert.match(homeHtml, /<title>GAME OVER · 小游戏大厅<\/title>/);
   assert.match(homeHtml, /<meta property="og:url" content="https:\/\/game\.5iyeji\.xyz\/" \/>/);
-  for (const slug of ['blackjack', 'sudoku', 'minesweeper', 'spider', 'jump', 'match3', 'doudizhu']) {
+  for (const slug of ['emberwild', 'blackjack', 'sudoku', 'minesweeper', 'spider', 'jump', 'match3', 'doudizhu']) {
     const response = await fetch(`${baseUrl}/${slug}`);
     assert.equal(response.status, 200, `${slug} should open from the game hub`);
     assert.match(await response.text(), /<html lang="zh-CN">/);
   }
+  const emberRules = await fetch(`${baseUrl}/emberwild-rules.js`);
+  assert.equal(emberRules.status, 200, 'the camp adventure must load its game rules');
+  assert.match(emberRules.headers.get('content-type'), /javascript/);
 
   const create = await postJson(`${baseUrl}/api/rooms`, { name: 'Host' });
   assert.equal(create.status, 201);

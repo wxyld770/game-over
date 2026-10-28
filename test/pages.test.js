@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..', 'public');
 const pages = [
   'hub.html',
+  'games/emberwild.html',
   'games/doudizhu.html',
   'games/sudoku.html',
   'games/minesweeper.html',

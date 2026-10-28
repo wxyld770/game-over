@@ -842,6 +842,7 @@ function leaveRoom(room, player) {
 async function serveStatic(req, res, pathname, searchParams) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res, 405, '请求方式不支持');
   const gamePages = {
+    '/emberwild': '/games/emberwild.html',
     '/blackjack': '/index.html',
     '/sudoku': '/games/sudoku.html',
     '/minesweeper': '/games/minesweeper.html',

@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0b1718" />
-  <meta name="description" content="GAME OVER 小游戏大厅：联机牌局、益智、纸牌、反应与消除游戏，七款游戏打开网页直接玩。" />
+  <meta name="description" content="GAME OVER 小游戏大厅：余烬营地打怪经营、联机牌局、益智、纸牌与消除游戏，八款游戏打开网页直接玩。" />
   <link rel="canonical" href="https://game.5iyeji.xyz/" />
   <meta property="og:type" content="website" />
   <meta property="og:locale" content="zh_CN" />
-  <meta property="og:title" content="GAME OVER · 七款小游戏，打开就玩" />
-  <meta property="og:description" content="和朋友同桌，或一个人闯关。牌类、益智、反应、消除游戏都在这里。" />
+  <meta property="og:title" content="GAME OVER · 八款小游戏，打开就玩" />
+  <meta property="og:description" content="新游戏余烬营地：出征打怪、建设家园、挑战首领。还有联机牌局和单人益智游戏。" />
   <meta property="og:url" content="https://game.5iyeji.xyz/" />
   <title>GAME OVER · 小游戏大厅</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -39,7 +39,7 @@
     .button-secondary { color: #f3d18f; background: rgba(233,191,114,.08); }
     .hero-art { position: relative; display: grid; place-items: center; min-height: 290px; border: 1px solid rgba(241,212,155,.21); border-radius: 30px; background: radial-gradient(circle at 50% 40%, #176a50, #0c3f34 62%, #082a27); box-shadow: 0 28px 65px rgba(0,0,0,.24), inset 0 0 0 9px rgba(220,172,91,.08); overflow: hidden; }
     .hero-art::before { content: ""; position: absolute; width: 260px; height: 260px; border: 1px solid rgba(239,216,164,.3); border-radius: 50%; }
-    .hero-art::after { content: "SEVEN GAMES · ONE PLACE"; position: absolute; bottom: 25px; color: rgba(242,218,167,.74); font-size: .63rem; letter-spacing: .2em; }
+    .hero-art::after { content: "EIGHT GAMES · ONE PLACE"; position: absolute; bottom: 25px; color: rgba(242,218,167,.74); font-size: .63rem; letter-spacing: .2em; }
     .art-grid { position: relative; display: grid; grid-template-columns: repeat(3, clamp(56px, 5.5vw, 72px)); gap: 10px; transform: rotate(-7deg); }
     .art-icon { display: grid; place-items: center; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.45); border-radius: 16px; color: #123a32; background: #f5e7bb; box-shadow: 0 10px 20px rgba(0,0,0,.28); font-size: clamp(1.7rem, 3.2vw, 2.5rem); font-weight: 900; animation: icon-rise 3.5s ease-in-out infinite; }
     .art-icon:nth-child(2), .art-icon:nth-child(5) { color: #fff4dd; background: #bb594e; animation-delay: -.6s; }
@@ -58,6 +58,12 @@
     @keyframes card-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
     .game-card::after { content: attr(data-symbol); position: absolute; right: 15px; top: 9px; color: rgba(247,225,175,.1); font-size: 6.5rem; font-weight: 800; line-height: 1; pointer-events: none; }
     .game-card.featured { border-color: rgba(233,191,114,.48); background: linear-gradient(145deg, #245c48, #102f29); }
+    .game-card.camp { border-color: rgba(246,178,85,.7); background: radial-gradient(ellipse at 100% 0, rgba(247,139,55,.23), transparent 66%), linear-gradient(145deg, #493724, #1b3025); box-shadow: inset 0 1px 0 rgba(255,218,155,.1); }
+    .game-card.camp::after { color: rgba(255,188,99,.21); }
+    .game-card.camp .pill { color: #ffdc9d; border-color: rgba(255,192,99,.5); background: rgba(241,160,59,.15); }
+    .game-card.camp h3 { color: #ffe5b5; }
+    .game-card.camp p { color: #e0d3b8; }
+    .game-card.camp .play { color: #ffcd80; }
     .pill { align-self: start; padding: 5px 9px; border: 1px solid rgba(238,207,151,.33); border-radius: 99px; color: #f0d099; background: rgba(233,191,114,.09); font-size: .69rem; font-weight: 700; }
     .game-card h3 { position: relative; margin: 19px 0 6px; font-size: 1.55rem; letter-spacing: -.03em; }
     .game-card p { position: relative; flex: 1; margin: 0; max-width: 260px; color: #c0d2c3; font-size: .86rem; line-height: 1.7; }
@@ -73,10 +79,11 @@
     <header><a class="brand" href="/" aria-label="回到小游戏大厅"><span class="brand-mark">GO</span><span>GAME OVER · 小游戏大厅</span></a><span class="header-note">选一个游戏，马上开玩</span></header>
     <main>
       <section class="hero" aria-labelledby="heroTitle">
-        <div><span class="eyebrow">SEVEN GAMES · ONE PLACE</span><h1 id="heroTitle">打开就玩，<br /><em>总有一款合拍。</em></h1><p>和朋友同桌竞技，或一个人解谜、闯关、放松。牌类、益智、反应、消除游戏都在这里，选一款直接开始。</p><div class="hero-actions"><a class="button button-primary" href="#games">挑个游戏，开始玩 ↓</a><a id="resumeBlackjack" class="button button-secondary" href="/blackjack" hidden>回到上次牌桌 →</a></div></div>
-        <div class="hero-art" aria-hidden="true"><div class="art-grid"><span class="art-icon">♠</span><span class="art-icon">◆</span><span class="art-icon">9</span><span class="art-icon">✹</span><span class="art-icon">↗</span><span class="art-icon">♣</span></div></div>
+        <div><span class="eyebrow">EIGHT GAMES · ONE PLACE</span><h1 id="heroTitle">打开就玩，<br /><em>总有一款合拍。</em></h1><p>从一簇篝火开始，打怪寻宝，把小营地建成冒险家园。也可以和朋友同桌竞技，或一个人解谜、闯关、放松。</p><div class="hero-actions"><a class="button button-primary" href="/emberwild">新游戏 · 进入余烬营地 →</a><a class="button button-secondary" href="#games">浏览全部游戏 ↓</a><a id="resumeBlackjack" class="button button-secondary" href="/blackjack" hidden>回到上次牌桌 →</a></div></div>
+        <div class="hero-art" aria-hidden="true"><div class="art-grid"><span class="art-icon">♠</span><span class="art-icon">✦</span><span class="art-icon">9</span><span class="art-icon">✹</span><span class="art-icon">↗</span><span class="art-icon">♣</span></div></div>
       </section>
-      <section id="games" aria-labelledby="gamesTitle"><div class="section-heading"><div><span class="eyebrow">PICK A GAME</span><h2 id="gamesTitle">游戏菜单</h2></div><p>两款支持联机，五款适合独自挑战。</p></div><div class="games">
+      <section id="games" aria-labelledby="gamesTitle"><div class="section-heading"><div><span class="eyebrow">PICK A GAME</span><h2 id="gamesTitle">游戏菜单</h2></div><p>两款支持联机，六款适合独自挑战。</p></div><div class="games">
+        <a class="game-card featured camp" href="/emberwild" data-symbol="✦"><span class="pill">成长经营 · 新游戏</span><h3>余烬营地</h3><p>出征打怪获得资源，建设营地、升级装备，挑战森林深处的首领。</p><span class="play">点燃篝火，启程 →</span></a>
         <a class="game-card featured" href="/blackjack" data-symbol="♠"><span class="pill">朋友联机 · 1–6 人</span><h3>21 点</h3><p>创建私人房间，下注、要牌、冲击目标筹码。</p><span class="play">开一桌 →</span></a>
         <a class="game-card featured" href="/doudizhu" data-symbol="♣"><span class="pill">单机或三人联机</span><h3>斗地主</h3><p>叫分抢地主，和电脑较量，或约两位朋友同桌。</p><span class="play">开始斗地主 →</span></a>
         <a class="game-card" href="/sudoku" data-symbol="9"><span class="pill">单人益智</span><h3>数独</h3><p>三档难度，笔记、提示和撤销陪你解开九宫格。</p><span class="play">开始解题 →</span></a>
