@@ -143,7 +143,9 @@ test('randomized eight-run deals conserve every card and replay a complete winni
   let hiddenAces = 0;
   let revealedAces = 0;
 
-  for (let seed = 1; seed <= 30; seed++) {
+  // Seed 1415 needs more than the former 100-attempt generation budget.
+  const seeds = [...Array.from({ length: 30 }, (_, index) => index + 1), 1415];
+  for (const seed of seeds) {
     const generated = planner.createSolvableDeal(seededRandom(seed));
     let state = generated.state;
     const initialSnapshot = JSON.stringify(state);
@@ -162,7 +164,9 @@ test('randomized eight-run deals conserve every card and replay a complete winni
       .filter((card, index) => col[index].r === card.r + 1).length, 0);
     assert.ok(descendingPairs <= adjacentPairs / 2,
       `seed ${seed} must contain genuinely mixed columns, rather than reordered complete descending runs`);
-    assert.ok(state.cols.flat().filter(card => !card.up).length >= 20, `seed ${seed} should retain enough cards to uncover`);
+    assert.equal(state.cols.flat().filter(card => !card.up).length, 84, `seed ${seed} should leave 84 cards to uncover`);
+    assert.ok(state.cols.every(col => col.filter(card => card.up).length === 1),
+      `seed ${seed} should initially show only the top card of each column`);
     assert.ok(state.cols.flat().some(card => card.r === 1 && card.up), `seed ${seed} should not hide every Ace`);
     assert.equal(state.cols.every(col => col.length > 0 && col.at(-1).up), true);
     assert.equal(planner.isValidState(state), true);
@@ -173,8 +177,11 @@ test('randomized eight-run deals conserve every card and replay a complete winni
       `seed ${seed} choices should involve different ranks`);
     assert.equal(generated.plan.filter(action => action.type === 'deal').length, 1);
     hiddenAces += state.cols.flat().filter(card => card.r === 1 && !card.up).length;
+    let revealedCards = 0;
+    let revealingMoves = 0;
 
     for (const action of generated.plan) {
+      const hiddenBefore = state.cols.flat().filter(card => !card.up).length;
       const acesBefore = state.cols.flat().filter(card => card.r === 1 && !card.up).length;
       if (action.type === 'deal') {
         assert.deepEqual(Array.from(planner.planDeal(state)), Array.from(state.stock.slice(-10)).reverse(),
@@ -191,6 +198,9 @@ test('randomized eight-run deals conserve every card and replay a complete winni
       }
       const acesAfter = state.cols.flat().filter(card => card.r === 1 && !card.up).length;
       revealedAces += Math.max(0, acesBefore - acesAfter);
+      const exposed = hiddenBefore - state.cols.flat().filter(card => !card.up).length;
+      revealedCards += exposed;
+      if (exposed > 0) revealingMoves++;
       assert.equal(planner.isValidState(state), true, `seed ${seed} must conserve cards after every action`);
       assert.deepEqual(rankCounts(state), Array(13).fill(8));
       assert.equal(state.cols.every(col => !col.length || col.at(-1).up), true,
@@ -198,6 +208,8 @@ test('randomized eight-run deals conserve every card and replay a complete winni
     }
 
     assert.equal(state.completed, 8, `seed ${seed} should collect all eight runs`);
+    assert.equal(revealedCards, 84, `seed ${seed} must turn over every initially hidden card`);
+    assert.ok(revealingMoves >= 60, `seed ${seed} should offer repeated reveals throughout the game`);
     assert.equal(state.stock.length, 0);
     assert.ok(state.cols.every(col => col.length === 0));
     const replayed = planner.replayPlan(generated.state, generated.plan);

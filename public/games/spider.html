@@ -282,7 +282,7 @@
           <section class="side-panel">
             <h2>玩法规则</h2>
             <ol class="rules">
-              <li>牌面固定为 <strong>104 张</strong>：每个点数各 8 张；十列起始牌 <strong>94 张</strong>，底牌 <strong>10 张</strong>，只能发 <strong>1 轮</strong>。</li>
+              <li>牌面固定为 <strong>104 张</strong>：每个点数各 8 张；十列起始牌 <strong>94 张</strong>，每列只亮最上面 <strong>1 张</strong>，其余逐步翻开。底牌 <strong>10 张</strong>，只能发 <strong>1 轮</strong>。</li>
               <li>可移动一张明牌，或一整段连续的 <strong>降序明牌</strong>；目标列顶牌须比移动牌的第一张大 1，空列可放任意可移动牌段。</li>
               <li>移走盖在暗牌上的牌后，暗牌自动翻开；所有牌的点数在开局时已经固定。</li>
               <li>列顶凑齐 <strong>K、Q、J … 2、A</strong>，整组自动移出。收完八组即获胜。</li>
@@ -373,6 +373,7 @@
       let found = null;
       const forbidden = new Set(Array.isArray(settings.forbiddenKeys) ? settings.forbiddenKeys : []);
       const referencePositions = new Map();
+      const referenceColumns = [];
 
       function isSolved(current) {
         return current.completed >= targetRuns && !current.stock.length && current.cols.every(function (col) { return !col.length; });
@@ -407,7 +408,10 @@
             positions.push({ state: current, offset: offset + 1 });
           }
           if (!cutoff && positions.length === settings.referencePlan.length + 1 && isSolved(current)) {
-            for (const position of positions) referencePositions.set(canonicalKey(position.state), position);
+            for (const position of positions) {
+              referencePositions.set(canonicalKey(position.state), position);
+              referenceColumns.push(new Set(columnKeys(position.state)));
+            }
           }
         } catch (_) { referencePositions.clear(); }
       }
@@ -494,7 +498,19 @@
           const source = action.type === "move" ? current.cols[action.fromCol] : null;
           const target = action.type === "move" ? current.cols[action.toCol] : null;
           const movesWholeColumn = source && action.fromIndex === 0;
-          const score = completed * 100000 + reveals * 5000 +
+          // Hidden deals create more branches. Prefer positions close to a
+          // verified route, while still replaying every action before claiming
+          // a solution. Column signatures include the fixed future stock.
+          let referenceMatches = 0;
+          if (referenceColumns.length) {
+            const signatures = columnKeys(next);
+            for (const columns of referenceColumns) {
+              let matches = 0;
+              for (const signature of signatures) if (columns.has(signature)) matches++;
+              referenceMatches = Math.max(referenceMatches, matches);
+            }
+          }
+          const score = referenceMatches * 1000000 + completed * 100000 + reveals * 5000 +
             (after.ordered - before.ordered) * 120 + (before.segments - after.segments) * 150 +
             (after.empty - before.empty) * 90 +
             (action.type === "deal" ? 2000 : 0) +
@@ -676,8 +692,9 @@
       const cols = Array.from({ length: COLUMN_COUNT }, () => []);
       const backwards = [];
       const capacities = randomize([11, 11, 11, 11, 10, 10, 10, 10, 10, 10]);
-      // Restore each collected run, then scatter small tails across other columns.
-      // Reversing these moves rebuilds the run using ordinary Spider moves.
+      // Scatter each restored run one card at a time, leaving only its King.
+      // The reverse route then exposes buried cards individually before moving
+      // them, so the initial deal only needs one face-up card per column.
       for (let group = 0; group < TARGET_RUNS; group++) {
         let donors = cols.map((col, index) => col.length < capacities[index] ? index : -1).filter(index => index >= 0);
         if (group === TARGET_RUNS - 1) {
@@ -689,8 +706,7 @@
         }
         const donor = donors[draw(donors.length)];
         const base = cols[donor].length;
-        const room = capacities[donor] - base;
-        const keep = group === TARGET_RUNS - 1 ? room : Math.min(room, 1 + draw(3));
+        const keep = 1;
         cols[donor].push(...Array.from({ length: 13 }, (_, index) => ({ r: 13 - index, up: true })));
         let remaining = 13;
         while (remaining > keep) {
@@ -698,8 +714,7 @@
             .filter(index => index >= 0);
           if (!receivers.length) return null;
           const receiver = receivers[draw(receivers.length)];
-          const count = Math.min(remaining - keep, capacities[receiver] - cols[receiver].length,
-            draw(10) < 7 ? 1 : 2 + draw(2));
+          const count = 1;
           const fromIndex = cols[receiver].length;
           cols[receiver].push(...cols[donor].splice(base + remaining - count));
           remaining -= count;
@@ -751,52 +766,11 @@
       const state = { cols, stock: round.reverse(), completed: 0 };
       if (!isValidState(state)) return null;
 
-      // Find which original cards the proof exposes individually. A card moved
-      // inside a larger stack before exposure must remain face up at the start.
-      const maximumHidden = cols.map(col => col.length - 1);
-      const seen = new Set();
-      const probe = cols.map((col, colIndex) => col.map((card, index) => ({ r: card.r, origin: colIndex, index })));
-      const stock = state.stock.slice();
-      const expose = col => {
-        const card = col[col.length - 1];
-        if (card && card.origin !== undefined) seen.add(card.origin + ":" + card.index);
-      };
-      probe.forEach(expose);
-      for (const action of plan) {
-        if (action.type === "deal") {
-          if (probe.some(col => !col.length)) return null;
-          for (const col of probe) col.push({ r: stock.pop() });
-        } else {
-          const source = probe[action.fromCol];
-          const moved = source.splice(action.fromIndex);
-          for (const card of moved) {
-            if (card.origin !== undefined && !seen.has(card.origin + ":" + card.index)) {
-              maximumHidden[card.origin] = Math.min(maximumHidden[card.origin], card.index);
-            }
-          }
-          probe[action.toCol].push(...moved);
-          expose(source);
-        }
-        for (const col of probe) {
-          while (fullRun(col)) {
-            for (const card of col.slice(-13)) {
-              if (card.origin !== undefined && !seen.has(card.origin + ":" + card.index)) {
-                maximumHidden[card.origin] = Math.min(maximumHidden[card.origin], card.index);
-              }
-            }
-            col.splice(-13);
-            expose(col);
-          }
-        }
-      }
-      cols.forEach((col, index) => {
-        const maximum = maximumHidden[index];
-        const hidden = maximum ? Math.max(1, maximum - draw(Math.min(maximum, 3))) : 0;
-        col.forEach((card, cardIndex) => { card.up = cardIndex >= hidden; });
-      });
-      if (cols.flat().filter(card => !card.up).length < 20 ||
-          cols.filter(col => col.some(card => card.r === 1)).length < 3 ||
+      cols.forEach(col => col.forEach((card, index) => { card.up = index === col.length - 1; }));
+      if (cols.filter(col => col.some(card => card.r === 1)).length < 3 ||
           !cols.some(col => col.some(card => card.r === 1 && card.up))) return null;
+      // Replay with the actual hidden cards, rejecting any route that would
+      // move a buried card before it has been uncovered.
       const proof = replayPlan(state, plan);
       if (!proof || proof.completed !== TARGET_RUNS || proof.stock.length || proof.cols.some(col => col.length)) return null;
       const moves = legalMoves(state);
@@ -806,7 +780,7 @@
       return { state, plan };
     }
 
-    for (let trial = 0; trial < 100; trial++) {
+    for (let trial = 0; trial < 512; trial++) {
       const generated = attempt();
       if (generated) return generated;
     }
@@ -1080,6 +1054,9 @@
           if (!saved || !cardCountsAreValid(saved.game) ||
               !Number.isFinite(saved.game.startedAt) ||
               (saved.game.finishedAt !== null && !Number.isFinite(saved.game.finishedAt))) return false;
+          // Refresh an untouched old layout; keep every game already in play.
+          if (saved.game.moves === 0 && saved.game.completed === 0 &&
+              saved.game.cols.some(col => col.filter(card => card.up).length !== 1)) return false;
           game = saved.game;
           game.solution = verifiedSolution(game, game.solution);
           if (!game.initial || !cardCountsAreValid(game.initial) || game.initial.completed !== 0 ||
