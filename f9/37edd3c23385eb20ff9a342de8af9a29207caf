@@ -1,0 +1,48 @@
+test/emberwild.test.js
+  s_168e1bfdeccdef::t_c4d5fe9f445568 1-182
+  s_168e1bfdeccdef::t_a142a183bc4e89 220-252
+  s_168e1bfdeccdef::t_4355ab30d92093 183-219
+public/games/emberwild.html
+  s_168e1bfdeccdef::t_2bce960013b04b 224-225
+  s_168e1bfdeccdef::t_4559021a142fe7 1-12,14-17,19-34,36-54,58-97,99-104,106-124,126-136,139-145,147-165,167-215,217-223,226-231,233,235-252
+  s_168e1bfdeccdef::t_ec375c972f75b5 13,55-57,105,138,146,216
+  s_168e1bfdeccdef::t_00dfec13514c10 18,35,166,232
+.github/workflows/ci.yml
+  s_168e1bfdeccdef::t_03c3834229560b 199-204
+  s_168e1bfdeccdef::t_e9137af77aa90d 54,74,76
+deploy/deploy-game-over
+  s_168e1bfdeccdef::t_03c3834229560b 46,50,80,110
+public/emberwild-rules.js
+  s_168e1bfdeccdef::t_349486e72789e1 1-33,35-40,47-173,240-294,296-439,441-443,446-458,460
+  s_168e1bfdeccdef::t_17783e7208d5fb 41-46,174-230,236-239,459
+  s_168e1bfdeccdef::t_c4d5fe9f445568 295
+  s_168e1bfdeccdef::t_4355ab30d92093 231-235
+  s_168e1bfdeccdef::t_a142a183bc4e89 34,440,444-445
+test/pages.test.js
+  s_168e1bfdeccdef::t_e9137af77aa90d 10
+public/hub.html
+  s_168e1bfdeccdef::t_15306c21590c42 7,11-12,42,61-66,82-83,85-86
+README.md
+  s_168e1bfdeccdef::t_e9137af77aa90d 3,7,14,79
+  s_168e1bfdeccdef::t_03c3834229560b 101
+test/smoke.test.js
+  s_168e1bfdeccdef::t_e9137af77aa90d 91,96-98
+server.js
+  s_168e1bfdeccdef::t_e9137af77aa90d 845
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f937edd3c23385eb20ff9a342de8af9a29207caf",
+  "prompts": {},
+  "sessions": {
+    "s_168e1bfdeccdef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d33e-3803-7f62-a4fa-f04b856c340e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
